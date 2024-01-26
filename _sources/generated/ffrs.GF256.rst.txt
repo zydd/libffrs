@@ -1,0 +1,53 @@
+﻿ffrs.GF256
+==========
+
+
+.. currentmodule:: ffrs
+
+.. autoclass:: GF256
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__, __init__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~GF256.__init__
+      ~GF256.add
+      ~GF256.div
+      ~GF256.exp
+      ~GF256.inv
+      ~GF256.log
+      ~GF256.mul
+      ~GF256.mul8
+      ~GF256.poly_add
+      ~GF256.poly_divmod
+      ~GF256.poly_eval
+      ~GF256.poly_eval8
+      ~GF256.poly_mod
+      ~GF256.poly_mod_x_n
+      ~GF256.poly_mul
+      ~GF256.poly_sub
+      ~GF256.pow
+      ~GF256.sub
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~GF256.field_elements
+      ~GF256.poly1
+      ~GF256.power
+      ~GF256.prime
+      ~GF256.primitive
+   
+   

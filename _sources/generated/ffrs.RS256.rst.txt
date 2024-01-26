@@ -1,0 +1,36 @@
+﻿ffrs.RS256
+==========
+
+
+.. currentmodule:: ffrs
+
+.. autoclass:: RS256
+   :members:
+   :show-inheritance:
+   :inherited-members:
+   :special-members: __call__, __add__, __mul__, __init__
+
+   
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+      :nosignatures:
+   
+      ~RS256.__init__
+      ~RS256.decode
+      ~RS256.encode
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~RS256.ecc_len
+      ~RS256.generator
+      ~RS256.gf
+   
+   

@@ -1,0 +1,5 @@
+/build
+/docs/generated
+/pybind11
+__pycache__/
+.vscode/
