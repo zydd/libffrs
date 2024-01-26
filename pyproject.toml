@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ffrs"
+authors = [
+    {name = "Gabriel Machado", email = "gabriel_machado@live.com"},
+]
+description = "Fairly Fast & Flexible Reed-Solomon coding"
+readme = "README.rst"
+requires-python = ">=3.7"
+keywords = ["reed-solomon", "ecc", "error-correction", "data", "storage"]
+license = {text = "Apache-2.0"}
+classifiers = [
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Communications",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: System :: Archiving",
+    "Topic :: System :: Archiving :: Backup",
+    "Topic :: Utilities",
+]
+dependencies = [
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+docs = ["Sphinx>=7.2.0", "furo==2023.9.10"]
+
+# [project.scripts]
+# my-script = "ffrs.module:function"

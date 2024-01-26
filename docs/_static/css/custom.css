@@ -1,0 +1,7 @@
+/* expand content on sidebar */
+.toctree-checkbox~ul {
+    display:block;
+}
+.sidebar-tree label {
+    display: none;
+}

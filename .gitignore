@@ -1,0 +1,4 @@
+/build
+/docs/generated
+__pycache__/
+.vscode/
