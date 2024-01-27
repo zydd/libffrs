@@ -18,6 +18,9 @@
 
 #pragma once
 
+#include <cstdint>
+
+
 namespace ffrs {
 namespace detail {
 
@@ -124,17 +127,17 @@ private:
 };
 
 
-inline constexpr unsigned ilog2_floor(unsigned a) {
-    unsigned r = 0;
+inline constexpr size_t ilog2_floor(size_t a) {
+    size_t r = 0;
     while (a >>= 1)
         r += 1;
     return r;
 }
 
 
-inline constexpr unsigned ipow(unsigned a, unsigned b) {
-    unsigned r = 1;
-    for (unsigned i = 0; i < b; ++i)
+inline constexpr size_t ipow(size_t a, size_t b) {
+    size_t r = 1;
+    for (size_t i = 0; i < b; ++i)
         r *= a;
     return r;
 }

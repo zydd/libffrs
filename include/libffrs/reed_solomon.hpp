@@ -47,25 +47,26 @@ struct rs_generator {
     template<typename GF, typename RS>
     class type {
     public:
-        typename GF::GFT generator[MaxEccLen + 1] = {};
-        typename GF::GFT generator_roots[MaxEccLen] = {};
+        using GFT = typename GF::GFT;
+        GFT generator[MaxEccLen + 1] = {};
+        GFT generator_roots[MaxEccLen] = {};
 
     protected:
         inline void init() {
             auto rs = RS::cast(this);
 
-            auto temp = (typename GF::GFT *) alloca(rs.ecc_len + 1);
+            auto temp = (GFT *) alloca(rs.ecc_len + 1);
             std::fill_n(temp, rs.ecc_len + 1, 0x00);
 
             auto p1 = (rs.ecc_len & 1) ? &generator[0] : &temp[0];
             auto p2 = (rs.ecc_len & 1) ? &temp[0] : &generator[0];
 
-            unsigned len = 1;
+            size_t len = 1;
             p2[0] = 1;
 
-            for (unsigned i = 0; i < rs.ecc_len; ++i) {
+            for (GFT i = 0; i < rs.ecc_len; ++i) {
                 generator_roots[i] = rs.gf.exp(i);
-                typename GF::GFT factor[] = {1, rs.gf.sub(0, generator_roots[i])};
+                GFT factor[] = {1, rs.gf.sub(0, generator_roots[i])};
                 len = rs.gf.poly_mul(p2, len, factor, 2, p1);
 
                 auto t = p1;
@@ -89,7 +90,7 @@ struct rs_encode_basic {
         rs.gf.poly_mod(input_x_n, input_size + rs.ecc_len, rs.generator, rs.ecc_len + 1, output);
 
         if (rs.gf.prime != 2) {
-            for (unsigned i = 0; i < rs.ecc_len; ++i)
+            for (size_t i = 0; i < rs.ecc_len; ++i)
                 output[i] = rs.gf.sub(0, output[i]);
         }
     }
@@ -104,7 +105,7 @@ struct rs_encode_basic_v2 {
         rs.gf.poly_mod_x_n(input, input_size, &rs.generator[1], rs.ecc_len, output);
 
         if (rs.gf.prime != 2) {
-            for (unsigned i = 0; i < rs.ecc_len; ++i)
+            for (size_t i = 0; i < rs.ecc_len; ++i)
                 output[i] = rs.gf.sub(0, output[i]);
         }
     }
@@ -119,7 +120,7 @@ struct rs_encode_lut_pw2 {
         inline void encode(const uint8_t *input, size_t size, uint8_t *output) const {
             auto rs = RS::cast(this);
             std::fill_n(output, rs.ecc_len, 0x00);
-            for (unsigned i = 0; i < size; ++i) {
+            for (size_t i = 0; i < size; ++i) {
                 uint8_t pos = output[0] ^ input[i];
                 output[0] = 0;
                 std::rotate(output, output + 1, output + rs.ecc_len);
@@ -132,13 +133,13 @@ struct rs_encode_lut_pw2 {
     protected:
         inline void init() {
             auto rs = RS::cast(this);
-            for (unsigned i = 0; i < rs.gf.field_elements; ++i) {
+            for (size_t i = 0; i < rs.gf.field_elements; ++i) {
                 auto data = (uint8_t *) alloca(rs.ecc_len + 1);
                 std::fill_n(data, rs.ecc_len + 1, 0x00);
                 data[0] = uint8_t(i);
                 rs.gf.ex_synth_div(&data[0], rs.ecc_len + 1, &rs.generator[0], rs.ecc_len + 1);
 
-                for (unsigned j = 0; j < rs.ecc_len; ++j)
+                for (size_t j = 0; j < rs.ecc_len; ++j)
                     generator_lut[i][j] = data[j + 1];
             }
         }
@@ -158,7 +159,7 @@ struct rs_encode_slice_pw2 {
 
         inline void encode(const uint8_t *input, size_t size, uint8_t *output) {
             auto rs = RS::cast(this);
-            unsigned i = 0;
+            size_t i = 0;
             Word rem = 0;
 
             if constexpr (Stride > 1) {
@@ -166,12 +167,12 @@ struct rs_encode_slice_pw2 {
                     auto in = reinterpret_cast<const Word *>(&input[i]);
                     rem ^= *in++;
                     Word t = 0;
-                    for (unsigned j = 0; j < rs.ecc_len; ++j)
+                    for (size_t j = 0; j < rs.ecc_len; ++j)
                         t ^= generator_lut[Stride - j - 1][(rem >> (8 * j)) & 0xff];
 
-                    for (unsigned k = 1; k < Stride / rs.ecc_len; ++k) {
+                    for (size_t k = 1; k < Stride / rs.ecc_len; ++k) {
                         auto two = *in++;
-                        for (unsigned j = 0; j < rs.ecc_len; ++j)
+                        for (size_t j = 0; j < rs.ecc_len; ++j)
                             t ^= generator_lut[Stride - k * rs.ecc_len - j - 1][(two >> (8 * j)) & 0xff];
                     }
                     rem = t;
@@ -182,7 +183,7 @@ struct rs_encode_slice_pw2 {
                 rem = (rem >> 8) ^ generator_lut[0][(rem & 0xff) ^ input[i]];
 
             // endianess dependent
-            for (unsigned i = 0; i < rs.ecc_len; ++i)
+            for (size_t i = 0; i < rs.ecc_len; ++i)
                 output[i] = rem >> (8 * i);
         }
 
@@ -193,18 +194,18 @@ struct rs_encode_slice_pw2 {
             assert(rs.ecc_len == sizeof(Word));
             assert(Stride == 1 || Stride % rs.ecc_len == 0);
 
-            for (unsigned i = 0; i < rs.gf.field_elements; ++i) {
+            for (size_t i = 0; i < rs.gf.field_elements; ++i) {
                 uint8_t data[sizeof(Word) + 1] = {0};
                 data[0] = uint8_t(i);
                 rs.gf.ex_synth_div(&data[0], sizeof(Word) + 1, &rs.generator[0], sizeof(Word) + 1);
 
                 // endianess dependent
-                for (unsigned j = 0; j < sizeof(Word); ++j)
+                for (size_t j = 0; j < sizeof(Word); ++j)
                     generator_lut[0][i] |= Word(data[j + 1]) << j * 8;
             }
 
-            for (unsigned i = 0; i < rs.gf.field_elements; ++i) {
-                for (unsigned j = 1; j < Stride; ++j)
+            for (size_t i = 0; i < rs.gf.field_elements; ++i) {
+                for (size_t j = 1; j < Stride; ++j)
                     generator_lut[j][i] =
                             (generator_lut[j - 1][i] >> 8) ^
                             generator_lut[0][generator_lut[j - 1][i] % rs.gf.field_elements];
@@ -225,9 +226,9 @@ struct rs_synds_basic {
         using synds_array_t = typename GF::GFT[MaxFieldElements];
 
         template<typename S, typename T>
-        inline void synds(synds_array_t synds, S const& data, unsigned size, T const& rem) const {
+        inline void synds(synds_array_t synds, S const& data, size_t size, T const& rem) const {
             auto rs = RS::cast(this);
-            for (unsigned i = 0; i < rs.ecc_len; ++i) {
+            for (size_t i = 0; i < rs.ecc_len; ++i) {
                 auto t = rs.gf.poly_eval(data, size, rs.generator_roots[i]);
                 synds[rs.ecc_len - i - 1] = rs.gf.poly_eval(rem, rs.ecc_len, rs.generator_roots[i], t);
             }
@@ -241,23 +242,26 @@ struct rs_synds_lut_pw2 {
     template<typename GF, typename RS>
     class type {
     public:
-        static constexpr auto max_ecc_w = (MaxEccLen / sizeof(Word)) + !!(MaxEccLen % sizeof(Word));
-        static constexpr auto synds_size = max_ecc_w * sizeof(Word);
+        static constexpr size_t max_ecc_w = (MaxEccLen / sizeof(Word)) + !!(MaxEccLen % sizeof(Word));
+        static constexpr size_t synds_size = max_ecc_w * sizeof(Word);
         using synds_array_t /* alignas(sizeof(Word)) */ = uint8_t[synds_size];
 
-        inline void synds(uint8_t synds[], const uint8_t *data, unsigned size, const uint8_t *rem) {
+        inline void synds(uint8_t synds[], const uint8_t *data, size_t size, const uint8_t *rem) {
             auto rs = RS::cast(this);
             auto synds_w = reinterpret_cast<Word *>(synds);
             for (size_t i = 0; i < ecc_w; ++i) {
                 auto t = rs.gf.poly_eval_wide(data, size, generator_roots_wide[i]);
-                synds_w[i] = rs.gf.poly_eval_wide(rem, rs.ecc_len, generator_roots_wide[i], t);
+
+                static_assert(sizeof(typename GF::wide_mul_word_t) >= sizeof(Word));
+
+                synds_w[i] = Word(rs.gf.poly_eval_wide(rem, rs.ecc_len, generator_roots_wide[i], t));
             }
         }
 
     protected:
         inline void init() {
             auto rs = RS::cast(this);
-            for (unsigned i = 0; i < rs.ecc_len; ++i) {
+            for (auto i = 0; i < rs.ecc_len; ++i) {
                 // reverse-order syndromes, endianess dependent
                 generator_roots_wide[i / sizeof(Word)] |= Word(rs.gf.exp(rs.ecc_len - i - 1)) << (i % sizeof(Word)) * 8;
             }
@@ -277,13 +281,14 @@ class rs_roots_eval_basic {
 public:
     using GFT = typename GF::GFT;
 
-    inline unsigned roots(
-            const GFT poly[], unsigned poly_size,
-            GFT roots[], unsigned size) const {
+    inline size_t roots(
+            const GFT poly[], const size_t poly_size,
+            const size_t max_search_pos,
+            GFT roots[]) const {
         auto rs = RS::cast(this);
-        unsigned count = 0;
+        size_t count = 0;
 
-        for (unsigned i = 0; i < size; ++i) {
+        for (size_t i = 0; i < max_search_pos; ++i) {
             if (rs.gf.poly_eval(poly, poly_size, rs.gf.inv(rs.gf.exp(i))) == 0)
                 roots[count++] = i;
         }
@@ -296,11 +301,12 @@ public:
 template<typename GF, typename RS>
 class rs_roots_eval_uint8_chien {
 public:
-    inline unsigned roots(
-            const uint8_t poly[], unsigned poly_size,
-            uint8_t roots[], unsigned size) {
+    inline size_t roots(
+            const uint8_t poly[], const size_t poly_size,
+            const size_t /*max_search_pos*/,
+            uint8_t roots[]) {
         auto rs = RS::cast(this);
-        unsigned count = 0;
+        size_t count = 0;
 
         auto coefs = (uint8_t *) alloca(rs.ecc_len);
         std::reverse_copy(&poly[0], &poly[poly_size], &coefs[0]);
@@ -308,7 +314,7 @@ public:
         for (int i = 254; i >= 0; --i) {
             uint8_t sum = 1;
 
-            for (unsigned j = 1; j < poly_size; ++j) {
+            for (size_t j = 1; j < poly_size; ++j) {
                 coefs[j] = rs.gf.mul(coefs[j], rs.gf.exp(j));
                 sum = rs.gf.add(sum, coefs[j]);
             }
@@ -330,20 +336,21 @@ struct rs_roots_eval_lut_pw2 {
     template<typename GF, typename RS>
     class type {
     public:
-        inline unsigned roots(
-                const uint8_t poly[], unsigned poly_size,
-                uint8_t roots[], unsigned size) {
+        inline size_t roots(
+                const uint8_t poly[], const size_t poly_size,
+                const size_t max_search_pos,
+                uint8_t roots[]) {
             auto rs = RS::cast(this);
-            unsigned count = 0;
+            size_t count = 0;
 
-            for (unsigned i = 0; i <= size/sizeof(Word); ++i) {
+            for (size_t i = 0; i <= max_search_pos/sizeof(Word); ++i) {
                 Word eval = rs.gf.poly_eval_wide(poly, poly_size, err_poly_roots.word[i]);
-                for (unsigned j = 0; j < sizeof(Word); ++j) {
+                for (size_t j = 0; j < sizeof(Word); ++j) {
                     if (reinterpret_cast<uint8_t *>(&eval)[j] == 0) {
-                        auto pos = i * sizeof(Word) + j;
+                        size_t pos = i * sizeof(Word) + j;
 
-                        if (pos < size)
-                            roots[count++] = pos;
+                        if (pos < max_search_pos)
+                            roots[count++] = uint8_t(pos);
                         else
                             break;
                     }
@@ -356,7 +363,7 @@ struct rs_roots_eval_lut_pw2 {
         inline void init() {
             auto rs = RS::cast(this);
             for (unsigned i = 0; i < 256; ++i)
-                err_poly_roots.u8[i] = rs.gf.inv(rs.gf.exp(i));
+                err_poly_roots.u8[i] = rs.gf.inv(rs.gf.exp(uint8_t(i)));
         }
 
     private:
@@ -373,7 +380,7 @@ struct rs_decode {
     using GFT = typename GF::GFT;
 
     template<typename T, typename U>
-    inline bool decode(T data, unsigned size, U rem) const {
+    inline bool decode(T data, const size_t size, U rem) const {
         auto rs = RS::cast(this);
         typename RS::synds_array_t synds;
         rs.synds(synds, &data[0], size, rem);
@@ -388,7 +395,7 @@ struct rs_decode {
             return false;
 
         auto err_pos = (GFT *) alloca(rs.ecc_len / 2);
-        auto roots = rs.roots(&err_poly[rs.ecc_len-errors-1], errors+1, err_pos, size + rs.ecc_len);
+        auto roots = rs.roots(&err_poly[rs.ecc_len-errors-1], errors+1, size + rs.ecc_len, err_pos);
 
         if (errors != roots)
             return false;
@@ -396,8 +403,8 @@ struct rs_decode {
         auto err_mag = (GFT *) alloca(rs.ecc_len / 2);
         forney(synds, &err_poly[rs.ecc_len-errors-1], err_pos, errors, err_mag);
 
-        for (unsigned i = 0; i < errors; ++i) {
-            unsigned pos = size + rs.ecc_len - 1 - err_pos[i];
+        for (size_t i = 0; i < errors; ++i) {
+            size_t pos = size + rs.ecc_len - 1 - err_pos[i];
             if (pos >= size + rs.ecc_len)
                 return false;
 
@@ -411,7 +418,7 @@ struct rs_decode {
     }
 
     template<typename T, typename U, typename V>
-    inline bool decode(T data, unsigned size, U rem, const V err_idx, unsigned errors) const {
+    inline bool decode(T data, size_t size, U rem, const V err_idx, size_t errors) const {
         auto rs = RS::cast(this);
         if (errors > rs.ecc_len)
             return false;
@@ -423,7 +430,7 @@ struct rs_decode {
             return true;
 
         auto err_pos = (GFT *) alloca(rs.ecc_len);
-        for (unsigned i = 0; i < errors; ++i) {
+        for (size_t i = 0; i < errors; ++i) {
             if (err_idx[i] > size + rs.ecc_len - 1)
                 return false;
 
@@ -432,7 +439,7 @@ struct rs_decode {
 
         auto err_poly = (GFT *) alloca(rs.ecc_len + 1);
         err_poly[0] = 1;
-        unsigned err_poly_len = 1;
+        size_t err_poly_len = 1;
 
         {
             auto temp = (GFT *) alloca(rs.ecc_len + 1);
@@ -442,7 +449,7 @@ struct rs_decode {
             auto p1 = (errors & 1) ? &err_poly[0] : &temp[0];
             auto p2 = (errors & 1) ? &temp[0] : &err_poly[0];
 
-            for (unsigned i = 0; i < errors; ++i) {
+            for (size_t i = 0; i < errors; ++i) {
                 GFT factor[2] = {rs.gf.sub(0, rs.gf.exp(err_pos[i])), 1};
                 err_poly_len = rs.gf.poly_mul(p2, err_poly_len, factor, 2, p1);
                 std::swap(p1, p2);
@@ -454,8 +461,8 @@ struct rs_decode {
         auto err_mag = (GFT *) alloca(rs.ecc_len);
         forney(synds, err_poly, err_pos, errors, err_mag);
 
-        for (unsigned i = 0; i < errors; ++i) {
-            unsigned pos = err_idx[i];
+        for (size_t i = 0; i < errors; ++i) {
+            size_t pos = err_idx[i];
             if (pos >= size + rs.ecc_len)
                 return false;
 
@@ -468,7 +475,7 @@ struct rs_decode {
         return true;
     }
 
-    inline unsigned berlekamp_massey(const GFT synds_rev[/*ecc_len*/], GFT err_poly[/*ecc_len*/]) const {
+    inline size_t berlekamp_massey(const GFT synds_rev[/*ecc_len*/], GFT err_poly[/*ecc_len*/]) const {
         auto rs = RS::cast(this);
         auto prev = (GFT *) alloca(rs.ecc_len);
         std::fill_n(prev, rs.ecc_len, 0x00);
@@ -480,13 +487,13 @@ struct rs_decode {
         prev[rs.ecc_len-1] = 1;
         err_poly[rs.ecc_len-1] = 1;
 
-        unsigned errors = 0;
-        unsigned m = 1;
+        size_t errors = 0;
+        size_t m = 1;
         GFT b = 1;
 
-        for (unsigned n = 0; n < rs.ecc_len; ++n) {
-            unsigned d = synds[n]; // discrepancy
-            for (unsigned i = 1; i < errors + 1; ++i)
+        for (size_t n = 0; n < rs.ecc_len; ++n) {
+            GFT d = synds[n]; // discrepancy
+            for (size_t i = 1; i < errors + 1; ++i)
                 d = rs.gf.add(d, rs.gf.mul(err_poly[rs.ecc_len - 1 - i], synds[n-i]));
 
             if (d == 0) {  // discrepancy is already zero
@@ -521,7 +528,7 @@ struct rs_decode {
 
     inline void forney(
             const GFT synds_rev[/*ecc_len*/], GFT err_poly[], const GFT err_pos[],
-            const unsigned err_count, GFT err_mag[]) const {
+            const size_t err_count, GFT err_mag[]) const {
         auto rs = RS::cast(this);
         auto err_eval = (GFT *) alloca(rs.ecc_len * 2);
         auto err_eval_size = rs.gf.poly_mul(
@@ -545,7 +552,7 @@ struct rs_decode {
         auto err_poly_deriv = err_poly + 1;
         auto err_poly_deriv_size = err_count;
 
-        for (unsigned i = 0; i < err_count; ++i) {
+        for (size_t i = 0; i < err_count; ++i) {
             auto xi = rs.gf.exp(err_pos[i]);
             auto xi_inv = rs.gf.inv(xi);
 

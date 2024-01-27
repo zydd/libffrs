@@ -39,7 +39,7 @@ public:
     const GFT power;
     const GFT primitive;
     const GFT poly1;
-    const unsigned field_elements;
+    const size_t field_elements;
 
     inline GF(GFT prime, GFT power, GFT primitive, GFT poly1):
         prime(prime), power(power), primitive(primitive), poly1(poly1),
@@ -98,7 +98,7 @@ public:
 
     inline void init() {
         auto gf = GF::cast(this);
-        iter = detail::ilog2_floor(gf.field_elements >> 1);
+        iter = int(detail::ilog2_floor(gf.field_elements >> 1));
     }
 private:
     int iter;
@@ -131,7 +131,7 @@ struct gf_exp_log_lut {
             if (a == 0)
                 return 0;
 
-            unsigned r = _log[a] + gf.field_elements-1 - _log[b];
+            size_t r = _log[a] + gf.field_elements-1 - _log[b];
             if (r >= gf.field_elements-1)
                 r -= gf.field_elements-1;
 
@@ -157,9 +157,9 @@ struct gf_exp_log_lut {
             auto gf_cpu = ffrs::GF<GFT, MulOperation>(gf.prime, gf.power, gf.primitive, gf.poly1);
 
             GFT x = 1;
-            for (unsigned i = 0; i < gf.field_elements; ++i) {
+            for (size_t i = 0; i < gf.field_elements; ++i) {
                 _exp[i] = x;
-                _log[x] = i;
+                _log[x] = GFT(i);
                 x = gf_cpu.mul(x, gf.primitive);
             }
         }
@@ -189,8 +189,8 @@ struct gf_mul_lut {
 
             auto gf_cpu = ffrs::GF<GFT, MulOperation>(gf.prime, gf.power, gf.primitive, gf.poly1);
 
-            for (unsigned i = 0; i < gf.field_elements; ++i) {
-                for (unsigned j = 0; j < gf.field_elements; ++j)
+            for (size_t i = 0; i < gf.field_elements; ++i) {
+                for (size_t j = 0; j < gf.field_elements; ++j)
                     _mul[i * gf.field_elements + j] = gf_cpu.mul(i, j);
             }
         }
@@ -207,11 +207,11 @@ struct gf_mul_exp_log_lut {
             return 0;
 
         auto gf = GF::cast(this);
-        unsigned r = gf.log(a) + gf.log(b);
+        size_t r = gf.log(a) + gf.log(b);
         if (r >= gf.field_elements-1)
             r -= gf.field_elements-1;
 
-        return gf.exp(r);
+        return gf.exp(GFT(r));
     }
 };
 
@@ -223,6 +223,8 @@ struct gf_wide_mul {
         static_assert(std::is_same_v<GFT, uint8_t>);
 
     public:
+        using wide_mul_word_t = Word;
+
         inline Word mul_wide(Word a, Word b) const {
             Word r = 0;
             for (int i = 7; i >= 0; --i) {
@@ -242,8 +244,7 @@ struct gf_wide_mul {
         }
 
         inline Word poly_eval_wide(const uint8_t poly[], const size_t size, const Word x, Word r = 0) const {
-            auto gf = GF::cast(this);
-            for (unsigned i = 0; i < size; ++i)
+            for (size_t i = 0; i < size; ++i)
                 r = mul_wide(r, x) ^ (poly[i] * rep_0x01);
             return r;
         }
@@ -259,7 +260,7 @@ struct gf_wide_mul {
 
         static constexpr Word _repeat_byte(uint8_t n) {
             Word p = 0;
-            for (unsigned i = 0; i < sizeof(Word); ++i)
+            for (size_t i = 0; i < sizeof(Word); ++i)
                 p |= Word(n) << (i * 8);
             return p;
         }
@@ -273,7 +274,7 @@ struct gf_wide_mul {
 template<typename GFT, typename GF>
 struct gf_poly {
     template<typename T, typename U>
-    inline unsigned ex_synth_div(T a[], unsigned size_a, const U b[], unsigned size_b) const {
+    inline size_t ex_synth_div(T a[], size_t size_a, const U b[], size_t size_b) const {
         if (size_b > size_a)
             return 0;
 
@@ -281,13 +282,13 @@ struct gf_poly {
 
         GFT norm_factor = gf.inv(b[0]);
 
-        for (unsigned i = 0; i < size_a - size_b + 1; ++i) {
+        for (size_t i = 0; i < size_a - size_b + 1; ++i) {
             auto c = a[i] = gf.mul(a[i], norm_factor);
 
             if (c == 0)
                 continue;
 
-            for (unsigned j = 1; j < size_b; ++j)
+            for (size_t j = 1; j < size_b; ++j)
                 a[i + j] = gf.sub(a[i + j], gf.mul(b[j], c));
         }
 
@@ -295,11 +296,11 @@ struct gf_poly {
     }
 
     template<typename T>
-    inline unsigned poly_mod(const T a[], unsigned size_a, const T b[], unsigned size_b, T rem[]) const {
+    inline size_t poly_mod(const T a[], size_t size_a, const T b[], size_t size_b, T rem[]) const {
         if (size_b < 2)
             return 0;
 
-        const unsigned size_r = size_b - 1;
+        const size_t size_r = size_b - 1;
         std::copy_n(a, std::min(size_a, size_r), rem);
 
         if (size_a < size_b)
@@ -310,7 +311,7 @@ struct gf_poly {
         GFT norm_factor = gf.inv(b[0]);
         b += 1;
 
-        for (unsigned i = 0; i < size_a - size_r; ++i) {
+        for (size_t i = 0; i < size_a - size_r; ++i) {
             T c = gf.mul(rem[0], norm_factor);
             std::rotate(rem, rem + 1, rem + size_r);
             rem[size_r - 1] = a[size_r + i];
@@ -318,7 +319,7 @@ struct gf_poly {
             if (c == 0)
                 continue;
 
-            for (unsigned j = 0; j < size_r; ++j)
+            for (size_t j = 0; j < size_r; ++j)
                 rem[j] = gf.sub(rem[j], gf.mul(b[j], c));
         }
 
@@ -334,7 +335,7 @@ struct gf_poly {
 
         if (size_a >= size_b) {
             std::copy_n(a, size_b, rem);
-            for (unsigned i = 0; i < size_a - size_b; ++i) {
+            for (size_t i = 0; i < size_a - size_b; ++i) {
                 Tr c = rem[0];
                 rem[0] = a[size_b + i];
                 std::rotate(rem, rem + 1, rem + size_b);
@@ -342,7 +343,7 @@ struct gf_poly {
                 if (c == 0)
                     continue;
 
-                for (unsigned j = 0; j < size_b; ++j)
+                for (size_t j = 0; j < size_b; ++j)
                     rem[j] = gf.sub(rem[j], gf.mul(b[j], c));
                 // std::transform(&rem[0], &rem[size_b], &b[0], &rem[0],
                 //         [c](T a, T b) { return gf.sub(a, gf.mul(b, c)); });
@@ -352,7 +353,7 @@ struct gf_poly {
             std::copy_n(a, size_a, &rem[size_b - size_a]);
         }
 
-        for (unsigned i = 0; i < size_b; ++i) {
+        for (size_t i = 0; i < size_b; ++i) {
             Tr c = rem[0];
             rem[0] = 0;
             std::rotate(rem, rem + 1, rem + size_b);
@@ -360,22 +361,22 @@ struct gf_poly {
             if (c == 0)
                 continue;
 
-            for (unsigned j = 0; j < size_b; ++j)
+            for (size_t j = 0; j < size_b; ++j)
                 rem[j] = gf.sub(rem[j], gf.mul(b[j], c));
         }
     }
 
     template<typename T>
-    inline GFT poly_eval(const T poly[], const unsigned size, GFT const& x, GFT r = 0) const {
+    inline GFT poly_eval(const T poly[], const size_t size, GFT const& x, GFT r = 0) const {
         auto gf = GF::cast(this);
-        for (unsigned i = 0; i < size; ++i)
+        for (size_t i = 0; i < size; ++i)
             r = gf.add(gf.mul(r, x), poly[i]);
         return r;
     }
 
     template<typename T>
-    inline void poly_shift(T poly[], const unsigned size, const unsigned n) const {
-        unsigned i = 0;
+    inline void poly_shift(T poly[], const size_t size, const size_t n) const {
+        size_t i = 0;
         for (; i < size - n; ++i)
             poly[i] = poly[i + n];
         for (; i < size; ++i)
@@ -383,16 +384,16 @@ struct gf_poly {
     }
 
     template<typename T>
-    inline void poly_scale(T poly[], const unsigned size, T const& a) const {
+    inline void poly_scale(T poly[], const size_t size, T const& a) const {
         auto gf = GF::cast(this);
-        for (unsigned i = 0; i < size; ++i)
+        for (size_t i = 0; i < size; ++i)
             poly[i] = gf.mul(a, poly[i]);
     }
 
     template<typename T>
     inline void poly_add(const T poly_a[], const T poly_b[], T output[], const size_t size) const {
         auto gf = GF::cast(this);
-        for (unsigned i = 0; i < size; ++i)
+        for (size_t i = 0; i < size; ++i)
             output[i] = gf.add(poly_a[i], poly_b[i]);
     }
 
@@ -417,9 +418,9 @@ struct gf_poly {
     }
 
     template<typename T>
-    inline void poly_sub(const T poly_a[], const T poly_b[], T output[], const unsigned size) const {
+    inline void poly_sub(const T poly_a[], const T poly_b[], T output[], const size_t size) const {
         auto gf = GF::cast(this);
-        for (unsigned i = 0; i < size; ++i)
+        for (size_t i = 0; i < size; ++i)
             output[i] = gf.sub(poly_a[i], poly_b[i]);
     }
 
@@ -444,18 +445,18 @@ struct gf_poly {
     }
 
     template<typename T, typename U>
-    inline unsigned poly_mul(
-            const T poly_a[], const unsigned size_a,
-            const U poly_b[], const unsigned size_b,
+    inline size_t poly_mul(
+            const T poly_a[], const size_t size_a,
+            const U poly_b[], const size_t size_b,
             GFT r[]) const {
-        unsigned res_len = size_a + size_b - 1;
+        size_t res_len = size_a + size_b - 1;
 
-        for (unsigned i = 0; i < res_len; ++i)
+        for (size_t i = 0; i < res_len; ++i)
             r[i] = 0;
 
         auto gf = GF::cast(this);
-        for (unsigned i = 0; i < size_a; ++i)
-            for (unsigned j = 0; j < size_b; ++j)
+        for (size_t i = 0; i < size_a; ++i)
+            for (size_t j = 0; j < size_b; ++j)
                 r[i + j] = gf.add(r[i + j], gf.mul(poly_a[i], poly_b[j]));
 
         return res_len;
@@ -466,8 +467,8 @@ struct gf_poly {
 template<typename GFT, typename GF>
 struct gf_poly_deriv_pw2 {
     template<typename T>
-    inline unsigned poly_deriv(T poly[], unsigned size) const {
-        for (unsigned i = 1; i < size; ++i)
+    inline size_t poly_deriv(T poly[], size_t size) const {
+        for (size_t i = 1; i < size; ++i)
             poly[size - i] = (i & 1) ? poly[size - i - 1] : 0;
 
         return size - 1;
@@ -478,9 +479,9 @@ struct gf_poly_deriv_pw2 {
 template<typename GFT, typename GF>
 struct gf_poly_deriv_prime {
     template<typename T>
-    inline unsigned poly_deriv(T poly[], unsigned size) const {
+    inline size_t poly_deriv(T poly[], size_t size) const {
         auto gf = GF::cast(this);
-        for (unsigned i = 1; i < size; ++i)
+        for (size_t i = 1; i < size; ++i)
             poly[size - i] = gf.mul(poly[size - i - 1], i);
         poly[0] = 0;
         return size - 1;
