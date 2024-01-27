@@ -118,7 +118,7 @@ private:
     inline void init_mixins() {
         try_init_mixin<Fs0>(0);
 
-        if constexpr (sizeof...(Fss))
+        if constexpr (sizeof...(Fss) > 0)
             init_mixins<Fss...>();
     }
 };

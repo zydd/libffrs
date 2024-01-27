@@ -54,7 +54,8 @@ struct rs_generator {
         inline void init() {
             auto rs = RS::cast(this);
 
-            typename GF::GFT temp[rs.ecc_len + 1] = {};
+            auto temp = (typename GF::GFT *) alloca(rs.ecc_len + 1);
+            std::fill_n(temp, rs.ecc_len + 1, 0x00);
 
             auto p1 = (rs.ecc_len & 1) ? &generator[0] : &temp[0];
             auto p2 = (rs.ecc_len & 1) ? &temp[0] : &generator[0];
@@ -132,7 +133,8 @@ struct rs_encode_lut_pw2 {
         inline void init() {
             auto rs = RS::cast(this);
             for (unsigned i = 0; i < rs.gf.field_elements; ++i) {
-                uint8_t data[rs.ecc_len + 1] = {0};
+                auto data = (uint8_t *) alloca(rs.ecc_len + 1);
+                std::fill_n(data, rs.ecc_len + 1, 0x00);
                 data[0] = uint8_t(i);
                 rs.gf.ex_synth_div(&data[0], rs.ecc_len + 1, &rs.generator[0], rs.ecc_len + 1);
 
@@ -300,7 +302,7 @@ public:
         auto rs = RS::cast(this);
         unsigned count = 0;
 
-        uint8_t coefs[rs.ecc_len];
+        auto coefs = (uint8_t *) alloca(rs.ecc_len);
         std::reverse_copy(&poly[0], &poly[poly_size], &coefs[0]);
 
         for (int i = 254; i >= 0; --i) {
@@ -379,19 +381,19 @@ struct rs_decode {
         if (std::all_of(&synds[0], &synds[rs.ecc_len], std::logical_not()))
             return true;
 
-        GFT err_poly[rs.ecc_len];
+        auto err_poly = (GFT *) alloca(rs.ecc_len);
         auto errors = berlekamp_massey(synds, err_poly);
 
         if (errors > rs.ecc_len / 2)
             return false;
 
-        GFT err_pos[rs.ecc_len / 2];
+        auto err_pos = (GFT *) alloca(rs.ecc_len / 2);
         auto roots = rs.roots(&err_poly[rs.ecc_len-errors-1], errors+1, err_pos, size + rs.ecc_len);
 
         if (errors != roots)
             return false;
 
-        GFT err_mag[rs.ecc_len / 2];
+        auto err_mag = (GFT *) alloca(rs.ecc_len / 2);
         forney(synds, &err_poly[rs.ecc_len-errors-1], err_pos, errors, err_mag);
 
         for (unsigned i = 0; i < errors; ++i) {
@@ -420,7 +422,7 @@ struct rs_decode {
         if (std::all_of(&synds[0], &synds[rs.ecc_len], std::logical_not()))
             return true;
 
-        GFT err_pos[rs.ecc_len];
+        auto err_pos = (GFT *) alloca(rs.ecc_len);
         for (unsigned i = 0; i < errors; ++i) {
             if (err_idx[i] > size + rs.ecc_len - 1)
                 return false;
@@ -428,11 +430,14 @@ struct rs_decode {
             err_pos[i] = size + rs.ecc_len - 1 - err_idx[i];
         }
 
-        GFT err_poly[rs.ecc_len + 1] = {1};
+        auto err_poly = (GFT *) alloca(rs.ecc_len + 1);
+        err_poly[0] = 1;
         unsigned err_poly_len = 1;
 
         {
-            GFT temp[rs.ecc_len + 1] = {1};
+            auto temp = (GFT *) alloca(rs.ecc_len + 1);
+            std::fill_n(temp, rs.ecc_len + 1, 0x00);
+            temp[0] = 1;
 
             auto p1 = (errors & 1) ? &err_poly[0] : &temp[0];
             auto p2 = (errors & 1) ? &temp[0] : &err_poly[0];
@@ -446,7 +451,7 @@ struct rs_decode {
 
         assert(err_poly_len == errors + 1);
 
-        GFT err_mag[rs.ecc_len];
+        auto err_mag = (GFT *) alloca(rs.ecc_len);
         forney(synds, err_poly, err_pos, errors, err_mag);
 
         for (unsigned i = 0; i < errors; ++i) {
@@ -465,9 +470,10 @@ struct rs_decode {
 
     inline unsigned berlekamp_massey(const GFT synds_rev[/*ecc_len*/], GFT err_poly[/*ecc_len*/]) const {
         auto rs = RS::cast(this);
-        GFT prev[rs.ecc_len] = {};
-        GFT temp[rs.ecc_len];
-        GFT synds[rs.ecc_len];
+        auto prev = (GFT *) alloca(rs.ecc_len);
+        std::fill_n(prev, rs.ecc_len, 0x00);
+        auto temp = (GFT *) alloca(rs.ecc_len);
+        auto synds = (GFT *) alloca(rs.ecc_len);
         std::reverse_copy(synds_rev, &synds_rev[rs.ecc_len], synds);
         std::fill_n(err_poly, rs.ecc_len, 0);
 
@@ -517,13 +523,15 @@ struct rs_decode {
             const GFT synds_rev[/*ecc_len*/], GFT err_poly[], const GFT err_pos[],
             const unsigned err_count, GFT err_mag[]) const {
         auto rs = RS::cast(this);
-        GFT err_eval[rs.ecc_len * 2];
+        auto err_eval = (GFT *) alloca(rs.ecc_len * 2);
         auto err_eval_size = rs.gf.poly_mul(
                 synds_rev, rs.ecc_len,
                 err_poly, err_count + 1,
                 err_eval);
 
-        GFT x_poly[rs.ecc_len + 1] = {1};
+        auto x_poly = (GFT *) alloca(rs.ecc_len + 1);
+        std::fill_n(x_poly, rs.ecc_len + 1, 0x00);
+        x_poly[0] = 1;
         auto err_eval_begin = rs.gf.ex_synth_div(
                 err_eval, err_eval_size,
                 x_poly, rs.ecc_len + 1);
