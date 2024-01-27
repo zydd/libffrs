@@ -94,3 +94,22 @@ def test_decode_fail():
             assert msg_b == msg_c
 
         assert msg_a != msg_b
+
+
+def test_encode_blocks():
+    for data_size in [1, 2, 3, 200, 201, 254]:
+        for block_size in range(1, data_size + 1):
+            a = randbytes(data_size)
+
+            msg = RS256.encode_blocks(a, block_size)
+
+            for i in range(data_size // block_size):
+                msg_i = a[i * block_size:][:block_size] + bytearray(RS256.ecc_len)
+                RS256.encode(msg_i)
+
+                assert msg_i == msg[i * (block_size + RS256.ecc_len):][:block_size + RS256.ecc_len]
+
+            tail_size = data_size % block_size
+            if tail_size > 0:
+                msg_i = a[-tail_size:] + bytearray(RS256.ecc_len)
+                RS256.encode(msg_i)

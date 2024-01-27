@@ -78,14 +78,17 @@ struct rs_generator {
 };
 
 template<typename GF, typename RS>
-struct rs_encode_basic {
-    template<typename In, typename Out>
-    inline void encode(In const& input, size_t input_size, Out output) {
+class rs_encode_basic {
+public:
+    using GFT = typename GF::GFT;
+
+    inline void encode(const GFT input[], size_t input_size, GFT output[]) {
         auto rs = RS::cast(this);
 
         // Multiply input by X^n, n = ecc_len+1  === append ecc_len bytes
-        std::remove_reference_t<decltype(input[0])> input_x_n[input_size + rs.ecc_len] = {};
+        auto input_x_n = (GFT *) alloca(input_size + rs.ecc_len);
         std::copy_n(input, input_size, input_x_n);
+        std::fill_n(&input_x_n[input_size], rs.ecc_len, 0x00);
 
         rs.gf.poly_mod(input_x_n, input_size + rs.ecc_len, rs.generator, rs.ecc_len + 1, output);
 
@@ -98,9 +101,11 @@ struct rs_encode_basic {
 
 
 template<typename GF, typename RS>
-struct rs_encode_basic_v2 {
-    template<typename In, typename Out>
-    inline void encode(In const& input, size_t input_size, Out output) {
+class rs_encode_basic_v2 {
+public:
+    using GFT = typename GF::GFT;
+
+    inline void encode(const GFT input[], size_t input_size, GFT output[]) {
         auto rs = RS::cast(this);
         rs.gf.poly_mod_x_n(input, input_size, &rs.generator[1], rs.ecc_len, output);
 
@@ -150,7 +155,7 @@ struct rs_encode_lut_pw2 {
 };
 
 
-template<typename Word, size_t MaxFieldElements, size_t Stride = sizeof(Word)>
+template<typename Word, size_t MaxFieldElements, size_t Stride = 1>
 struct rs_encode_slice_pw2 {
     template<typename GF, typename RS>
     class type {
@@ -191,7 +196,7 @@ struct rs_encode_slice_pw2 {
         inline void init() {
             auto rs = RS::cast(this);
 
-            assert(rs.ecc_len == sizeof(Word));
+            assert(rs.ecc_len % sizeof(Word) == 0);
             assert(Stride == 1 || Stride % rs.ecc_len == 0);
 
             for (size_t i = 0; i < rs.gf.field_elements; ++i) {
@@ -207,8 +212,8 @@ struct rs_encode_slice_pw2 {
             for (size_t i = 0; i < rs.gf.field_elements; ++i) {
                 for (size_t j = 1; j < Stride; ++j)
                     generator_lut[j][i] =
-                            (generator_lut[j - 1][i] >> 8) ^
-                            generator_lut[0][generator_lut[j - 1][i] % rs.gf.field_elements];
+                            (generator_lut[j - 1][i] >> 8)
+                            ^ generator_lut[0][generator_lut[j - 1][i] % rs.gf.field_elements];
             }
         }
 

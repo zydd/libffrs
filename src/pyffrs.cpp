@@ -31,9 +31,9 @@ using GF256 = ffrs::GF<uint8_t,
 
     ffrs::gf_exp_log_lut<ffrs::gf_mul_cpu_pw2, 256>::type,
 
-    ffrs::gf_mul_cpu_pw2,
+    // ffrs::gf_mul_cpu_pw2,
     // ffrs::gf_mul_lut<ffrs::gf_mul_cpu_pw2, 256>::type,
-    // ffrs::gf_mul_exp_log_lut,
+    ffrs::gf_mul_exp_log_lut,
 
     ffrs::gf_wide_mul<uint64_t>::type,
     ffrs::gf_poly_deriv_pw2,
@@ -45,9 +45,9 @@ using RS256 = ffrs::RS<GF,
     ffrs::rs_generator<256>::type,
 
     // ffrs::rs_encode_basic,
-    // ffrs::rs_encode_basic_v2,
+    ffrs::rs_encode_basic_v2,
     // ffrs::rs_encode_lut_pw2<256>::type,
-    ffrs::rs_encode_slice_pw2<uint64_t, 256>::type,
+    // ffrs::rs_encode_slice_pw2<uint64_t, 256>::type,
 
     // ffrs::rs_synds_basic<256>::type,
     ffrs::rs_synds_lut_pw2<uint32_t, 255>::type,
@@ -127,6 +127,50 @@ public:
         encode(buf.data, msg_size, &buf.data[msg_size]);
     }
 
+    inline size_t compute_output_size(size_t input_size, size_t block_size) {
+        size_t full_blocks = input_size / block_size;
+        size_t remainder = input_size % block_size;
+
+        size_t output_size = full_blocks * (block_size + this->ecc_len);
+
+        if (remainder > 0)
+            output_size += remainder + this->ecc_len;
+
+        return output_size;
+    }
+
+    inline py::bytearray py_encode_blocks(buffer_ro<uint8_t> buf, size_t input_block_size) {
+        size_t full_blocks = buf.size / input_block_size;
+
+        size_t output_size = full_blocks * (input_block_size + this->ecc_len);
+
+        // Last block will be smaller if input size is not divisible by input_block_size
+        size_t input_remainder = buf.size - full_blocks * input_block_size;
+        if (input_remainder > 0)
+            output_size += input_remainder + this->ecc_len;
+
+        size_t output_block_size = input_block_size + this->ecc_len;
+
+        auto output = py::bytearray();
+        PyByteArray_Resize(output.ptr(), output_size);
+        assert(size_t(PyByteArray_Size(output.ptr())) == output_size);
+        auto output_data = reinterpret_cast<uint8_t *>(PyByteArray_AsString(output.ptr()));
+
+        for (size_t block = 0; block < buf.size / input_block_size; ++block) {
+            auto output_block = &output_data[block * output_block_size];
+            std::copy_n(&buf.data[block * input_block_size], input_block_size, output_block);
+            encode(output_block, input_block_size, &output_block[input_block_size]);
+        }
+
+        if (input_remainder > 0) {
+            auto output_block = &output_data[output_size - input_remainder - this->ecc_len];
+            std::copy_n(&buf.data[buf.size - input_remainder], input_remainder, output_block);
+            encode(output_block, input_remainder, &output_block[input_remainder]);
+        }
+
+        return output;
+    }
+
     inline bool py_decode(buffer_rw<uint8_t> buf) {
         size_t msg_size = buf.size - ecc_len;
         return decode(buf.data, msg_size, &buf.data[msg_size]);
@@ -195,6 +239,7 @@ PYBIND11_MODULE(ffrs, m) {
             return py::bytes(reinterpret_cast<const char *>(self.generator), self.ecc_len + 1); })
         .def(py::init<uint8_t>(), R"()", "ecc_len"_a)
         .def("encode", cast_args(&PyRS256::py_encode), R"(Systematic encode)", "buffer"_a)
+        .def("encode_blocks", cast_args(&PyRS256::py_encode_blocks), R"(Encode blocks)", "buffer"_a, "input_block_size"_a)
         .def("decode", cast_args(&PyRS256::py_decode), R"(Systematic decode)", "buffer"_a)
         .doc() = R"(Reed-Solomon coding over :math:`GF(2^8)`)";
 }
