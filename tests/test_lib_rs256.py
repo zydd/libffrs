@@ -42,7 +42,6 @@ def test_encode():
 def test_encode_decode():
     for size in range(255 - RS256.ecc_len):
         a = randbytes(size)
-        rem = RS256.gf.poly_mod_x_n(a, RS256.generator[1:])
 
         msg_a = a + bytearray(RS256.ecc_len)
         RS256.encode(msg_a)
@@ -97,6 +96,27 @@ def test_decode_fail():
 
 
 def test_encode_blocks():
+    for size in range(1, 255 - RS256.ecc_len):
+        a = randbytes(size)
+        msg_a = a + bytearray(RS256.ecc_len)
+        RS256.encode(msg_a)
+
+        # block size == input size
+        assert msg_a == RS256.encode_blocks(a, len(a))
+
+        # blocks size > input size
+        max_block_size = 254 - RS256.ecc_len
+        assert msg_a == RS256.encode_blocks(a, min(len(a) + 1, max_block_size))
+        assert msg_a == RS256.encode_blocks(a, min(len(a) + 10, max_block_size))
+
+
+def test_encode_blocks_empty():
+    assert bytearray() == RS256.encode_blocks(bytearray(), 0)
+    assert bytearray() == RS256.encode_blocks(bytearray(10), 0)
+    assert bytearray() == RS256.encode_blocks(bytearray(), 10)
+
+
+def test_encode_blocks_lenghts():
     for data_size in [1, 2, 3, 200, 201, 254]:
         for block_size in range(1, data_size + 1):
             a = randbytes(data_size)

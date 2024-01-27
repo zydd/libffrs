@@ -140,6 +140,9 @@ public:
     }
 
     inline py::bytearray py_encode_blocks(buffer_ro<uint8_t> buf, size_t input_block_size) {
+        if (buf.size == 0 || input_block_size == 0)
+            return {};
+
         size_t full_blocks = buf.size / input_block_size;
 
         size_t output_size = full_blocks * (input_block_size + this->ecc_len);
