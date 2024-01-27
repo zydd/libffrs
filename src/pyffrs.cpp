@@ -20,51 +20,46 @@
 
 #include <libffrs/reed_solomon.hpp>
 
+#include "util.hpp"
+
 namespace py = pybind11;
 using namespace pybind11::literals;
 
 
-template<typename T>
-struct buffer_ro {
-    py::buffer buffer;
-    py::buffer_info info;
-    size_t size;
-    const T *data;
-
-    inline buffer_ro(py::buffer&& pybuf):
-        buffer(std::move(pybuf)),
-        info(buffer.request(false)),
-        size(size_t(info.size)),
-        data(reinterpret_cast<const T *>(info.ptr))
-    { }
-};
-
-template<typename T>
-struct buffer_rw {
-    py::buffer buffer;
-    py::buffer_info info;
-    size_t size;
-    T *data;
-
-    inline buffer_rw(py::buffer&& pybuf):
-        buffer(std::move(pybuf)),
-        info(buffer.request(true)),
-        size(size_t(info.size)),
-        data(reinterpret_cast<T *>(info.ptr))
-    { }
-};
-
-
 using GF256 = ffrs::GF<uint8_t,
     ffrs::gf_add_xor,
-    // ffrs::gf_mul_cpu_pw2,
-    // ffrs::gf_mul_lut<ffrs::gf_mul_cpu_pw2, 256>::type,
+
     ffrs::gf_exp_log_lut<ffrs::gf_mul_cpu_pw2, 256>::type,
-    ffrs::gf_mul_exp_log_lut,
+
+    ffrs::gf_mul_cpu_pw2,
+    // ffrs::gf_mul_lut<ffrs::gf_mul_cpu_pw2, 256>::type,
+    // ffrs::gf_mul_exp_log_lut,
+
     ffrs::gf_wide_mul<uint64_t>::type,
     ffrs::gf_poly_deriv_pw2,
     ffrs::gf_poly
     >;
+
+template<typename GF>
+using RS256 = ffrs::RS<GF,
+    ffrs::rs_generator<256>::type,
+
+    // ffrs::rs_encode_basic,
+    // ffrs::rs_encode_basic_v2,
+    // ffrs::rs_encode_lut_pw2<256>::type,
+    ffrs::rs_encode_slice_pw2<uint64_t, 256>::type,
+
+    // ffrs::rs_synds_basic<256>::type,
+    ffrs::rs_synds_lut_pw2<uint32_t, 255>::type,
+
+    // ffrs::rs_roots_eval_basic,
+    // ffrs::rs_roots_eval_uint8_chien,
+    ffrs::rs_roots_eval_lut_pw2<uint64_t>::type,
+
+    ffrs::rs_decode
+    >;
+
+
 class PyGF256 : public GF256 {
 public:
     inline PyGF256(GFT prime, GFT power, GFT primitive, GFT poly1):
@@ -103,8 +98,7 @@ public:
         poly_mod_x_n(buf1.data, buf1.size, buf2.data, buf2.size, output.data());
         return py::bytearray(reinterpret_cast<const char *>(output.data()), buf2.size);
     }
-    inline uint8_t py_poly_eval(py::buffer&& a, uint8_t x) {
-        auto buf = buffer_ro<uint8_t>(std::move(a));
+    inline uint8_t py_poly_eval(buffer_ro<uint8_t> buf, uint8_t x) {
         return poly_eval(buf.data, buf.size, x);
     }
     inline py::bytearray py_poly_eval8(buffer_ro<uint8_t> buf1, buffer_ro<uint64_t> buf2) {
@@ -122,27 +116,10 @@ public:
 };
 
 
-using RS256 = ffrs::RS<PyGF256,
-    ffrs::rs_generator<256>::type,
-
-    // ffrs::rs_encode_basic,
-    // ffrs::rs_encode_basic_v2,
-    ffrs::rs_encode_lut_pw2<256>::type,
-    // ffrs::rs_encode_slice_pw2<uint32_t, 256>::type,
-
-    // ffrs::rs_synds_basic<256>::type,
-    ffrs::rs_synds_lut_pw2<uint32_t, 255>::type,
-
-    // ffrs::rs_roots_eval_basic,
-    // ffrs::rs_roots_eval_uint8_chien,
-    ffrs::rs_roots_eval_lut_pw2<uint64_t>::type,
-
-    ffrs::rs_decode
-    >;
-class PyRS256 : public RS256 {
+class PyRS256 : public RS256<PyGF256> {
 public:
     inline PyRS256(uint8_t ecc_len):
-        RS256(PyGF256(2, 8, 2, 0x1d), ecc_len)
+        RS256<PyGF256>(PyGF256(2, 8, 2, 0x1d), ecc_len)
     { }
 
     inline void py_encode(buffer_rw<uint8_t> buf) {
@@ -188,51 +165,21 @@ PYBIND11_MODULE(ffrs, m) {
         .def("exp", &PyGF256::exp, R"(Exponential function: :math:`a^{\text{value}}`)", "value"_a)
         .def("log", &PyGF256::log, R"(Logarithm: :math:`\log_a (\text{value})`)", "value"_a)
         .def("pow", &PyGF256::pow, R"(Power: :math:`\text{base}^\text{exponent}`)", "base"_a, "exponent"_a)
-        .def("poly_add", [](PyGF256& self, py::buffer&& a, py::buffer&& b) {
-            return self.py_poly_add(std::move(a), std::move(b)); },
-            R"(
-                Add polynomials
-            )", "p1"_a, "p2"_a)
-        .def("poly_sub", [](PyGF256& self, py::buffer&& a, py::buffer&& b) {
-            return self.py_poly_sub(std::move(a), std::move(b)); },
-            R"(
-                Subtract polynomials
-            )", "p1"_a, "p2"_a)
-        .def("poly_mul", [](PyGF256& self, py::buffer&& a, py::buffer&& b) {
-            return self.py_poly_mul(std::move(a), std::move(b)); },
-            R"(
-                Multiply polynomials
-            )", "p1"_a, "p2"_a)
-        .def("poly_mod", [](PyGF256& self, py::buffer&& a, py::buffer&& b) {
-            return self.py_poly_mod(std::move(a), std::move(b)); },
-            R"(
-                Polynomial remainder
-            )", "p1"_a, "p2"_a)
-        .def("poly_eval", &PyGF256::py_poly_eval,
-            R"(
-                Evaluate polynomial at ``x``
-            )", "poly"_a, "x"_a)
-        .def("poly_eval8", [](PyGF256& self, py::buffer&& a, py::buffer&& b) {
-            return self.py_poly_eval8(std::move(a), std::move(b)); },
-            R"(
-                Evaluate polynomial at 8 points on a single operation
-            )", "poly"_a, "xs"_a)
-        .def("mul8", [](PyGF256& self, py::buffer&& a, py::buffer&& b) {
-            return self.py_mul8(std::move(a), std::move(b)); },
-            R"(
-                Multiply 8 values in a single operation
-            )", "a"_a, "b"_a)
-        .def("poly_divmod", [](PyGF256& self, py::buffer&& a, py::buffer&& b) {
-            return self.py_poly_divmod(std::move(a), std::move(b)); },
-            R"(
+        .def("poly_add", cast_args(&PyGF256::py_poly_add), R"(Add polynomials)", "p1"_a, "p2"_a)
+        .def("poly_sub", cast_args(&PyGF256::py_poly_sub), R"(Subtract polynomials)", "p1"_a, "p2"_a)
+        .def("poly_mul", cast_args(&PyGF256::py_poly_mul), R"(Multiply polynomials)", "p1"_a, "p2"_a)
+        .def("poly_mod", cast_args(&PyGF256::py_poly_mod), R"(Polynomial remainder)", "p1"_a, "p2"_a)
+        .def("poly_eval", cast_args(&PyGF256::py_poly_eval), R"(Evaluate polynomial at ``x``)", "poly"_a, "x"_a)
+        .def("poly_eval8", cast_args(&PyGF256::py_poly_eval8),
+            R"(Evaluate polynomial at 8 points on a single operation)", "poly"_a, "xs"_a)
+        .def("mul8", cast_args(&PyGF256::py_mul8), R"(Multiply 8 values in a single operation)", "a"_a, "b"_a)
+        .def("poly_divmod", cast_args(&PyGF256::py_poly_divmod), R"(
                 Polynomial quotient and remainder
 
                 Returns:
                     (quotient, remainder)
             )", "p1"_a, "p2"_a)
-        .def("poly_mod_x_n", [](PyGF256& self, py::buffer&& a, py::buffer&& b) {
-            return self.py_poly_mod_x_n(std::move(a), std::move(b)); },
-            R"(
+        .def("poly_mod_x_n", cast_args(&PyGF256::py_poly_mod_x_n), R"(
                 Shifted polynomial remainder
 
                 :math:`P \times X^n \mod (X^n + p_2)` where ``n = len(p2)``
@@ -247,13 +194,7 @@ PYBIND11_MODULE(ffrs, m) {
         .def_property_readonly("generator", [](PyRS256& self) {
             return py::bytes(reinterpret_cast<const char *>(self.generator), self.ecc_len + 1); })
         .def(py::init<uint8_t>(), R"()", "ecc_len"_a)
-        .def("encode", [](PyRS256& self, py::buffer&& a) {
-            return self.py_encode(std::move(a)); },
-            R"(Systematic encode)", "buffer"_a)
-        .def("decode", [](PyRS256& self, py::buffer&& a) {
-            return self.py_decode(std::move(a)); },
-            R"(Systematic decode)", "buffer"_a)
-        .doc() = R"(
-            Reed-Solomon coding over :math:`GF(2^8)`
-        )";
+        .def("encode", cast_args(&PyRS256::py_encode), R"(Systematic encode)", "buffer"_a)
+        .def("decode", cast_args(&PyRS256::py_decode), R"(Systematic decode)", "buffer"_a)
+        .doc() = R"(Reed-Solomon coding over :math:`GF(2^8)`)";
 }

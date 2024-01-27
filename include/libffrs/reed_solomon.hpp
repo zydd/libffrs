@@ -184,7 +184,7 @@ struct rs_encode_slice_pw2 {
 
             // endianess dependent
             for (size_t i = 0; i < rs.ecc_len; ++i)
-                output[i] = rem >> (8 * i);
+                output[i] = uint8_t(rem >> (8 * i));
         }
 
     protected:
