@@ -353,8 +353,8 @@ struct gf_poly {
                 //         [c](T a, T b) { return gf.sub(a, gf.mul(b, c)); });
             }
         } else {
-            std::fill_n(rem, size_b - size_a, 0);
             std::copy_n(a, size_a, &rem[size_b - size_a]);
+            std::fill_n(rem, size_b - size_a, 0x00);
         }
 
         for (size_t i = 0; i < size_b; ++i) {

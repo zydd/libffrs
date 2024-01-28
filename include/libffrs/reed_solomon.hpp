@@ -165,32 +165,29 @@ struct rs_encode_slice_pw2 {
 
         inline void encode(const uint8_t *input, size_t size, uint8_t *output) {
             size_t i = 0;
-            Word rem = 0;
+            WordB rem = {};
 
             if constexpr (Stride > 1) {
                 for (; size - i >= Stride; i += Stride) {
                     auto in = reinterpret_cast<const Word *>(&input[i]);
-                    rem ^= *in++;
+                    rem.word ^= *in++;
                     Word t = 0;
                     for (size_t j = 0; j < ecc_len; ++j)
-                        t ^= generator_lut[Stride - j - 1][(rem >> (8 * j)) & 0xff];
+                        t ^= generator_lut[Stride-1 - j][rem.bytes[j]].word;
 
                     for (size_t k = 1; k < Stride / ecc_len; ++k) {
-                        auto two = *in++;
+                        WordB rem2 { *in++ };
                         for (size_t j = 0; j < ecc_len; ++j)
-                            t ^= generator_lut[Stride - k * ecc_len - j - 1][(two >> (8 * j)) & 0xff];
+                            t ^= generator_lut[Stride-1 - (k * ecc_len + j)][rem2.bytes[j]].word;
                     }
-                    rem = t;
+                    rem.word = t;
                 }
             }
 
             for (; i < size; ++i)
-                rem = (rem >> 8) ^ generator_lut[0][(rem & 0xff) ^ input[i]];
+                rem.word = (rem.word >> 8) ^ generator_lut[0][(rem.word & 0xff) ^ input[i]].word;
 
-            // endianess dependent
-            // for (size_t i = 0; i < ecc_len; ++i)
-            //     output[i] = uint8_t(rem >> (8 * i));
-            std::copy_n(reinterpret_cast<uint8_t *>(&rem), ecc_len, output);
+            *reinterpret_cast<Word *>(output) = rem.word;
         }
 
     protected:
@@ -201,26 +198,22 @@ struct rs_encode_slice_pw2 {
             static_assert(Stride == 1 || Stride % ecc_len == 0);
 
             for (size_t i = 0; i < rs.gf.field_elements; ++i) {
-                uint8_t data[sizeof(Word) + 1] = {0};
-                data[0] = uint8_t(i);
-                rs.gf.poly_mod(data, sizeof(Word) + 1, rs.generator, sizeof(Word) + 1, data);
-
-                // endianess dependent
-                // for (size_t j = 0; j < sizeof(Word); ++j)
-                //     generator_lut[0][i] |= Word(data[j + 1]) << j * 8;
-                std::copy_n(data, sizeof(Word), reinterpret_cast<uint8_t *>(&generator_lut[0][i]));
+                auto lut_i = generator_lut[0][i].bytes;
+                lut_i[0] = uint8_t(i);
+                rs.gf.poly_mod_x_n(lut_i, 1, &rs.generator[1], ecc_len, lut_i);
             }
 
             for (size_t i = 0; i < rs.gf.field_elements; ++i) {
-                for (size_t j = 1; j < Stride; ++j)
-                    generator_lut[j][i] =
-                            (generator_lut[j - 1][i] >> 8)
-                            ^ generator_lut[0][generator_lut[j - 1][i] % rs.gf.field_elements];
+                for (size_t j = 1; j < Stride; ++j) {
+                    Word prev = generator_lut[j - 1][i].word;
+                    generator_lut[j][i].word = (prev >> 8) ^ generator_lut[0][prev & 0xff].word;
+                }
             }
         }
 
     private:
-        Word generator_lut[Stride][MaxFieldElements] = {};
+        union WordB { Word word; uint8_t bytes[sizeof(Word)]; };
+        WordB generator_lut[Stride][MaxFieldElements] = {};
     };
 };
 
@@ -237,7 +230,7 @@ class rs_encode_slice_pw2_dispatch :
         protected rs_encode_slice_2<GF, RS>,
         protected rs_encode_slice_4<GF, RS>,
         protected rs_encode_slice_8<GF, RS>,
-        protected rs_encode_lut_pw2<256>::type<GF, RS>::type
+        protected rs_encode_lut_pw2<256>::type<GF, RS>
         // protected rs_encode_basic_v2<GF, RS>
 {
 public:
