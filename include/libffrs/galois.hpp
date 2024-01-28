@@ -151,7 +151,7 @@ struct gf_exp_log_lut {
             return _exp[(_log[a] * b) % (gf.field_elements - 1)];
         }
 
-
+    protected:
         inline void init() {
             auto gf = GF::cast(this);
             auto gf_cpu = ffrs::GF<GFT, MulOperation>(gf.prime, gf.power, gf.primitive, gf.poly1);
@@ -183,7 +183,7 @@ struct gf_mul_lut {
             return _mul[a * gf.field_elements + b];
         }
 
-
+    protected:
         inline void init() {
             auto gf = GF::cast(this);
 
@@ -201,7 +201,8 @@ struct gf_mul_lut {
 
 
 template<typename GFT, typename GF>
-struct gf_mul_exp_log_lut {
+class gf_mul_exp_log_lut {
+public:
     inline GFT mul(GFT const& a, GFT const& b) const {
         if (a == 0 || b == 0)
             return 0;
@@ -296,7 +297,10 @@ struct gf_poly {
     }
 
     template<typename T>
-    inline size_t poly_mod(const T a[], size_t size_a, const T b[], size_t size_b, T rem[]) const {
+    inline size_t poly_mod(
+            const T a[], const size_t size_a,
+            const T b[], const  size_t size_b,
+            T rem[]) const {
         if (size_b < 2)
             return 0;
 

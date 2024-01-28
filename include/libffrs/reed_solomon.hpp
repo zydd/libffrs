@@ -155,15 +155,14 @@ struct rs_encode_lut_pw2 {
 };
 
 
-template<typename Word, size_t MaxFieldElements, size_t Stride = 1>
+template<typename Word, size_t ecc_len, size_t MaxFieldElements, size_t Stride>
 struct rs_encode_slice_pw2 {
     template<typename GF, typename RS>
     class type {
-        public:
+    public:
         using GFT = typename GF::GFT;
 
         inline void encode(const uint8_t *input, size_t size, uint8_t *output) {
-            auto rs = RS::cast(this);
             size_t i = 0;
             Word rem = 0;
 
@@ -172,13 +171,13 @@ struct rs_encode_slice_pw2 {
                     auto in = reinterpret_cast<const Word *>(&input[i]);
                     rem ^= *in++;
                     Word t = 0;
-                    for (size_t j = 0; j < rs.ecc_len; ++j)
+                    for (size_t j = 0; j < ecc_len; ++j)
                         t ^= generator_lut[Stride - j - 1][(rem >> (8 * j)) & 0xff];
 
-                    for (size_t k = 1; k < Stride / rs.ecc_len; ++k) {
+                    for (size_t k = 1; k < Stride / ecc_len; ++k) {
                         auto two = *in++;
-                        for (size_t j = 0; j < rs.ecc_len; ++j)
-                            t ^= generator_lut[Stride - k * rs.ecc_len - j - 1][(two >> (8 * j)) & 0xff];
+                        for (size_t j = 0; j < ecc_len; ++j)
+                            t ^= generator_lut[Stride - k * ecc_len - j - 1][(two >> (8 * j)) & 0xff];
                     }
                     rem = t;
                 }
@@ -188,25 +187,27 @@ struct rs_encode_slice_pw2 {
                 rem = (rem >> 8) ^ generator_lut[0][(rem & 0xff) ^ input[i]];
 
             // endianess dependent
-            for (size_t i = 0; i < rs.ecc_len; ++i)
-                output[i] = uint8_t(rem >> (8 * i));
+            // for (size_t i = 0; i < ecc_len; ++i)
+            //     output[i] = uint8_t(rem >> (8 * i));
+            std::copy_n(reinterpret_cast<uint8_t *>(&rem), ecc_len, output);
         }
 
     protected:
         inline void init() {
             auto rs = RS::cast(this);
 
-            assert(rs.ecc_len % sizeof(Word) == 0);
-            assert(Stride == 1 || Stride % rs.ecc_len == 0);
+            static_assert(ecc_len == sizeof(Word));
+            static_assert(Stride == 1 || Stride % ecc_len == 0);
 
             for (size_t i = 0; i < rs.gf.field_elements; ++i) {
                 uint8_t data[sizeof(Word) + 1] = {0};
                 data[0] = uint8_t(i);
-                rs.gf.ex_synth_div(&data[0], sizeof(Word) + 1, &rs.generator[0], sizeof(Word) + 1);
+                rs.gf.poly_mod(data, sizeof(Word) + 1, rs.generator, sizeof(Word) + 1, data);
 
                 // endianess dependent
-                for (size_t j = 0; j < sizeof(Word); ++j)
-                    generator_lut[0][i] |= Word(data[j + 1]) << j * 8;
+                // for (size_t j = 0; j < sizeof(Word); ++j)
+                //     generator_lut[0][i] |= Word(data[j + 1]) << j * 8;
+                std::copy_n(data, sizeof(Word), reinterpret_cast<uint8_t *>(&generator_lut[0][i]));
             }
 
             for (size_t i = 0; i < rs.gf.field_elements; ++i) {
@@ -220,6 +221,42 @@ struct rs_encode_slice_pw2 {
     private:
         Word generator_lut[Stride][MaxFieldElements] = {};
     };
+};
+
+
+template<typename GF, typename RS>
+using rs_encode_slice_2 = rs_encode_slice_pw2<uint16_t, 2, 256, 16>::type<GF, RS>;
+template<typename GF, typename RS>
+using rs_encode_slice_4 = rs_encode_slice_pw2<uint32_t, 4, 256, 16>::type<GF, RS>;
+template<typename GF, typename RS>
+using rs_encode_slice_8 = rs_encode_slice_pw2<uint64_t, 8, 256, 16>::type<GF, RS>;
+
+template<typename GF, typename RS>
+class rs_encode_slice_pw2_dispatch :
+        protected rs_encode_slice_2<GF, RS>,
+        protected rs_encode_slice_4<GF, RS>,
+        protected rs_encode_slice_8<GF, RS>,
+        protected rs_encode_basic_v2<GF, RS>
+{
+public:
+    using GFT = typename GF::GFT;
+
+    inline void encode(const uint8_t *input, size_t size, uint8_t *output) {
+        auto rs = RS::cast(this);
+        switch (rs.ecc_len) {
+        case 2: return rs_encode_slice_2<GF, RS>::encode(input, size, output);
+        case 4: return rs_encode_slice_4<GF, RS>::encode(input, size, output);
+        case 8: return rs_encode_slice_8<GF, RS>::encode(input, size, output);
+        default: return rs_encode_basic_v2<GF, RS>::encode(input, size, output);
+        }
+    }
+
+protected:
+    void init() {
+        rs_encode_slice_2<GF, RS>::init();
+        rs_encode_slice_4<GF, RS>::init();
+        rs_encode_slice_8<GF, RS>::init();
+    }
 };
 
 

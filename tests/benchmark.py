@@ -20,26 +20,39 @@ import timeit
 
 import ffrs
 
-RS256 = ffrs.RS256(ecc_len=255 - 223)
 
 random.seed(42)
 
-def test_encode_blocks():
+def benchmark(method, ecc_len, duration=2, update_interval=0.5):
+    print(f'\n{method} ecc_len: {ecc_len}')
+    RS256 = ffrs.RS256(ecc_len=ecc_len)
+
     total_time = 0
-    for i in range(0, 1000, 10):
-        size = i * 1000 * 1000
+    total_size = 0
+    size = 1 * 1000 * 1000
+
+    while total_time < duration:
         data = bytearray(size)
 
-        time = timeit.timeit("RS256.encode_blocks(data, 223)",
+        time = timeit.timeit(f'RS256.{method}(data, {255 - ecc_len})',
             number=1, globals=dict(RS256=RS256, data=data))
 
-        throughput = size * 1e-6 / time
+        throughput = size / time
 
-        print(f'Encode speed: {throughput:.3f} MB/s')
+        print(f'Encode speed: {throughput * 1e-6:.3f} MB/s')
 
         total_time += time
-        if total_time > 5:
-            break
+        total_size += size
+
+        size = round(throughput * update_interval)
+
+    average_throughput = total_size / total_time
+    print(f'Average: {average_throughput * 1e-6:.3f} MB/s')
+
 
 if __name__ == '__main__':
-    test_encode_blocks()
+    benchmark('encode_blocks', 2)
+    benchmark('encode_blocks', 4)
+    benchmark('encode_blocks', 6)
+    benchmark('encode_blocks', 8)
+    benchmark('encode_blocks', 32)

@@ -20,6 +20,11 @@
 
 #include <cstdint>
 
+// #ifdef _MSC_VER
+// #define _noinline __declspec(noinline)
+// #else
+// #define _noinline __attribute__((noinline))
+// #endif
 
 namespace ffrs {
 namespace detail {
