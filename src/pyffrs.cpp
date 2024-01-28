@@ -147,7 +147,7 @@ public:
         case 2: return _encode_blocks(&ffrs::rs_encode_slice_2<PyGF256, RS256<PyGF256>>::encode, std::move(buf), input_block_size);
         case 4: return _encode_blocks(&ffrs::rs_encode_slice_4<PyGF256, RS256<PyGF256>>::encode, std::move(buf), input_block_size);
         case 8: return _encode_blocks(&ffrs::rs_encode_slice_8<PyGF256, RS256<PyGF256>>::encode, std::move(buf), input_block_size);
-        default: return _encode_blocks(&ffrs::rs_encode_basic_v2<PyGF256, RS256<PyGF256>>::encode, std::move(buf), input_block_size);
+        default: return _encode_blocks(&ffrs::rs_encode_lut_pw2<256>::type<PyGF256, RS256<PyGF256>>::encode, std::move(buf), input_block_size);
         }
     }
 

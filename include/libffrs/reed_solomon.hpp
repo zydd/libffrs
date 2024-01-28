@@ -117,7 +117,7 @@ public:
 };
 
 
-template<size_t MaxFieldElements>
+template<size_t MaxFieldElements, size_t MaxEccLen = MaxFieldElements>
 struct rs_encode_lut_pw2 {
     template<typename GF, typename RS>
     class type {
@@ -142,15 +142,16 @@ struct rs_encode_lut_pw2 {
                 auto data = (uint8_t *) alloca(rs.ecc_len + 1);
                 std::fill_n(data, rs.ecc_len + 1, 0x00);
                 data[0] = uint8_t(i);
-                rs.gf.ex_synth_div(&data[0], rs.ecc_len + 1, &rs.generator[0], rs.ecc_len + 1);
+                rs.gf.poly_mod(data, rs.ecc_len + 1, rs.generator, rs.ecc_len + 1, data);
 
                 for (size_t j = 0; j < rs.ecc_len; ++j)
-                    generator_lut[i][j] = data[j + 1];
+                    generator_lut[i][j] = data[j];
             }
         }
 
     private:
-        uint8_t generator_lut[MaxFieldElements][MaxFieldElements] = {};
+        alignas(size_t)
+        uint8_t generator_lut[detail::align_size(MaxFieldElements, alignof(size_t))][detail::align_size(MaxEccLen, alignof(size_t))] = {};
     };
 };
 
@@ -236,7 +237,8 @@ class rs_encode_slice_pw2_dispatch :
         protected rs_encode_slice_2<GF, RS>,
         protected rs_encode_slice_4<GF, RS>,
         protected rs_encode_slice_8<GF, RS>,
-        protected rs_encode_basic_v2<GF, RS>
+        protected rs_encode_lut_pw2<256>::type<GF, RS>::type
+        // protected rs_encode_basic_v2<GF, RS>
 {
 public:
     using GFT = typename GF::GFT;
@@ -247,7 +249,7 @@ public:
         case 2: return rs_encode_slice_2<GF, RS>::encode(input, size, output);
         case 4: return rs_encode_slice_4<GF, RS>::encode(input, size, output);
         case 8: return rs_encode_slice_8<GF, RS>::encode(input, size, output);
-        default: return rs_encode_basic_v2<GF, RS>::encode(input, size, output);
+        default: return rs_encode_lut_pw2<256>::type<GF, RS>::encode(input, size, output);
         }
     }
 
@@ -256,6 +258,7 @@ protected:
         rs_encode_slice_2<GF, RS>::init();
         rs_encode_slice_4<GF, RS>::init();
         rs_encode_slice_8<GF, RS>::init();
+        rs_encode_lut_pw2<256>::type<GF, RS>::type::init();
     }
 };
 

@@ -132,7 +132,7 @@ private:
 };
 
 
-inline constexpr size_t ilog2_floor(size_t a) {
+constexpr size_t ilog2_floor(size_t a) {
     size_t r = 0;
     while (a >>= 1)
         r += 1;
@@ -140,11 +140,15 @@ inline constexpr size_t ilog2_floor(size_t a) {
 }
 
 
-inline constexpr size_t ipow(size_t a, size_t b) {
+constexpr size_t ipow(size_t a, size_t b) {
     size_t r = 1;
     for (size_t i = 0; i < b; ++i)
         r *= a;
     return r;
+}
+
+constexpr size_t align_size(size_t size, size_t alignment) {
+    return size + (alignment - (size % alignment)) % alignment;
 }
 
 }

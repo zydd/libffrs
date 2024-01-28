@@ -1,5 +1,5 @@
 
-#  test_lib_rs256.py
+#  benchmark.py
 #
 #  Copyright 2024 Gabriel Machado
 #
@@ -23,8 +23,8 @@ import ffrs
 
 random.seed(42)
 
-def benchmark(method, ecc_len, duration=2, update_interval=0.5):
-    print(f'\n{method} ecc_len: {ecc_len}')
+def benchmark(method, ecc_len, block_size, duration=2, update_interval=0.5):
+    print(f'\n{method} ecc_len: {ecc_len} block_size: {block_size}')
     RS256 = ffrs.RS256(ecc_len=ecc_len)
 
     total_time = 0
@@ -34,7 +34,7 @@ def benchmark(method, ecc_len, duration=2, update_interval=0.5):
     while total_time < duration:
         data = bytearray(size)
 
-        time = timeit.timeit(f'RS256.{method}(data, {255 - ecc_len})',
+        time = timeit.timeit(f'RS256.{method}(data, {block_size})',
             number=1, globals=dict(RS256=RS256, data=data))
 
         throughput = size / time
@@ -51,8 +51,10 @@ def benchmark(method, ecc_len, duration=2, update_interval=0.5):
 
 
 if __name__ == '__main__':
-    benchmark('encode_blocks', 2)
-    benchmark('encode_blocks', 4)
-    benchmark('encode_blocks', 6)
-    benchmark('encode_blocks', 8)
-    benchmark('encode_blocks', 32)
+    benchmark('encode_blocks', 2, 255 - 2)
+    benchmark('encode_blocks', 4, 255 - 4)
+    benchmark('encode_blocks', 6, 255 - 6)
+    benchmark('encode_blocks', 8, 32 - 8)
+    benchmark('encode_blocks', 8, 255 - 8)
+    benchmark('encode_blocks', 32, 255 - 32)
+    benchmark('encode_blocks', 64, 255 - 64)
