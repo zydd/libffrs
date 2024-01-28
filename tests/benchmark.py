@@ -51,10 +51,10 @@ def benchmark(method, ecc_len, block_size, duration=2, update_interval=0.5):
 
 
 if __name__ == '__main__':
-    benchmark('encode_blocks', 2, 255 - 2)
-    benchmark('encode_blocks', 4, 255 - 4)
-    benchmark('encode_blocks', 6, 255 - 6)
-    benchmark('encode_blocks', 8, 32 - 8)
+    # benchmark('encode_blocks', 2, 255 - 2)
+    # benchmark('encode_blocks', 4, 255 - 4)
+    # benchmark('encode_blocks', 6, 255 - 6)
+    # benchmark('encode_blocks', 8, 32 - 8)
     benchmark('encode_blocks', 8, 255 - 8)
-    benchmark('encode_blocks', 32, 255 - 32)
-    benchmark('encode_blocks', 64, 255 - 64)
+    # benchmark('encode_blocks', 32, 255 - 32)
+    # benchmark('encode_blocks', 64, 255 - 64)

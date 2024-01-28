@@ -169,17 +169,16 @@ struct rs_encode_slice_pw2 {
 
             if constexpr (Stride > 1) {
                 for (; size - i >= Stride; i += Stride) {
-                    auto in = reinterpret_cast<const Word *>(&input[i]);
-                    rem.word ^= *in++;
+                    rem.word ^= *reinterpret_cast<const Word *>(&input[i]);
+
                     Word t = 0;
+
                     for (size_t j = 0; j < ecc_len; ++j)
                         t ^= generator_lut[Stride-1 - j][rem.bytes[j]].word;
 
-                    for (size_t k = 1; k < Stride / ecc_len; ++k) {
-                        WordB rem2 { *in++ };
-                        for (size_t j = 0; j < ecc_len; ++j)
-                            t ^= generator_lut[Stride-1 - (k * ecc_len + j)][rem2.bytes[j]].word;
-                    }
+                    for (size_t j = ecc_len; j < Stride; ++j)
+                        t ^= generator_lut[Stride-1 - j][input[i + j]].word;
+
                     rem.word = t;
                 }
             }
