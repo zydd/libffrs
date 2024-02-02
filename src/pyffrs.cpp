@@ -184,6 +184,18 @@ public:
 
 PYBIND11_MODULE(ffrs, m) {
     m.attr("__version__") = VERSION_INFO;
+#if defined(__clang__)
+    m.attr("compiler_info") = __VERSION__;
+#elif defined(__GNUC__)
+    m.attr("compiler_info") = "gcc" __VERSION__;
+#elif defined(_MSC_VER)
+    #define _str(a) _stringify(a)
+    #define _stringify(a) #a
+    m.attr("compiler_info") = "MSVC" _str(_MSC_VER);
+#else
+    m.attr("compiler_info") = "unknown";
+#endif
+
     m.doc() = R"(
         FFRS main module
     )";

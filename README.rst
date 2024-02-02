@@ -1,15 +1,16 @@
 libffrs
--------
+=======
 
-**ffrs** -- Fairly Fast & Flexible Reed-Solomon coding
+Fairly *F*\ ast & *F*\ lexible *R*\ eed-*S*\ olomon Coding
 
-The core of this library is implemented in C++ and exported to Python with `pybind11 <https://github.com/pybind/pybind11>`_.
+This library uses a variation Intel's Slicing-by-8 algorithm for the encoding routines,
+achieving some hefty speeds depending on the code sizes. See `Benchmarks <https://zydd.github.io/libffrs/benchmark.html>`_.
 
-For the time being this project has only been tested on Python 3.9.2
+The core implementation is done in C++ and exported to Python with `pybind11 <https://github.com/pybind/pybind11>`_.
 
 
 Basic usage
------------
+===========
 
 .. code-block:: python
 
@@ -18,27 +19,30 @@ Basic usage
     message = bytearray(b'Hello World!')
 
     # Create encoder/decoder for 8 parity bytes
-    RS256 = ffrs.RS256(ecc_len=8)
+    rs8 = ffrs.RS256(ecc_len=8)
 
     # Allocate space for correction code
-    data = message + bytearray(RS256.ecc_len)
+    data = message + bytearray(rs8.ecc_len)
 
     # Compute parity bytes
-    RS256.encode(data)
+    rs8.encode(data)
 
     # Corrupt some bytes (up to ecc_len/2)
     data[3] ^= 0xaa
     data[9] ^= 0x55
 
     # Restore partially corrupted message
-    RS256.decode(data)
+    rs8.decode(data)
 
     # Remove parity bytes
-    recovered_message = data[:-RS256.ecc_len]
+    recovered_message = data[:-rs8.ecc_len]
+
+    assert message == recovered_message
+
 
 
 Installation
-------------
+============
 
 .. code-block:: bash
 
@@ -47,7 +51,7 @@ Installation
 
 
 Documentation
--------------
+=============
 
 Auto-generated documentation can be found at:
 
@@ -55,9 +59,9 @@ Auto-generated documentation can be found at:
 
 
 Building the documentation
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+--------------------------
 
-Documentation for this project is generated automatically using Sphinx based on class/method signatures and docstrings.
+Documentation for this project is generated automatically using Sphinx based on class/method signatures and doc strings.
 
 .. code-block:: bash
 
@@ -68,6 +72,6 @@ Documentation for this project is generated automatically using Sphinx based on 
 Documentation files will be created in ``./build/html``
 
 License
--------
+=======
 
 **libffrs** is licensed under the `Apache License, Version 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_

@@ -5,7 +5,7 @@
 
 :hide-toc:
 
-.. include:: ../README.rst
+.. include:: front.rst
 
 .. toctree::
     :maxdepth: 4
@@ -13,6 +13,7 @@
     :hidden:
 
     front
+    benchmark
 
 .. autosummary::
     :toctree: ./generated
@@ -20,7 +21,6 @@
     :recursive:
 
     ffrs
-
 
 .. toctree::
     genindex
