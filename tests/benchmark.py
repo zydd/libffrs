@@ -100,17 +100,32 @@ if __name__ == '__main__':
         # ('method', ecc_len, block_size)
 
         # Max block size
+        ('encode_blocks', 1, 255 - 2),
         ('encode_blocks', 2, 255 - 2),
+        ('encode_blocks', 3, 255 - 2),
         ('encode_blocks', 4, 255 - 4),
+        ('encode_blocks', 5, 255 - 4),
         ('encode_blocks', 6, 255 - 6),
+        ('encode_blocks', 7, 255 - 6),
         ('encode_blocks', 8, 255 - 8),
+        ('encode_blocks', 9, 255 - 8),
         ('encode_blocks', 10, 255 - 10),
+        ('encode_blocks', 11, 255 - 12),
         ('encode_blocks', 12, 255 - 12),
+        ('encode_blocks', 13, 255 - 12),
+        ('encode_blocks', 14, 255 - 12),
+        ('encode_blocks', 15, 255 - 12),
         ('encode_blocks', 16, 255 - 16),
         ('encode_blocks', 24, 255 - 24),
+        ('encode_blocks', 31, 255 - 32),
         ('encode_blocks', 32, 255 - 32),
+        ('encode_blocks', 33, 255 - 32),
+        ('encode_blocks', 63, 255 - 64),
         ('encode_blocks', 64, 255 - 64),
+        ('encode_blocks', 65, 255 - 64),
+        ('encode_blocks', 127, 255 - 128),
         ('encode_blocks', 128, 255 - 128),
+        ('encode_blocks', 129, 255 - 128),
 
         # CD-ROM CIRC
         ('encode_blocks', 32 - 28, 28),  # inner
@@ -121,7 +136,10 @@ if __name__ == '__main__':
         ('encode_blocks', 182 - 172, 172),  # outer
     ]
 
-    throughput = []
-    for method, ecc_len, block_size in config:
-        if len(sys.argv) == 1 or str(ecc_len) in sys.argv[1:]:
-            throughput.append(benchmark_peak(method, ecc_len, block_size))
+    if len(sys.argv) > 1:
+        for arg in sys.argv[1:]:
+            ecc_len = int(arg)
+            benchmark_peak('encode_blocks', ecc_len, 255 - ecc_len, cooldown=5)
+    else:
+        for method, ecc_len, block_size in config:
+            benchmark_peak(method, ecc_len, block_size)

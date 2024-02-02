@@ -27,7 +27,9 @@ def randbytes(n):
     return bytearray(random.randrange(256) for _ in range(n))
 
 
-@pytest.mark.parametrize('rs', [ffrs.RS256(ecc_len=l) for l in list(range(1, 10)) + [32, 33]])
+@pytest.mark.parametrize('rs', [
+    ffrs.RS256(ecc_len=l) for l in
+        list(range(1, 16 + 1)) + [31, 32, 33, 63, 64, 65, 127, 128, 129, 253, 254]])
 class TestRS:
     def test_encode(self, rs):
         for size in range(rs.gf.field_elements-1 - rs.ecc_len):

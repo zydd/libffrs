@@ -48,7 +48,7 @@ using RS256 = ffrs::RS<GF,
     // ffrs::rs_encode_basic_v2,
     // ffrs::rs_encode_lut_pw2<256>::type,
     // ffrs::rs_encode_slice_pw2<uint64_t, 8, 256, 16>::type,
-    ffrs::rs_encode_slice_pw2_dispatch,
+    ffrs::rs_encode_slice_pw2_dispatch<255>::type,
 
     // ffrs::rs_synds_basic<256>::type,
     ffrs::rs_synds_lut_pw2<uint32_t, 255>::type,
@@ -141,24 +141,6 @@ public:
     }
 
     inline py::bytearray py_encode_blocks(buffer_ro<uint8_t> buf, size_t input_block_size) {
-        // encode_blocks is 10x slower in MSVC compared to gcc/clang if we call rs_encode_slice_pw2_dispatch::encode
-        // performing the dispatch 1 level higher seems to do the trick, MSVC is still slower, but comparable
-        switch (ecc_len) {
-        case 2: return _encode_blocks(&ffrs::rs_encode_slice_2<PyGF256, RS256<PyGF256>>::encode, std::move(buf), input_block_size);
-        case 4: return _encode_blocks(&ffrs::rs_encode_slice_4<PyGF256, RS256<PyGF256>>::encode, std::move(buf), input_block_size);
-        case 8: return _encode_blocks(&ffrs::rs_encode_slice_8<PyGF256, RS256<PyGF256>>::encode, std::move(buf), input_block_size);
-        default: return _encode_blocks(&ffrs::rs_encode_lut_pw2<256>::type<PyGF256, RS256<PyGF256>>::encode, std::move(buf), input_block_size);
-        }
-    }
-
-    inline bool py_decode(buffer_rw<uint8_t> buf) {
-        size_t msg_size = buf.size - ecc_len;
-        return decode(buf.data, msg_size, &buf.data[msg_size]);
-    }
-
-private:
-    template<typename Method>
-    inline py::bytearray _encode_blocks(Method method, buffer_ro<uint8_t> buf, size_t input_block_size) {
         if (buf.size == 0 || input_block_size == 0)
             return {};
 
@@ -181,18 +163,22 @@ private:
         for (size_t block = 0; block < buf.size / input_block_size; ++block) {
             auto output_block = &output_data[block * output_block_size];
             std::copy_n(&buf.data[block * input_block_size], input_block_size, output_block);
-            (this->*method)(output_block, input_block_size, &output_block[input_block_size]);
+            encode(output_block, input_block_size, &output_block[input_block_size]);
         }
 
         if (input_remainder > 0) {
             auto output_block = &output_data[output_size - input_remainder - this->ecc_len];
             std::copy_n(&buf.data[buf.size - input_remainder], input_remainder, output_block);
-            (this->*method)(output_block, input_remainder, &output_block[input_remainder]);
+            encode(output_block, input_remainder, &output_block[input_remainder]);
         }
 
         return output;
     }
 
+    inline bool py_decode(buffer_rw<uint8_t> buf) {
+        size_t msg_size = buf.size - ecc_len;
+        return decode(buf.data, msg_size, &buf.data[msg_size]);
+    }
 };
 
 

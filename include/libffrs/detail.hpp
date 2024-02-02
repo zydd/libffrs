@@ -109,6 +109,11 @@ public:
         return static_cast<T const&>(*_this);
     }
 
+    template<typename F>
+    static constexpr T& cast_mut(F _this) {
+        return static_cast<T&>(*_this);
+    }
+
 protected:
     // base class constructors are always called first
     // define an `init` method to make sure it's called after GF is initialized
