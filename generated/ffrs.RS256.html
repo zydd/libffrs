@@ -162,6 +162,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../front.html#installation">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../front.html#documentation">Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../front.html#license">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../benchmark.html">Benchmarks</a></li>
 </ul>
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="ffrs.html">ffrs</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of ffrs</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
@@ -226,6 +227,9 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.RS256.encode" title="ffrs.RS256.encode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">encode</span></code></a></p></td>
 <td><p>Systematic encode</p></td>
 </tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.RS256.encode_blocks" title="ffrs.RS256.encode_blocks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">encode_blocks</span></code></a></p></td>
+<td><p>Encode blocks</p></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -260,6 +264,12 @@
 <dt class="sig sig-object py" id="ffrs.RS256.encode">
 <span class="sig-name descname"><span class="pre">encode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#ffrs.RS256" title="ffrs.RS256"><span class="pre">ffrs.RS256</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Buffer</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#ffrs.RS256.encode" title="Link to this definition">#</a></dt>
 <dd><p>Systematic encode</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ffrs.RS256.encode_blocks">
+<span class="sig-name descname"><span class="pre">encode_blocks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#ffrs.RS256" title="ffrs.RS256"><span class="pre">ffrs.RS256</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Buffer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_block_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytearray</span></span></span><a class="headerlink" href="#ffrs.RS256.encode_blocks" title="Link to this definition">#</a></dt>
+<dd><p>Encode blocks</p>
 </dd></dl>
 
 </dd></dl>
@@ -318,6 +328,7 @@
 <li><a class="reference internal" href="#ffrs.RS256.__init__"><code class="docutils literal notranslate"><span class="pre">RS256.__init__()</span></code></a></li>
 <li><a class="reference internal" href="#ffrs.RS256.decode"><code class="docutils literal notranslate"><span class="pre">RS256.decode()</span></code></a></li>
 <li><a class="reference internal" href="#ffrs.RS256.encode"><code class="docutils literal notranslate"><span class="pre">RS256.encode()</span></code></a></li>
+<li><a class="reference internal" href="#ffrs.RS256.encode_blocks"><code class="docutils literal notranslate"><span class="pre">RS256.encode_blocks()</span></code></a></li>
 </ul>
 </li>
 </ul>

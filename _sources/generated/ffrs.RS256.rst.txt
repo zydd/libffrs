@@ -1,4 +1,4 @@
-﻿ffrs.RS256
+ffrs.RS256
 ==========
 
 
@@ -20,6 +20,7 @@
       ~RS256.__init__
       ~RS256.decode
       ~RS256.encode
+      ~RS256.encode_blocks
    
    
 

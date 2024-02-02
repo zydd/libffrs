@@ -162,6 +162,7 @@
 <li class="toctree-l1"><a class="reference internal" href="front.html#installation">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="front.html#documentation">Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="front.html#license">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="benchmark.html">Benchmarks</a></li>
 </ul>
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="generated/ffrs.html">ffrs</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of ffrs</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
@@ -208,9 +209,10 @@
         <article role="main">
           <section id="libffrs">
 <h1>libffrs<a class="headerlink" href="#libffrs" title="Link to this heading">#</a></h1>
-<p><strong>ffrs</strong> – Fairly Fast &amp; Flexible Reed-Solomon coding</p>
-<p>The core of this library is implemented in C++ and exported to Python with <a class="reference external" href="https://github.com/pybind/pybind11">pybind11</a>.</p>
-<p>For the time being this project has only been tested on Python 3.9.2</p>
+<p>Fairly <em>F</em>ast &amp; <em>F</em>lexible <em>R</em>eed-<em>S</em>olomon Coding</p>
+<p>This library uses a variation Intel’s Slicing-by-8 algorithm for the encoding routines,
+achieving some hefty encoding speeds depending on the code sizes. See <a class="reference internal" href="benchmark.html#benchmarks"><span class="std std-ref">Benchmarks</span></a>.</p>
+<p>The core implementation is done in C++ and exported to Python with <a class="reference external" href="https://github.com/pybind/pybind11">pybind11</a>.</p>
 </section>
 <section id="basic-usage">
 <h1>Basic usage<a class="headerlink" href="#basic-usage" title="Link to this heading">#</a></h1>
@@ -219,23 +221,25 @@
 <span class="n">message</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;Hello World!&#39;</span><span class="p">)</span>
 
 <span class="c1"># Create encoder/decoder for 8 parity bytes</span>
-<span class="n">RS256</span> <span class="o">=</span> <span class="n">ffrs</span><span class="o">.</span><span class="n">RS256</span><span class="p">(</span><span class="n">ecc_len</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<span class="n">rs8</span> <span class="o">=</span> <span class="n">ffrs</span><span class="o">.</span><span class="n">RS256</span><span class="p">(</span><span class="n">ecc_len</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
 
 <span class="c1"># Allocate space for correction code</span>
-<span class="n">data</span> <span class="o">=</span> <span class="n">message</span> <span class="o">+</span> <span class="nb">bytearray</span><span class="p">(</span><span class="n">RS256</span><span class="o">.</span><span class="n">ecc_len</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">message</span> <span class="o">+</span> <span class="nb">bytearray</span><span class="p">(</span><span class="n">rs8</span><span class="o">.</span><span class="n">ecc_len</span><span class="p">)</span>
 
 <span class="c1"># Compute parity bytes</span>
-<span class="n">RS256</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="n">rs8</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 
 <span class="c1"># Corrupt some bytes (up to ecc_len/2)</span>
 <span class="n">data</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">^=</span> <span class="mh">0xaa</span>
 <span class="n">data</span><span class="p">[</span><span class="mi">9</span><span class="p">]</span> <span class="o">^=</span> <span class="mh">0x55</span>
 
 <span class="c1"># Restore partially corrupted message</span>
-<span class="n">RS256</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="n">rs8</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 
 <span class="c1"># Remove parity bytes</span>
-<span class="n">recovered_message</span> <span class="o">=</span> <span class="n">data</span><span class="p">[:</span><span class="o">-</span><span class="n">RS256</span><span class="o">.</span><span class="n">ecc_len</span><span class="p">]</span>
+<span class="n">recovered_message</span> <span class="o">=</span> <span class="n">data</span><span class="p">[:</span><span class="o">-</span><span class="n">rs8</span><span class="o">.</span><span class="n">ecc_len</span><span class="p">]</span>
+
+<span class="k">assert</span> <span class="n">message</span> <span class="o">==</span> <span class="n">recovered_message</span>
 </pre></div>
 </div>
 </section>
@@ -254,7 +258,7 @@ pip<span class="w"> </span>install<span class="w"> </span>./libffrs
 </ul>
 <section id="building-the-documentation">
 <h2>Building the documentation<a class="headerlink" href="#building-the-documentation" title="Link to this heading">#</a></h2>
-<p>Documentation for this project is generated automatically using Sphinx based on class/method signatures and docstrings.</p>
+<p>Documentation for this project is generated automatically using Sphinx based on class/method signatures and doc strings.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>./libffrs
 pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;sphinx&gt;=7.2&#39;</span><span class="w"> </span><span class="s1">&#39;furo==2023.9.10&#39;</span>
 make<span class="w"> </span>-C<span class="w"> </span>./docs/<span class="w"> </span>html
