@@ -10,8 +10,8 @@ Encoding
 **libffrs** `v0.1-11-g5bf2eb3 <https://github.com/zydd/libffrs/tree/v0.1>`_
 
 
-`ffrs.RS256.encode_blocks <generated/ffrs.RS256.html#ffrs.RS256.encode_blocks>`_
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+:py:meth:`ffrs.RS256.encode_blocks`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. csv-table::
     :file: benchmark_encode_blocks.csv

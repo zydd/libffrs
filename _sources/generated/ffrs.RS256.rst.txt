@@ -1,4 +1,4 @@
-ffrs.RS256
+﻿ffrs.RS256
 ==========
 
 
@@ -30,8 +30,11 @@ ffrs.RS256
 
    .. autosummary::
    
+      ~RS256.default_block_len
+      ~RS256.default_block_msg_len
       ~RS256.ecc_len
       ~RS256.generator
+      ~RS256.generator_roots
       ~RS256.gf
    
    
