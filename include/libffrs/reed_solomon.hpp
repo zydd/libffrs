@@ -225,7 +225,7 @@ struct rs_encode_slice_generic_pw2 {
         auto& generator_lut = *static_cast<const generator_lut_t *>(lut);
 
         if constexpr (Stride > 1) {
-            for (; size - i >= Stride; i += Stride) {
+            for (; i + Stride <= size; i += Stride) {
                 // rem.word ^= *reinterpret_cast<const Word *>(&input[i]);
                 std::transform(&rem[0], &rem[EccLen], &input[i], &rem[0], std::bit_xor());
 
@@ -360,11 +360,12 @@ struct rs_synds_basic {
         using synds_array_t = typename GF::GFT[MaxFieldElements];
 
         template<typename S, typename T>
-        inline void synds(synds_array_t synds, S const& data, size_t size, T const& rem) const {
+        inline void synds(S const& data, size_t size, T const& rem, synds_array_t synds) const {
             auto rs = RS::cast(this);
+
             for (size_t i = 0; i < rs.ecc_len; ++i) {
                 auto t = rs.gf.poly_eval(data, size, rs.generator_roots[i]);
-                synds[rs.ecc_len - i - 1] = rs.gf.poly_eval(rem, rs.ecc_len, rs.generator_roots[i], t);
+                synds[i] = rs.gf.poly_eval(rem, rs.ecc_len, rs.generator_roots[i], t);
             }
         }
     };
@@ -375,19 +376,19 @@ template<typename Word, size_t MaxEccLen>
 struct rs_synds_lut_pw2 {
     template<typename GF, typename RS>
     class type {
+        static_assert(sizeof(typename GF::wide_mul_word_t) >= sizeof(Word));
+
     public:
         static constexpr size_t max_ecc_w = (MaxEccLen / sizeof(Word)) + !!(MaxEccLen % sizeof(Word));
         static constexpr size_t synds_size = max_ecc_w * sizeof(Word);
         using synds_array_t /* alignas(sizeof(Word)) */ = uint8_t[synds_size];
+        using GFT = typename GF::GFT;
 
-        inline void synds(uint8_t synds[], const uint8_t *data, size_t size, const uint8_t *rem) {
+        inline void synds(const GFT *data, size_t size, const GFT *rem, synds_array_t synds) const {
             auto rs = RS::cast(this);
             auto synds_w = reinterpret_cast<Word *>(synds);
             for (size_t i = 0; i < ecc_w; ++i) {
                 auto t = rs.gf.poly_eval_wide(data, size, generator_roots_wide[i]);
-
-                static_assert(sizeof(typename GF::wide_mul_word_t) >= sizeof(Word));
-
                 synds_w[i] = Word(rs.gf.poly_eval_wide(rem, rs.ecc_len, generator_roots_wide[i], t));
             }
         }
@@ -395,9 +396,14 @@ struct rs_synds_lut_pw2 {
     protected:
         inline void init() {
             auto rs = RS::cast(this);
-            for (auto i = 0; i < rs.ecc_len; ++i) {
-                // reverse-order syndromes, endianess dependent
-                generator_roots_wide[i / sizeof(Word)] |= Word(rs.gf.exp(rs.ecc_len - i - 1)) << (i % sizeof(Word)) * 8;
+
+            size_t i = 0;
+            for (; i + sizeof(Word) <= rs.ecc_len; i += sizeof(Word)) {
+                generator_roots_wide[i / sizeof(Word)] = reinterpret_cast<const Word *>(rs.generator_roots)[i / sizeof(Word)];
+            }
+
+            for (; i < rs.ecc_len; ++i) {
+                reinterpret_cast<GFT *>(generator_roots_wide)[i] = rs.generator_roots[i];
             }
 
             ecc_w = (rs.ecc_len / sizeof(Word)) + !!(rs.ecc_len % sizeof(Word));
@@ -517,7 +523,7 @@ struct rs_decode {
     inline bool decode(T data, const size_t size, U rem) const {
         auto rs = RS::cast(this);
         typename RS::synds_array_t synds;
-        rs.synds(synds, &data[0], size, rem);
+        rs.synds(&data[0], size, rem, synds);
 
         if (std::all_of(&synds[0], &synds[rs.ecc_len], std::logical_not()))
             return true;
@@ -558,7 +564,7 @@ struct rs_decode {
             return false;
 
         typename RS::synds_array_t synds;
-        rs.synds(synds, &data[0], size, rem);
+        rs.synds(&data[0], size, rem, synds);
 
         if (std::all_of(&synds[0], &synds[rs.ecc_len], std::logical_not()))
             return true;
@@ -609,13 +615,11 @@ struct rs_decode {
         return true;
     }
 
-    inline size_t berlekamp_massey(const GFT synds_rev[/*ecc_len*/], GFT err_poly[/*ecc_len*/]) const {
+    inline size_t berlekamp_massey(const GFT synds[/*ecc_len*/], GFT err_poly[/*ecc_len*/]) const {
         auto rs = RS::cast(this);
         auto prev = (GFT *) alloca(rs.ecc_len);
         std::fill_n(prev, rs.ecc_len, 0x00);
         auto temp = (GFT *) alloca(rs.ecc_len);
-        auto synds = (GFT *) alloca(rs.ecc_len);
-        std::reverse_copy(synds_rev, &synds_rev[rs.ecc_len], synds);
         std::fill_n(err_poly, rs.ecc_len, 0);
 
         prev[rs.ecc_len-1] = 1;
@@ -661,10 +665,14 @@ struct rs_decode {
     }
 
     inline void forney(
-            const GFT synds_rev[/*ecc_len*/], GFT err_poly[], const GFT err_pos[],
+            const GFT synds[/*ecc_len*/], GFT err_poly[], const GFT err_pos[],
             const size_t err_count, GFT err_mag[]) const {
         auto rs = RS::cast(this);
         auto err_eval = (GFT *) alloca(rs.ecc_len * 2);
+
+        auto synds_rev = (GFT *) alloca(rs.ecc_len);
+        std::reverse_copy(synds, &synds[rs.ecc_len], synds_rev);
+
         auto err_eval_size = rs.gf.poly_mul(
                 synds_rev, rs.ecc_len,
                 err_poly, err_count + 1,

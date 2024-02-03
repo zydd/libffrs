@@ -179,6 +179,18 @@ public:
         size_t msg_size = buf.size - ecc_len;
         return decode(buf.data, msg_size, &buf.data[msg_size]);
     }
+
+    inline py::bytearray py_synds(buffer_ro<uint8_t> buf) {
+        if (buf.size < ecc_len)
+            return {};
+
+        size_t msg_size = buf.size - ecc_len;
+        synds_array_t synds_arr;
+
+        synds(buf.data, msg_size, &buf.data[msg_size], synds_arr);
+
+        return py::bytearray(reinterpret_cast<const char *>(synds_arr), ecc_len);
+    }
 };
 
 
@@ -253,10 +265,13 @@ PYBIND11_MODULE(ffrs, m) {
         .def_property_readonly("gf", [](PyRS256& self) { return self.gf; })
         .def_property_readonly("generator", [](PyRS256& self) {
             return py::bytes(reinterpret_cast<const char *>(self.generator), self.ecc_len + 1); })
+        .def_property_readonly("generator_roots", [](PyRS256& self) {
+            return py::bytes(reinterpret_cast<const char *>(self.generator_roots), self.ecc_len); })
         .def(py::init<uint8_t>(), R"()", "ecc_len"_a)
         .def("__sizeof__", [](PyRS256& self) { return sizeof(self); })
         .def("encode", cast_args(&PyRS256::py_encode), R"(Systematic encode)", "buffer"_a)
         .def("encode_blocks", cast_args(&PyRS256::py_encode_blocks), R"(Encode blocks)", "buffer"_a, "input_block_size"_a)
         .def("decode", cast_args(&PyRS256::py_decode), R"(Systematic decode)", "buffer"_a)
+        .def("_synds", cast_args(&PyRS256::py_synds), R"(Compute syndromes)", "buffer"_a)
         .doc() = R"(Reed-Solomon coding over :math:`GF(2^8)`)";
 }

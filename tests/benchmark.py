@@ -112,7 +112,7 @@ def run_benchmarks(config):
         table = [['method', 'ecc_len', 'block_size']]
         for cfg in config:
             table.append(list(map(str, cfg)))
-    
+
     header = table[0]
 
     throughput = []

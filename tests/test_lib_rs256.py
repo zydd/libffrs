@@ -30,6 +30,7 @@ def randbytes(n):
 @pytest.mark.parametrize('rs', [
     ffrs.RS256(ecc_len=l) for l in
         list(range(1, 16 + 1)) + [31, 32, 33, 63, 64, 65, 127, 128, 129, 253, 254]])
+        # [5]])
 class TestRS:
     def test_encode(self, rs):
         for size in range(rs.gf.field_elements-1 - rs.ecc_len):
@@ -61,6 +62,9 @@ class TestRS:
                     continue
                 error_positions.add(i)
                 msg_b[i] ^= random.randrange(1, 256)
+
+            if size > 0 and rs.ecc_len >= 2:
+                assert msg_a != msg_b
 
             assert rs.decode(msg_b) is True
             assert msg_a == msg_b
@@ -95,6 +99,44 @@ class TestRS:
                 assert msg_b == msg_c
 
             assert msg_a != msg_b
+
+
+    def test__synds(self, rs):
+        for size in range(1, rs.gf.field_elements-1 - rs.ecc_len):
+            a = randbytes(size)
+
+            msg_a = a + bytearray(rs.ecc_len)
+            rs.encode(msg_a)
+
+            msg_b = bytearray(msg_a)
+
+            error_positions = set()
+            while len(error_positions) < rs.ecc_len//2:
+                i = random.randrange(len(msg_b))
+                if i in error_positions:
+                    continue
+                error_positions.add(i)
+                msg_b[i] ^= random.randrange(1, 256)
+
+            eval_gen_roots_a = bytearray(rs.gf.poly_eval(msg_a, x) for x in rs.generator_roots)
+            eval_gen_roots_b = bytearray(rs.gf.poly_eval(msg_b, x) for x in rs.generator_roots)
+
+            synd_a = rs._synds(msg_a)
+            synd_b = rs._synds(msg_b)
+
+            assert synd_a == bytearray(rs.ecc_len)
+            assert synd_a == eval_gen_roots_a
+            assert synd_b == eval_gen_roots_b
+
+            if rs.ecc_len >= 2:
+                assert msg_a != msg_b
+                assert synd_b != synd_a
+
+            rem_a = rs.gf.poly_mod(msg_a, rs.generator)
+            rem_b = rs.gf.poly_mod(msg_b, rs.generator)
+
+            assert synd_a == rs._synds(rem_a)
+            assert synd_b == rs._synds(rem_b)
 
 
     def test_encode_blocks(self, rs):
