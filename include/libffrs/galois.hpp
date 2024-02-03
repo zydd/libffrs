@@ -41,6 +41,12 @@ public:
     const GFT poly1;
     const size_t field_elements;
 
+    GF(GF const&) = delete;
+    GF& operator=(GF const&) = delete;
+
+    GF(GF&&) = default;
+    GF& operator=(GF&&) = default;
+
     inline GF(GFT prime, GFT power, GFT primitive, GFT poly1):
         prime(prime), power(power), primitive(primitive), poly1(poly1),
         field_elements(detail::ipow(prime, power))
@@ -54,12 +60,12 @@ template<typename GFT, typename GF>
 class gf_add_ring {
 public:
     inline GFT add(GFT const& lhs, GFT const& rhs) const {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
         return (lhs + rhs) % gf.prime;
     }
 
     inline GFT sub(GFT const& lhs, GFT const& rhs) const {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
         if (lhs >= rhs)
             return (lhs - rhs) % gf.prime;
         else
@@ -79,7 +85,7 @@ template<typename GFT, typename GF>
 class gf_mul_cpu_pw2 {
 public:
     inline GFT mul(GFT const& a, GFT const& b) const {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
 
         GFT r = 0;
 
@@ -97,7 +103,7 @@ public:
     }
 
     inline void init() {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
         iter = int(detail::ilog2_floor(gf.field_elements >> 1));
     }
 private:
@@ -109,7 +115,7 @@ template<typename GFT, typename GF>
 class gf_mul_cpu_prime {
 public:
     inline GFT mul(GFT const& lhs, GFT const& rhs) const {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
         return (lhs * rhs) % gf.prime;
     }
 };
@@ -121,12 +127,12 @@ struct gf_exp_log_lut {
     class type {
     public:
         inline GFT inv(GFT const& a) const {
-            auto gf = GF::cast(this);
+            auto& gf = GF::cast(this);
             return _exp[gf.field_elements-1 - _log[a]];
         }
 
         inline GFT div(GFT const& a, GFT const& b) const {
-            auto gf = GF::cast(this);
+            auto& gf = GF::cast(this);
 
             if (a == 0)
                 return 0;
@@ -147,13 +153,13 @@ struct gf_exp_log_lut {
         }
 
         inline GFT pow(GFT const& a, GFT const& b) const {
-            auto gf = GF::cast(this);
+            auto& gf = GF::cast(this);
             return _exp[(_log[a] * b) % (gf.field_elements - 1)];
         }
 
     protected:
         inline void init() {
-            auto gf = GF::cast(this);
+            auto& gf = GF::cast(this);
             auto gf_cpu = ffrs::GF<GFT, MulOperation>(gf.prime, gf.power, gf.primitive, gf.poly1);
 
             GFT x = 1;
@@ -179,13 +185,13 @@ struct gf_mul_lut {
         static_assert(MaxFieldElements <= 4096); // limit 16MB
 
         inline GFT mul(GFT const& a, GFT const& b) const {
-            auto gf = GF::cast(this);
+            auto& gf = GF::cast(this);
             return _mul[a * gf.field_elements + b];
         }
 
     protected:
         inline void init() {
-            auto gf = GF::cast(this);
+            auto& gf = GF::cast(this);
 
             auto gf_cpu = ffrs::GF<GFT, MulOperation>(gf.prime, gf.power, gf.primitive, gf.poly1);
 
@@ -207,7 +213,7 @@ public:
         if (a == 0 || b == 0)
             return 0;
 
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
         size_t r = gf.log(a) + gf.log(b);
         if (r >= gf.field_elements-1)
             r -= gf.field_elements-1;
@@ -252,7 +258,7 @@ struct gf_wide_mul {
 
     protected:
         inline void init() {
-            auto gf = GF::cast(this);
+            auto& gf = GF::cast(this);
             polyw = _repeat_byte(gf.poly1);
         }
 
@@ -279,7 +285,7 @@ struct gf_poly {
         if (size_b > size_a)
             return 0;
 
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
 
         GFT norm_factor = gf.inv(b[0]);
 
@@ -310,7 +316,7 @@ struct gf_poly {
         if (size_a < size_b)
             return size_a;
 
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
 
         GFT norm_factor = gf.inv(b[0]);
         b += 1;
@@ -335,7 +341,7 @@ struct gf_poly {
             const Ta a[], const size_t size_a,
             const Tb b[], const size_t size_b,
             Tr rem[]) const {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
 
         if (size_a >= size_b) {
             std::copy_n(a, size_b, rem);
@@ -372,7 +378,7 @@ struct gf_poly {
 
     template<typename T>
     inline GFT poly_eval(const T poly[], const size_t size, GFT const& x, GFT r = 0) const {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
         for (size_t i = 0; i < size; ++i)
             r = gf.add(gf.mul(r, x), poly[i]);
         return r;
@@ -389,21 +395,21 @@ struct gf_poly {
 
     template<typename T>
     inline void poly_scale(T poly[], const size_t size, T const& a) const {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
         for (size_t i = 0; i < size; ++i)
             poly[i] = gf.mul(a, poly[i]);
     }
 
     template<typename T>
     inline void poly_add(const T poly_a[], const T poly_b[], T output[], const size_t size) const {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
         for (size_t i = 0; i < size; ++i)
             output[i] = gf.add(poly_a[i], poly_b[i]);
     }
 
     template<typename T>
     inline void poly_add(const T poly_a[], const size_t size_a, const T poly_b[], const size_t size_b, T output[]) const {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
 
         if (size_a > size_b) {
             auto start = size_a - size_b;
@@ -423,14 +429,14 @@ struct gf_poly {
 
     template<typename T>
     inline void poly_sub(const T poly_a[], const T poly_b[], T output[], const size_t size) const {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
         for (size_t i = 0; i < size; ++i)
             output[i] = gf.sub(poly_a[i], poly_b[i]);
     }
 
     template<typename T>
     inline void poly_sub(const T poly_a[], const size_t size_a, const T poly_b[], const size_t size_b, T output[]) const {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
 
         if (size_a > size_b) {
             auto start = size_a - size_b;
@@ -458,7 +464,7 @@ struct gf_poly {
         for (size_t i = 0; i < res_len; ++i)
             r[i] = 0;
 
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
         for (size_t i = 0; i < size_a; ++i)
             for (size_t j = 0; j < size_b; ++j)
                 r[i + j] = gf.add(r[i + j], gf.mul(poly_a[i], poly_b[j]));
@@ -484,7 +490,7 @@ template<typename GFT, typename GF>
 struct gf_poly_deriv_prime {
     template<typename T>
     inline size_t poly_deriv(T poly[], size_t size) const {
-        auto gf = GF::cast(this);
+        auto& gf = GF::cast(this);
         for (size_t i = 1; i < size; ++i)
             poly[size - i] = gf.mul(poly[size - i - 1], i);
         poly[0] = 0;

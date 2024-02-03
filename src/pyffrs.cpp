@@ -262,7 +262,7 @@ PYBIND11_MODULE(ffrs, m) {
 
     py::class_<PyRS256>(m, "RS256")
         .def_property_readonly("ecc_len", [](PyRS256& self) { return self.ecc_len; })
-        .def_property_readonly("gf", [](PyRS256& self) { return self.gf; })
+        .def_property_readonly("gf", [](PyRS256& self) -> auto const& { return self.gf; })
         .def_property_readonly("generator", [](PyRS256& self) {
             return py::bytes(reinterpret_cast<const char *>(self.generator), self.ecc_len + 1); })
         .def_property_readonly("generator_roots", [](PyRS256& self) {

@@ -35,8 +35,11 @@ public:
     const GF gf;
     const GFT ecc_len;
 
-    inline RS(GF const& gf, GFT ecc_len):
-        gf(gf), ecc_len(ecc_len)
+    RS(RS const&) = delete;
+    RS& operator=(RS const&) = delete;
+
+    inline RS(GF&& gf, GFT ecc_len):
+        gf(std::move(gf)), ecc_len(ecc_len)
     {
         detail::CRTP<RS<GF, Fs...>, Fs<GF, RS<GF, Fs...>>...>::init();
     }
@@ -54,7 +57,7 @@ struct rs_generator {
 
     protected:
         inline void init() {
-            auto rs = RS::cast(this);
+            auto& rs = RS::cast(this);
 
             auto temp = (GFT *) alloca(rs.ecc_len + 1);
             std::fill_n(temp, rs.ecc_len + 1, 0x00);
@@ -84,7 +87,7 @@ public:
     using GFT = typename GF::GFT;
 
     inline void encode(const GFT input[], size_t input_size, GFT output[]) {
-        auto rs = RS::cast(this);
+        auto& rs = RS::cast(this);
 
         // Multiply input by X^n, n = ecc_len+1  === append ecc_len bytes
         auto input_x_n = (GFT *) alloca(input_size + rs.ecc_len);
@@ -107,7 +110,7 @@ public:
     using GFT = typename GF::GFT;
 
     inline void encode(const GFT input[], size_t input_size, GFT output[]) {
-        auto rs = RS::cast(this);
+        auto& rs = RS::cast(this);
         rs.gf.poly_mod_x_n(input, input_size, &rs.generator[1], rs.ecc_len, output);
 
         if (rs.gf.prime != 2) {
@@ -124,7 +127,7 @@ struct rs_encode_lut_pw2 {
     class type {
     public:
         inline void encode(const uint8_t *input, size_t size, uint8_t *output) const {
-            auto rs = RS::cast(this);
+            auto& rs = RS::cast(this);
             std::fill_n(output, rs.ecc_len, 0x00);
             for (size_t i = 0; i < size; ++i) {
                 uint8_t pos = output[0] ^ input[i];
@@ -138,7 +141,7 @@ struct rs_encode_lut_pw2 {
 
     protected:
         inline void init() {
-            auto rs = RS::cast(this);
+            auto& rs = RS::cast(this);
             for (size_t i = 0; i < rs.gf.field_elements; ++i) {
                 auto data = (uint8_t *) alloca(rs.ecc_len + 1);
                 std::fill_n(data, rs.ecc_len + 1, 0x00);
@@ -361,7 +364,7 @@ struct rs_synds_basic {
 
         template<typename S, typename T>
         inline void synds(S const& data, size_t size, T const& rem, synds_array_t synds) const {
-            auto rs = RS::cast(this);
+            auto& rs = RS::cast(this);
 
             for (size_t i = 0; i < rs.ecc_len; ++i) {
                 auto t = rs.gf.poly_eval(data, size, rs.generator_roots[i]);
@@ -385,7 +388,7 @@ struct rs_synds_lut_pw2 {
         using GFT = typename GF::GFT;
 
         inline void synds(const GFT *data, size_t size, const GFT *rem, synds_array_t synds) const {
-            auto rs = RS::cast(this);
+            auto& rs = RS::cast(this);
             auto synds_w = reinterpret_cast<Word *>(synds);
             for (size_t i = 0; i < ecc_w; ++i) {
                 auto t = rs.gf.poly_eval_wide(data, size, generator_roots_wide[i]);
@@ -395,7 +398,7 @@ struct rs_synds_lut_pw2 {
 
     protected:
         inline void init() {
-            auto rs = RS::cast(this);
+            auto& rs = RS::cast(this);
 
             size_t i = 0;
             for (; i + sizeof(Word) <= rs.ecc_len; i += sizeof(Word)) {
@@ -425,7 +428,7 @@ public:
             const GFT poly[], const size_t poly_size,
             const size_t max_search_pos,
             GFT roots[]) const {
-        auto rs = RS::cast(this);
+        auto& rs = RS::cast(this);
         size_t count = 0;
 
         for (size_t i = 0; i < max_search_pos; ++i) {
@@ -444,8 +447,8 @@ public:
     inline size_t roots(
             const uint8_t poly[], const size_t poly_size,
             const size_t /*max_search_pos*/,
-            uint8_t roots[]) {
-        auto rs = RS::cast(this);
+            uint8_t roots[]) const {
+        auto& rs = RS::cast(this);
         size_t count = 0;
 
         auto coefs = (uint8_t *) alloca(rs.ecc_len);
@@ -479,8 +482,8 @@ struct rs_roots_eval_lut_pw2 {
         inline size_t roots(
                 const uint8_t poly[], const size_t poly_size,
                 const size_t max_search_pos,
-                uint8_t roots[]) {
-            auto rs = RS::cast(this);
+                uint8_t roots[]) const {
+            auto& rs = RS::cast(this);
             size_t count = 0;
 
             for (size_t i = 0; i <= max_search_pos/sizeof(Word); ++i) {
@@ -501,7 +504,7 @@ struct rs_roots_eval_lut_pw2 {
         }
     protected:
         inline void init() {
-            auto rs = RS::cast(this);
+            auto& rs = RS::cast(this);
             for (unsigned i = 0; i < 256; ++i)
                 err_poly_roots.u8[i] = rs.gf.inv(rs.gf.exp(uint8_t(i)));
         }
@@ -521,7 +524,7 @@ struct rs_decode {
 
     template<typename T, typename U>
     inline bool decode(T data, const size_t size, U rem) const {
-        auto rs = RS::cast(this);
+        auto& rs = RS::cast(this);
         typename RS::synds_array_t synds;
         rs.synds(&data[0], size, rem, synds);
 
@@ -559,7 +562,7 @@ struct rs_decode {
 
     template<typename T, typename U, typename V>
     inline bool decode(T data, size_t size, U rem, const V err_idx, size_t errors) const {
-        auto rs = RS::cast(this);
+        auto& rs = RS::cast(this);
         if (errors > rs.ecc_len)
             return false;
 
@@ -616,7 +619,7 @@ struct rs_decode {
     }
 
     inline size_t berlekamp_massey(const GFT synds[/*ecc_len*/], GFT err_poly[/*ecc_len*/]) const {
-        auto rs = RS::cast(this);
+        auto& rs = RS::cast(this);
         auto prev = (GFT *) alloca(rs.ecc_len);
         std::fill_n(prev, rs.ecc_len, 0x00);
         auto temp = (GFT *) alloca(rs.ecc_len);
@@ -667,7 +670,7 @@ struct rs_decode {
     inline void forney(
             const GFT synds[/*ecc_len*/], GFT err_poly[], const GFT err_pos[],
             const size_t err_count, GFT err_mag[]) const {
-        auto rs = RS::cast(this);
+        auto& rs = RS::cast(this);
         auto err_eval = (GFT *) alloca(rs.ecc_len * 2);
 
         auto synds_rev = (GFT *) alloca(rs.ecc_len);
