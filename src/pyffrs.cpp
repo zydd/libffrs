@@ -16,7 +16,10 @@
  * limitations under the License.
  **************************************************************************/
 
+#include <optional>
+
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include <libffrs/reed_solomon.hpp>
 
@@ -63,8 +66,8 @@ using RS256 = ffrs::RS<GF,
 
 class PyGF256 : public GF256 {
 public:
-    inline PyGF256(GFT prime, GFT power, GFT primitive, GFT poly1):
-        GF256(prime, power, primitive, poly1)
+    inline PyGF256(uint8_t primitive, uint16_t poly1):
+        GF256(2, 8, primitive, poly1 & 0xff)
     { }
 
     inline py::bytearray py_poly_add(buffer_ro<uint8_t> buf1, buffer_ro<uint8_t> buf2) {
@@ -119,29 +122,53 @@ public:
 
 class PyRS256 : public RS256<PyGF256> {
 public:
-    inline PyRS256(uint8_t ecc_len):
-        RS256<PyGF256>(PyGF256(2, 8, 2, 0x1d), ecc_len)
-    { }
+    size_t default_block_size = 255;
+
+    inline PyRS256(
+            std::optional<uint8_t> block_size,
+            std::optional<uint8_t> message_len,
+            std::optional<uint8_t> ecc_len,
+            uint8_t primitive,
+            uint16_t polynomial):
+        PyRS256(_get_ecc_len(block_size, message_len, ecc_len),
+                block_size.value_or(255),
+                primitive, polynomial)
+    {
+        if (ecc_len && message_len) {
+            if (block_size && *message_len + *ecc_len != *block_size) {
+                throw py::value_error("block_len must be equal to message_len + ecc_len");
+            } else if (!block_size) {
+                set_default_block_size(size_t(*message_len) + size_t(*ecc_len));
+            }
+        }
+    }
+
+    inline PyRS256(uint8_t ecc_len, size_t block_size, uint8_t primitive, uint16_t polynomial):
+        RS256<PyGF256>(PyGF256(primitive, polynomial), ecc_len)
+    {
+        set_default_block_size(block_size);
+    }
+
+    inline void set_default_block_size(size_t block_size) {
+        if (block_size <= ecc_len)
+            throw py::value_error("block_len must be greater than ecc_len");
+
+        if (block_size > 255)
+            throw py::value_error("block_len must be <= 255");
+
+        default_block_size = block_size;
+    }
 
     inline void py_encode(buffer_rw<uint8_t> buf) {
         size_t msg_size = buf.size - ecc_len;
         encode(buf.data, msg_size, &buf.data[msg_size]);
     }
 
-    inline size_t compute_output_size(size_t input_size, size_t block_size) {
-        size_t full_blocks = input_size / block_size;
-        size_t remainder = input_size % block_size;
+    inline py::bytearray py_encode_blocks(buffer_ro<uint8_t> buf, std::optional<size_t> block_size) {
+        size_t output_block_size = block_size.value_or(default_block_size);
+        size_t input_block_size = output_block_size - ecc_len;
 
-        size_t output_size = full_blocks * (block_size + this->ecc_len);
-
-        if (remainder > 0)
-            output_size += remainder + this->ecc_len;
-
-        return output_size;
-    }
-
-    inline py::bytearray py_encode_blocks(buffer_ro<uint8_t> buf, size_t input_block_size) {
-        if (buf.size == 0 || input_block_size == 0)
+        if (buf.size == 0 || output_block_size == 0 || output_block_size <= ecc_len)
             return {};
 
         size_t full_blocks = buf.size / input_block_size;
@@ -152,8 +179,6 @@ public:
         size_t input_remainder = buf.size - full_blocks * input_block_size;
         if (input_remainder > 0)
             output_size += input_remainder + this->ecc_len;
-
-        size_t output_block_size = input_block_size + this->ecc_len;
 
         auto output = py::bytearray();
         PyByteArray_Resize(output.ptr(), output_size);
@@ -191,6 +216,23 @@ public:
 
         return py::bytearray(reinterpret_cast<const char *>(synds_arr), ecc_len);
     }
+
+private:
+    inline uint8_t _get_ecc_len(
+            std::optional<uint8_t> block_len,
+            std::optional<uint8_t> message_len,
+            std::optional<uint8_t> ecc_len) {
+        if (ecc_len) {
+            return *ecc_len;
+        } else if (message_len && block_len) {
+            if (*message_len >= *block_len) {
+                throw py::value_error("block_len must be greater than message_len");
+            }
+            return block_len.value_or(default_block_size) - *message_len;
+        } else {
+            throw py::value_error("Must specify either (block_len, message_len) or ecc_len");
+        }
+    }
 };
 
 
@@ -218,16 +260,14 @@ PYBIND11_MODULE(ffrs, m) {
         .def_property_readonly("primitive", [](PyGF256& self) { return self.primitive; })
         .def_property_readonly("poly1", [](PyGF256& self) { return self.poly1; })
         .def_property_readonly("field_elements", [](PyGF256& self) { return self.field_elements; })
-        .def(py::init<uint8_t, uint8_t, uint8_t, uint8_t>(), R"(
+        .def(py::init<uint8_t, uint16_t>(), R"(
             Instantiate type for operations over :math:`GF(p^n)/P`
 
             Args:
-                prime : :math:`p` -- always 2
-                power : :math:`n` -- always 8
                 primitive : :math:`a` -- primitive value used to generate the field
                 polynomial : :math:`P` -- irreducible polynomial used to generate the field
             )",
-            "prime"_a = 2, "power"_a = 8, "primitive"_a = 2, "poly1"_a = 0x1d
+            "primitive"_a = 2, "poly1"_a = 0x11d
         )
         .def("mul", &PyGF256::mul, R"(Multiplication: :math:`\text{lhs} \times \text{rhs}`)", "lhs"_a, "rhs"_a)
         .def("add", &PyGF256::add, R"(Addition: :math:`\text{lhs} + \text{rhs}`)", "lhs"_a, "rhs"_a)
@@ -262,16 +302,75 @@ PYBIND11_MODULE(ffrs, m) {
 
     py::class_<PyRS256>(m, "RS256")
         .def_property_readonly("ecc_len", [](PyRS256& self) { return self.ecc_len; })
+
+        .def_property("default_block_len",
+            [](PyRS256& self) { return self.default_block_size; },
+            &PyRS256::set_default_block_size)
+
+        .def_property_readonly("default_block_msg_len",
+            [](PyRS256& self) { return self.default_block_size - self.ecc_len; })
+
         .def_property_readonly("gf", [](PyRS256& self) -> auto const& { return self.gf; })
+
         .def_property_readonly("generator", [](PyRS256& self) {
             return py::bytes(reinterpret_cast<const char *>(self.generator), self.ecc_len + 1); })
+
         .def_property_readonly("generator_roots", [](PyRS256& self) {
             return py::bytes(reinterpret_cast<const char *>(self.generator_roots), self.ecc_len); })
-        .def(py::init<uint8_t>(), R"()", "ecc_len"_a)
+
+        .def(py::init<std::optional<uint8_t>, std::optional<uint8_t>, std::optional<uint8_t>, uint8_t, uint16_t>(), R"(
+            Instantiate a Reed-Solomon encoder with the given configuration
+
+            Example:
+                ``RS256(255, 223)``
+                    Equivalent to ``RS256(ecc_len=32)``
+
+                    Creates an encoder for 32 bytes of parity, capable of correcting up to 16 errors in a 255-byte block
+
+            Args:
+                block_len
+                    | :math:`n` -- default block size used by :py:meth:`encode_blocks`
+                    | ``block_len = message_len + ecc_len``
+
+                message_len
+                    | :math:`k` -- number of actual data bytes in a block
+                    | Can be omitted if ``ecc_len`` is supplied
+
+                ecc_len
+                    | :math:`(n - k)` -- number of parity bytes in a block
+                    |  Can be omitted if ``message_len`` is supplied
+
+                primitive
+                    :math:`a` -- primitive value for :py:class:`GF256`
+
+                polynomial
+                    :math:`P` -- irreducible polynomial for :py:class:`GF256`
+            )",
+            "block_len"_a = py::none(), "message_len"_a = py::none(), "ecc_len"_a = py::none(),
+            "primitive"_a = 2, "polynomial"_a = 0x11d)
+
         .def("__sizeof__", [](PyRS256& self) { return sizeof(self); })
-        .def("encode", cast_args(&PyRS256::py_encode), R"(Systematic encode)", "buffer"_a)
-        .def("encode_blocks", cast_args(&PyRS256::py_encode_blocks), R"(Encode blocks)", "buffer"_a, "input_block_size"_a)
-        .def("decode", cast_args(&PyRS256::py_decode), R"(Systematic decode)", "buffer"_a)
-        .def("_synds", cast_args(&PyRS256::py_synds), R"(Compute syndromes)", "buffer"_a)
+
+        .def("encode", cast_args(&PyRS256::py_encode),
+            R"(Systematic encode)",
+            "buffer"_a)
+
+        .def("encode_blocks", cast_args(&PyRS256::py_encode_blocks), R"(
+            Encode blocks
+
+            .. note::
+                The size of ``buffer`` should be a multiple of :py:attr:`RS256.default_block_msg_len`
+                to allow concatenating the results of multiple calls to :py:meth:`encode_blocks`.
+            )",
+            "buffer"_a, "block_len"_a = py::none())
+
+        .def("decode", cast_args(&PyRS256::py_decode),
+            R"(Systematic decode)",
+            "buffer"_a)
+
+        .def("_synds", cast_args(&PyRS256::py_synds),
+            R"(Compute syndromes)",
+            "buffer"_a)
+
         .doc() = R"(Reed-Solomon coding over :math:`GF(2^8)`)";
 }

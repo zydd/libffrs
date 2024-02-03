@@ -26,6 +26,49 @@ random.seed(42)
 def randbytes(n):
     return bytearray(random.randrange(256) for _ in range(n))
 
+def test__init__():
+    rs1 = ffrs.RS256(254, 222)
+    rs2 = ffrs.RS256(ecc_len=32)
+    rs3 = ffrs.RS256(254, 222, ecc_len=32)
+
+    assert rs1.ecc_len == rs2.ecc_len == rs3.ecc_len == 32
+    assert rs1.default_block_len == rs3.default_block_len == 254
+
+    assert rs2.default_block_msg_len == 255 - 32
+    rs2.default_block_len = 48
+    assert rs2.default_block_msg_len == 48 - 32
+
+    assert 222 == ffrs.RS256(254, 222).default_block_msg_len
+    assert 222 == ffrs.RS256(block_len=254, ecc_len=32).default_block_msg_len
+    assert 222 == ffrs.RS256(254, 222, ecc_len=32).default_block_msg_len
+
+    assert ffrs.RS256(message_len=8, ecc_len=9).default_block_len == 17
+    assert ffrs.RS256(message_len=8, ecc_len=9).default_block_msg_len == 8
+
+    with pytest.raises(ValueError):
+        ffrs.RS256(message_len=223)
+
+    with pytest.raises(ValueError):
+        ffrs.RS256(255, 223, ecc_len=33)  # 255 - 223 = 32
+
+    with pytest.raises(ValueError):
+        ffrs.RS256(254, 255)
+
+    with pytest.raises(ValueError):
+        ffrs.RS256(block_len=8, ecc_len=8)
+
+    with pytest.raises(ValueError):
+        ffrs.RS256(block_len=8, ecc_len=9)
+
+    with pytest.raises(ValueError):
+        ffrs.RS256()
+
+    with pytest.raises(ValueError):
+        ffrs.RS256(ecc_len=32).default_block_len = 32
+
+    with pytest.raises(ValueError):
+        ffrs.RS256(ecc_len=32).default_block_len = 0
+
 
 @pytest.mark.parametrize('rs', [
     ffrs.RS256(ecc_len=l) for l in
@@ -139,19 +182,19 @@ class TestRS:
             assert synd_b == rs._synds(rem_b)
 
 
-    def test_encode_blocks(self, rs):
+    def test_encode_blocks_single(self, rs):
         for size in range(1, rs.gf.field_elements-1 - rs.ecc_len):
             a = randbytes(size)
             msg_a = a + bytearray(rs.ecc_len)
             rs.encode(msg_a)
 
             # block size == input size
-            assert msg_a == rs.encode_blocks(a, len(a))
+            assert msg_a == rs.encode_blocks(a, len(a) + rs.ecc_len)
 
             # blocks size > input size
-            max_block_size = 254 - rs.ecc_len
-            assert msg_a == rs.encode_blocks(a, min(len(a) + 1, max_block_size))
-            assert msg_a == rs.encode_blocks(a, min(len(a) + 10, max_block_size))
+            max_block_size = 255
+            assert msg_a == rs.encode_blocks(a, min(len(a) + 1 + rs.ecc_len, max_block_size))
+            assert msg_a == rs.encode_blocks(a, min(len(a) + 10 + rs.ecc_len, max_block_size))
 
 
     def test_encode_blocks_empty(self, rs):
@@ -160,18 +203,21 @@ class TestRS:
         assert bytearray() == rs.encode_blocks(bytearray(), 10)
 
 
-    def test_encode_blocks_lenghts(self, rs):
+    def test_encode_blocks_multi(self, rs):
         for data_size in [1, 2, 3, 200, 201, 254]:
-            for block_size in range(1, data_size + 1):
+            for block_size in range(rs.ecc_len + 1, data_size + rs.ecc_len + 1):
+
                 a = randbytes(data_size)
 
                 msg = rs.encode_blocks(a, block_size)
 
-                for i in range(data_size // block_size):
-                    msg_i = a[i * block_size:][:block_size] + bytearray(rs.ecc_len)
+                block_msg_size = block_size - rs.ecc_len
+
+                for i in range(data_size // block_msg_size):
+                    msg_i = a[i * block_msg_size:][:block_msg_size] + bytearray(rs.ecc_len)
                     rs.encode(msg_i)
 
-                    assert msg_i == msg[i * (block_size + rs.ecc_len):][:block_size + rs.ecc_len]
+                    assert msg_i == msg[i * block_size:][:block_size]
 
                 tail_size = data_size % block_size
                 if tail_size > 0:
