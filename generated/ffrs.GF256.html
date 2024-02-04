@@ -212,64 +212,63 @@
 <dl class="py class">
 <dt class="sig sig-object py" id="ffrs.GF256">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ffrs.</span></span><span class="sig-name descname"><span class="pre">GF256</span></span><a class="headerlink" href="#ffrs.GF256" title="Link to this definition">#</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
-<p>Finite-field operations optimized for <span class="math notranslate nohighlight">\(GF(2^8)\)</span></p>
+<dd><p>Finite-field operations optimized for <span class="math notranslate nohighlight">\(GF(2^8)\)</span></p>
 <p class="rubric">Methods</p>
 <div class="table-wrapper autosummary longtable docutils container">
 <table class="autosummary longtable docutils align-default">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.__init__" title="ffrs.GF256.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.__init__" title="ffrs.GF256.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.__init__</span></code></a></p></td>
 <td><p>Instantiate type for operations over <span class="math notranslate nohighlight">\(GF(p^n)/P\)</span></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.add" title="ffrs.GF256.add"><code class="xref py py-obj docutils literal notranslate"><span class="pre">add</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.add" title="ffrs.GF256.add"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.add</span></code></a></p></td>
 <td><p>Addition: <span class="math notranslate nohighlight">\(\text{lhs} + \text{rhs}\)</span></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.div" title="ffrs.GF256.div"><code class="xref py py-obj docutils literal notranslate"><span class="pre">div</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.div" title="ffrs.GF256.div"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.div</span></code></a></p></td>
 <td><p>Division: <span class="math notranslate nohighlight">\(\frac{\text{num}}{\text{den}}\)</span></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.exp" title="ffrs.GF256.exp"><code class="xref py py-obj docutils literal notranslate"><span class="pre">exp</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.exp" title="ffrs.GF256.exp"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.exp</span></code></a></p></td>
 <td><p>Exponential function: <span class="math notranslate nohighlight">\(a^{\text{value}}\)</span></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.inv" title="ffrs.GF256.inv"><code class="xref py py-obj docutils literal notranslate"><span class="pre">inv</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.inv" title="ffrs.GF256.inv"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.inv</span></code></a></p></td>
 <td><p>Reciprocal: <span class="math notranslate nohighlight">\(\frac{1}{\text{value}}\)</span></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.log" title="ffrs.GF256.log"><code class="xref py py-obj docutils literal notranslate"><span class="pre">log</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.log" title="ffrs.GF256.log"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.log</span></code></a></p></td>
 <td><p>Logarithm: <span class="math notranslate nohighlight">\(\log_a (\text{value})\)</span></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.mul" title="ffrs.GF256.mul"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mul</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.mul" title="ffrs.GF256.mul"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.mul</span></code></a></p></td>
 <td><p>Multiplication: <span class="math notranslate nohighlight">\(\text{lhs} \times \text{rhs}\)</span></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.mul8" title="ffrs.GF256.mul8"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mul8</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.mul8" title="ffrs.GF256.mul8"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.mul8</span></code></a></p></td>
 <td><p>Multiply 8 values in a single operation</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.poly_add" title="ffrs.GF256.poly_add"><code class="xref py py-obj docutils literal notranslate"><span class="pre">poly_add</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.poly_add" title="ffrs.GF256.poly_add"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.poly_add</span></code></a></p></td>
 <td><p>Add polynomials</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.poly_divmod" title="ffrs.GF256.poly_divmod"><code class="xref py py-obj docutils literal notranslate"><span class="pre">poly_divmod</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.poly_divmod" title="ffrs.GF256.poly_divmod"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.poly_divmod</span></code></a></p></td>
 <td><p>Polynomial quotient and remainder</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.poly_eval" title="ffrs.GF256.poly_eval"><code class="xref py py-obj docutils literal notranslate"><span class="pre">poly_eval</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.poly_eval" title="ffrs.GF256.poly_eval"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.poly_eval</span></code></a></p></td>
 <td><p>Evaluate polynomial at <code class="docutils literal notranslate"><span class="pre">x</span></code></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.poly_eval8" title="ffrs.GF256.poly_eval8"><code class="xref py py-obj docutils literal notranslate"><span class="pre">poly_eval8</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.poly_eval8" title="ffrs.GF256.poly_eval8"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.poly_eval8</span></code></a></p></td>
 <td><p>Evaluate polynomial at 8 points on a single operation</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.poly_mod" title="ffrs.GF256.poly_mod"><code class="xref py py-obj docutils literal notranslate"><span class="pre">poly_mod</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.poly_mod" title="ffrs.GF256.poly_mod"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.poly_mod</span></code></a></p></td>
 <td><p>Polynomial remainder</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.poly_mod_x_n" title="ffrs.GF256.poly_mod_x_n"><code class="xref py py-obj docutils literal notranslate"><span class="pre">poly_mod_x_n</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.poly_mod_x_n" title="ffrs.GF256.poly_mod_x_n"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.poly_mod_x_n</span></code></a></p></td>
 <td><p>Shifted polynomial remainder</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.poly_mul" title="ffrs.GF256.poly_mul"><code class="xref py py-obj docutils literal notranslate"><span class="pre">poly_mul</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.poly_mul" title="ffrs.GF256.poly_mul"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.poly_mul</span></code></a></p></td>
 <td><p>Multiply polynomials</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.poly_sub" title="ffrs.GF256.poly_sub"><code class="xref py py-obj docutils literal notranslate"><span class="pre">poly_sub</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.poly_sub" title="ffrs.GF256.poly_sub"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.poly_sub</span></code></a></p></td>
 <td><p>Subtract polynomials</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.pow" title="ffrs.GF256.pow"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pow</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.GF256.pow" title="ffrs.GF256.pow"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.pow</span></code></a></p></td>
 <td><p>Power: <span class="math notranslate nohighlight">\(\text{base}^\text{exponent}\)</span></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.sub" title="ffrs.GF256.sub"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sub</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.GF256.sub" title="ffrs.GF256.sub"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.sub</span></code></a></p></td>
 <td><p>Subtraction: <span class="math notranslate nohighlight">\(\text{lhs} - \text{rhs}\)</span></p></td>
 </tr>
 </tbody>
@@ -279,20 +278,20 @@
 <div class="table-wrapper autosummary longtable docutils container">
 <table class="autosummary longtable docutils align-default">
 <tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">field_elements</span></code></p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.field_elements</span></code></p></td>
+<td><p>Always 256</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">poly1</span></code></p></td>
-<td><p></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.poly1</span></code></p></td>
+<td><p>Masked irreducible polynomial, excluding MSb</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">power</span></code></p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.power</span></code></p></td>
+<td><p>Always 8</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">prime</span></code></p></td>
-<td><p></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.prime</span></code></p></td>
+<td><p>Always 2</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">GF256.primitive</span></code></p></td>
+<td><p>Primitive value used to generate the field</p></td>
 </tr>
 </tbody>
 </table>

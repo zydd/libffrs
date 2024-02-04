@@ -5,36 +5,46 @@
 .. currentmodule:: ffrs
 
 .. autoclass:: RS256
-   :members:
-   :show-inheritance:
-   :inherited-members:
-   :special-members: __call__, __add__, __mul__, __init__
 
-   
-   
-   .. rubric:: Methods
 
-   .. autosummary::
-      :nosignatures:
-   
-      ~RS256.__init__
-      ~RS256.decode
-      ~RS256.encode
-      ~RS256.encode_blocks
-   
-   
+    
+    .. rubric:: Methods
 
-   
-   
-   .. rubric:: Attributes
+    .. autosummary::
+        :nosignatures:
+        
+        RS256.__init__
+        RS256.decode
+        RS256.encode
+        RS256.encode_blocks
+    
 
-   .. autosummary::
-   
-      ~RS256.default_block_len
-      ~RS256.default_block_msg_len
-      ~RS256.ecc_len
-      ~RS256.generator
-      ~RS256.generator_roots
-      ~RS256.gf
-   
-   
+
+
+    
+    .. rubric:: Attributes
+
+    .. autosummary::
+        
+        RS256.block_len
+        RS256.ecc_len
+        RS256.generator
+        RS256.generator_roots
+        RS256.gf
+        RS256.message_len
+    
+
+
+
+    .. automethod:: RS256.__init__
+
+        .. include:: ../extra/ffrs.RS256.__init__.rst
+    .. automethod:: RS256.decode
+
+        .. include:: ../extra/ffrs.RS256.decode.rst
+    .. automethod:: RS256.encode
+
+        .. include:: ../extra/ffrs.RS256.encode.rst
+    .. automethod:: RS256.encode_blocks
+
+        .. include:: ../extra/ffrs.RS256.encode_blocks.rst

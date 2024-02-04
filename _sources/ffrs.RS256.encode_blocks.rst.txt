@@ -1,0 +1,32 @@
+
+Example:
+    - Considering ``RS256(6,2)``, and 32 bytes of input:
+        ::
+
+            Input buffer (32 bytes):
+            🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+            🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+
+            Output buffer (32 data bytes + 16 parity bytes):
+            🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨
+            🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨
+
+
+.. note::
+    The size of ``buffer`` should be a multiple of :py:attr:`RS256.default_block_msg_len`
+    to allow concatenating the results of multiple calls to :py:meth:`encode_blocks`.
+
+If the size of the input buffer is not a multiple of :py:attr:`RS256.default_block_msg_len`
+the remaining bytes at the end of the buffer will be encoded as if the block size were smaller.
+
+Example:
+    - Considering ``RS256(6,2)``, (``default_block_msg_len = 6 - 2 = 4``)
+        ::
+
+            Input buffer (29 bytes):
+            🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+            🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦
+
+            Output buffer (29 data bytes + 16 parity bytes):
+            🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨
+            🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟨🟨

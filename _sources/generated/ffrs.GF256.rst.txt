@@ -1,53 +1,105 @@
-ffrs.GF256
+﻿ffrs.GF256
 ==========
 
 
 .. currentmodule:: ffrs
 
 .. autoclass:: GF256
-   :members:
-   :show-inheritance:
-   :inherited-members:
-   :special-members: __call__, __add__, __mul__, __init__
 
-   
-   
-   .. rubric:: Methods
 
-   .. autosummary::
-      :nosignatures:
-   
-      ~GF256.__init__
-      ~GF256.add
-      ~GF256.div
-      ~GF256.exp
-      ~GF256.inv
-      ~GF256.log
-      ~GF256.mul
-      ~GF256.mul8
-      ~GF256.poly_add
-      ~GF256.poly_divmod
-      ~GF256.poly_eval
-      ~GF256.poly_eval8
-      ~GF256.poly_mod
-      ~GF256.poly_mod_x_n
-      ~GF256.poly_mul
-      ~GF256.poly_sub
-      ~GF256.pow
-      ~GF256.sub
-   
-   
+    
+    .. rubric:: Methods
 
-   
-   
-   .. rubric:: Attributes
+    .. autosummary::
+        :nosignatures:
+        
+        GF256.__init__
+        GF256.add
+        GF256.div
+        GF256.exp
+        GF256.inv
+        GF256.log
+        GF256.mul
+        GF256.mul8
+        GF256.poly_add
+        GF256.poly_divmod
+        GF256.poly_eval
+        GF256.poly_eval8
+        GF256.poly_mod
+        GF256.poly_mod_x_n
+        GF256.poly_mul
+        GF256.poly_sub
+        GF256.pow
+        GF256.sub
+    
 
-   .. autosummary::
-   
-      ~GF256.field_elements
-      ~GF256.poly1
-      ~GF256.power
-      ~GF256.prime
-      ~GF256.primitive
-   
-   
+
+
+    
+    .. rubric:: Attributes
+
+    .. autosummary::
+        
+        GF256.field_elements
+        GF256.poly1
+        GF256.power
+        GF256.prime
+        GF256.primitive
+    
+
+
+
+    .. automethod:: GF256.__init__
+
+        .. include:: ../extra/ffrs.GF256.__init__.rst
+    .. automethod:: GF256.add
+
+        .. include:: ../extra/ffrs.GF256.add.rst
+    .. automethod:: GF256.div
+
+        .. include:: ../extra/ffrs.GF256.div.rst
+    .. automethod:: GF256.exp
+
+        .. include:: ../extra/ffrs.GF256.exp.rst
+    .. automethod:: GF256.inv
+
+        .. include:: ../extra/ffrs.GF256.inv.rst
+    .. automethod:: GF256.log
+
+        .. include:: ../extra/ffrs.GF256.log.rst
+    .. automethod:: GF256.mul
+
+        .. include:: ../extra/ffrs.GF256.mul.rst
+    .. automethod:: GF256.mul8
+
+        .. include:: ../extra/ffrs.GF256.mul8.rst
+    .. automethod:: GF256.poly_add
+
+        .. include:: ../extra/ffrs.GF256.poly_add.rst
+    .. automethod:: GF256.poly_divmod
+
+        .. include:: ../extra/ffrs.GF256.poly_divmod.rst
+    .. automethod:: GF256.poly_eval
+
+        .. include:: ../extra/ffrs.GF256.poly_eval.rst
+    .. automethod:: GF256.poly_eval8
+
+        .. include:: ../extra/ffrs.GF256.poly_eval8.rst
+    .. automethod:: GF256.poly_mod
+
+        .. include:: ../extra/ffrs.GF256.poly_mod.rst
+    .. automethod:: GF256.poly_mod_x_n
+
+        .. include:: ../extra/ffrs.GF256.poly_mod_x_n.rst
+    .. automethod:: GF256.poly_mul
+
+        .. include:: ../extra/ffrs.GF256.poly_mul.rst
+    .. automethod:: GF256.poly_sub
+
+        .. include:: ../extra/ffrs.GF256.poly_sub.rst
+    .. automethod:: GF256.pow
+
+        .. include:: ../extra/ffrs.GF256.pow.rst
+    .. automethod:: GF256.sub
+
+        .. include:: ../extra/ffrs.GF256.sub.rst

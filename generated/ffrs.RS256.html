@@ -212,23 +212,22 @@
 <dl class="py class">
 <dt class="sig sig-object py" id="ffrs.RS256">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ffrs.</span></span><span class="sig-name descname"><span class="pre">RS256</span></span><a class="headerlink" href="#ffrs.RS256" title="Link to this definition">#</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
-<p>Reed-Solomon coding over <span class="math notranslate nohighlight">\(GF(2^8)\)</span></p>
+<dd><p>Reed-Solomon coding over <span class="math notranslate nohighlight">\(GF(2^8)\)</span></p>
 <p class="rubric">Methods</p>
 <div class="table-wrapper autosummary longtable docutils container">
 <table class="autosummary longtable docutils align-default">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.RS256.__init__" title="ffrs.RS256.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.RS256.__init__" title="ffrs.RS256.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.__init__</span></code></a></p></td>
 <td><p>Instantiate a Reed-Solomon encoder with the given configuration</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.RS256.decode" title="ffrs.RS256.decode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">decode</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.RS256.decode" title="ffrs.RS256.decode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.decode</span></code></a></p></td>
 <td><p>Systematic decode</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.RS256.encode" title="ffrs.RS256.encode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">encode</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.RS256.encode" title="ffrs.RS256.encode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.encode</span></code></a></p></td>
 <td><p>Systematic encode</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.RS256.encode_blocks" title="ffrs.RS256.encode_blocks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">encode_blocks</span></code></a></p></td>
-<td><p>Encode blocks</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.RS256.encode_blocks" title="ffrs.RS256.encode_blocks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.encode_blocks</span></code></a></p></td>
+<td><p>Encode the input buffer in blocks, storing the parity bytes right next to their corresponding block</p></td>
 </tr>
 </tbody>
 </table>
@@ -237,22 +236,22 @@
 <div class="table-wrapper autosummary longtable docutils container">
 <table class="autosummary longtable docutils align-default">
 <tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_block_len</span></code></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.block_len</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_block_msg_len</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.ecc_len</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">ecc_len</span></code></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.generator</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">generator</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.generator_roots</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">generator_roots</span></code></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.gf</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">gf</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.message_len</span></code></p></td>
 <td><p></p></td>
 </tr>
 </tbody>
@@ -262,34 +261,76 @@
 <dt class="sig sig-object py" id="ffrs.RS256.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#ffrs.RS256" title="ffrs.RS256"><span class="pre">ffrs.RS256</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ecc_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primitive</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">polynomial</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">285</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#ffrs.RS256.__init__" title="Link to this definition">#</a></dt>
 <dd><p>Instantiate a Reed-Solomon encoder with the given configuration</p>
-<p class="rubric">Example</p>
-<dl>
+<dl class="field-list">
+<dt class="field-odd">Examples<span class="colon">:</span></dt>
+<dd class="field-odd"><ul>
+<li><dl>
 <dt><code class="docutils literal notranslate"><span class="pre">RS256(255,</span> <span class="pre">223)</span></code></dt><dd><p>Equivalent to <code class="docutils literal notranslate"><span class="pre">RS256(ecc_len=32)</span></code></p>
-<p>Creates an encoder for 32 bytes of parity, capable of correcting up to 16 errors in a 255-byte block</p>
+<p>Creates an encoder for 32 bytes of parity,
+capable of correcting up to 16 errors in a 255-byte block.</p>
 </dd>
 </dl>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>block_len</strong> – <div class="line-block">
+</li>
+<li><dl>
+<dt><code class="docutils literal notranslate"><span class="pre">RS256(6,</span> <span class="pre">4)</span></code></dt><dd><div class="highlight-default notranslate"><div class="highlight"><pre><span></span>    block_len
+ ╭──────┴──────╮
+ 🟦🟦🟦🟦🟨🟨
+ ╰────┬───╯╰─┬─╯
+message_len ecc_len
+</pre></div>
+</div>
+</dd>
+</dl>
+</li>
+</ul>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul>
+<li><dl>
+<dt>block_len</dt><dd><div class="line-block">
 <div class="line"><span class="math notranslate nohighlight">\(n\)</span> – default block size used by <a class="reference internal" href="#ffrs.RS256.encode_blocks" title="ffrs.RS256.encode_blocks"><code class="xref py py-meth docutils literal notranslate"><span class="pre">encode_blocks()</span></code></a></div>
 <div class="line"><code class="docutils literal notranslate"><span class="pre">block_len</span> <span class="pre">=</span> <span class="pre">message_len</span> <span class="pre">+</span> <span class="pre">ecc_len</span></code></div>
+<div class="line">Defaults to <code class="docutils literal notranslate"><span class="pre">255</span></code></div>
 </div>
-</p></li>
-<li><p><strong>message_len</strong> – <div class="line-block">
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The maximum possible <code class="docutils literal notranslate"><span class="pre">block_len</span></code> for <a class="reference internal" href="#ffrs.RS256" title="ffrs.RS256"><code class="xref py py-class docutils literal notranslate"><span class="pre">RS256</span></code></a> is 255 bytes</p>
+</div>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt>message_len</dt><dd><div class="line-block">
 <div class="line"><span class="math notranslate nohighlight">\(k\)</span> – number of actual data bytes in a block</div>
 <div class="line">Can be omitted if <code class="docutils literal notranslate"><span class="pre">ecc_len</span></code> is supplied</div>
 </div>
-</p></li>
-<li><p><strong>ecc_len</strong> – <div class="line-block">
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt>ecc_len</dt><dd><div class="line-block">
 <div class="line"><span class="math notranslate nohighlight">\((n - k)\)</span> – number of parity bytes in a block</div>
-<div class="line-block">
 <div class="line">Can be omitted if <code class="docutils literal notranslate"><span class="pre">message_len</span></code> is supplied</div>
 </div>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt>primitive</dt><dd><div class="line-block">
+<div class="line"><span class="math notranslate nohighlight">\(a\)</span> – primitive value for <a class="reference internal" href="ffrs.GF256.html#ffrs.GF256" title="ffrs.GF256"><code class="xref py py-class docutils literal notranslate"><span class="pre">GF256</span></code></a></div>
+<div class="line">Defaults to <code class="docutils literal notranslate"><span class="pre">2</span></code></div>
 </div>
-</p></li>
-<li><p><strong>primitive</strong> – <span class="math notranslate nohighlight">\(a\)</span> – primitive value for <a class="reference internal" href="ffrs.GF256.html#ffrs.GF256" title="ffrs.GF256"><code class="xref py py-class docutils literal notranslate"><span class="pre">GF256</span></code></a></p></li>
-<li><p><strong>polynomial</strong> – <span class="math notranslate nohighlight">\(P\)</span> – irreducible polynomial for <a class="reference internal" href="ffrs.GF256.html#ffrs.GF256" title="ffrs.GF256"><code class="xref py py-class docutils literal notranslate"><span class="pre">GF256</span></code></a></p></li>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt>polynomial</dt><dd><div class="line-block">
+<div class="line"><span class="math notranslate nohighlight">\(P\)</span> – irreducible polynomial for <a class="reference internal" href="ffrs.GF256.html#ffrs.GF256" title="ffrs.GF256"><code class="xref py py-class docutils literal notranslate"><span class="pre">GF256</span></code></a></div>
+<div class="line">Defaults to <code class="docutils literal notranslate"><span class="pre">0x11b</span></code></div>
+</div>
+</dd>
+</dl>
+</li>
 </ul>
 </dd>
 </dl>
@@ -310,12 +351,53 @@
 <dl class="py method">
 <dt class="sig sig-object py" id="ffrs.RS256.encode_blocks">
 <span class="sig-name descname"><span class="pre">encode_blocks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#ffrs.RS256" title="ffrs.RS256"><span class="pre">ffrs.RS256</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Buffer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytearray</span></span></span><a class="headerlink" href="#ffrs.RS256.encode_blocks" title="Link to this definition">#</a></dt>
-<dd><p>Encode blocks</p>
+<dd><p>Encode the input buffer in blocks, storing the parity bytes right next to their corresponding block</p>
+<dl class="field-list">
+<dt class="field-odd">Example<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p>Considering <code class="docutils literal notranslate"><span class="pre">RS256(6,</span> <span class="pre">4)</span></code> and 32 bytes of input:</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">ffrs</span><span class="o">,</span> <span class="nn">random</span>
+<span class="n">rs62</span> <span class="o">=</span> <span class="n">ffrs</span><span class="o">.</span><span class="n">RS256</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="n">input_buffer</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randbytes</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
+<span class="n">output_buffer</span> <span class="o">=</span> <span class="n">rs62</span><span class="o">.</span><span class="n">encode_blocks</span><span class="p">(</span><span class="n">input_buffer</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Input buffer (32 bytes):
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+
+Output buffer (32 data bytes + 16 parity bytes):
+🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨
+🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨
+</pre></div>
+</div>
+</dd>
+</dl>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The size of <code class="docutils literal notranslate"><span class="pre">buffer</span></code> should be a multiple of <code class="xref py py-attr docutils literal notranslate"><span class="pre">RS256.default_block_msg_len</span></code>
-to allow concatenating the results of multiple calls to <a class="reference internal" href="#ffrs.RS256.encode_blocks" title="ffrs.RS256.encode_blocks"><code class="xref py py-meth docutils literal notranslate"><span class="pre">encode_blocks()</span></code></a>.</p>
+<p>To allow concatenating the results of multiple calls to <a class="reference internal" href="#ffrs.RS256.encode_blocks" title="ffrs.RS256.encode_blocks"><code class="xref py py-meth docutils literal notranslate"><span class="pre">encode_blocks()</span></code></a>,
+the size of <code class="docutils literal notranslate"><span class="pre">buffer</span></code> should be a multiple of <code class="xref py py-attr docutils literal notranslate"><span class="pre">RS256.message_len</span></code>
+(or <code class="docutils literal notranslate"><span class="pre">block_size</span> <span class="pre">-</span> <span class="pre">RS256.ecc_len</span></code> if the argument <code class="docutils literal notranslate"><span class="pre">block_size</span></code> is not <code class="docutils literal notranslate"><span class="pre">None</span></code>)</p>
 </div>
+<p>If the size of the input buffer is not a multiple of <code class="xref py py-attr docutils literal notranslate"><span class="pre">RS256.message_len</span></code>
+the remaining bytes at the end of the buffer will be encoded as if the block size were smaller.</p>
+<dl class="field-list">
+<dt class="field-odd">Example<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p>Considering <code class="docutils literal notranslate"><span class="pre">RS256(6,</span> <span class="pre">4)</span></code> and 29 bytes of input:</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Input buffer (29 bytes):
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦
+
+Output buffer (29 data bytes + 16 parity bytes):
+🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨
+🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟦🟦🟦🟨🟨🟦🟨🟨
+</pre></div>
+</div>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>
