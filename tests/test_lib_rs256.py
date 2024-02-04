@@ -32,18 +32,19 @@ def test__init__():
     rs3 = ffrs.RS256(254, 222, ecc_len=32)
 
     assert rs1.ecc_len == rs2.ecc_len == rs3.ecc_len == 32
-    assert rs1.default_block_len == rs3.default_block_len == 254
+    assert rs1.block_len == rs3.block_len == 254
 
-    assert rs2.default_block_msg_len == 255 - 32
-    rs2.default_block_len = 48
-    assert rs2.default_block_msg_len == 48 - 32
+    assert rs2.block_len == 255
+    assert rs2.message_len == 255 - 32
+    rs2.block_len = 48
+    assert rs2.message_len == 48 - 32
 
-    assert 222 == ffrs.RS256(254, 222).default_block_msg_len
-    assert 222 == ffrs.RS256(block_len=254, ecc_len=32).default_block_msg_len
-    assert 222 == ffrs.RS256(254, 222, ecc_len=32).default_block_msg_len
+    assert 222 == ffrs.RS256(254, 222).message_len
+    assert 222 == ffrs.RS256(block_len=254, ecc_len=32).message_len
+    assert 222 == ffrs.RS256(254, 222, ecc_len=32).message_len
 
-    assert ffrs.RS256(message_len=8, ecc_len=9).default_block_len == 17
-    assert ffrs.RS256(message_len=8, ecc_len=9).default_block_msg_len == 8
+    assert ffrs.RS256(message_len=8, ecc_len=9).block_len == 17
+    assert ffrs.RS256(message_len=8, ecc_len=9).message_len == 8
 
     with pytest.raises(ValueError):
         ffrs.RS256(message_len=223)
@@ -64,10 +65,10 @@ def test__init__():
         ffrs.RS256()
 
     with pytest.raises(ValueError):
-        ffrs.RS256(ecc_len=32).default_block_len = 32
+        ffrs.RS256(ecc_len=32).block_len = 32
 
     with pytest.raises(ValueError):
-        ffrs.RS256(ecc_len=32).default_block_len = 0
+        ffrs.RS256(ecc_len=32).block_len = 0
 
 
 @pytest.mark.parametrize('rs', [

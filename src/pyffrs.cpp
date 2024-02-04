@@ -255,11 +255,11 @@ PYBIND11_MODULE(ffrs, m) {
     )";
 
     py::class_<PyGF256>(m, "GF256")
-        .def_property_readonly("prime", [](PyGF256& self) { return self.prime; })
-        .def_property_readonly("power", [](PyGF256& self) { return self.power; })
-        .def_property_readonly("primitive", [](PyGF256& self) { return self.primitive; })
-        .def_property_readonly("poly1", [](PyGF256& self) { return self.poly1; })
-        .def_property_readonly("field_elements", [](PyGF256& self) { return self.field_elements; })
+        .def_property_readonly("prime", [](PyGF256& self) { return self.prime; }, "Always 2")
+        .def_property_readonly("power", [](PyGF256& self) { return self.power; }, "Always 8")
+        .def_property_readonly("primitive", [](PyGF256& self) { return self.primitive; }, "Primitive value used to generate the field")
+        .def_property_readonly("poly1", [](PyGF256& self) { return self.poly1; }, "Masked irreducible polynomial, excluding MSb")
+        .def_property_readonly("field_elements", [](PyGF256& self) { return self.field_elements; }, "Always 256")
         .def(py::init<uint8_t, uint16_t>(), R"(
             Instantiate type for operations over :math:`GF(p^n)/P`
 
@@ -303,11 +303,11 @@ PYBIND11_MODULE(ffrs, m) {
     py::class_<PyRS256>(m, "RS256")
         .def_property_readonly("ecc_len", [](PyRS256& self) { return self.ecc_len; })
 
-        .def_property("default_block_len",
+        .def_property("block_len",
             [](PyRS256& self) { return self.default_block_size; },
             &PyRS256::set_default_block_size)
 
-        .def_property_readonly("default_block_msg_len",
+        .def_property_readonly("message_len",
             [](PyRS256& self) { return self.default_block_size - self.ecc_len; })
 
         .def_property_readonly("gf", [](PyRS256& self) -> auto const& { return self.gf; })
@@ -320,31 +320,6 @@ PYBIND11_MODULE(ffrs, m) {
 
         .def(py::init<std::optional<uint8_t>, std::optional<uint8_t>, std::optional<uint8_t>, uint8_t, uint16_t>(), R"(
             Instantiate a Reed-Solomon encoder with the given configuration
-
-            Example:
-                ``RS256(255, 223)``
-                    Equivalent to ``RS256(ecc_len=32)``
-
-                    Creates an encoder for 32 bytes of parity, capable of correcting up to 16 errors in a 255-byte block
-
-            Args:
-                block_len
-                    | :math:`n` -- default block size used by :py:meth:`encode_blocks`
-                    | ``block_len = message_len + ecc_len``
-
-                message_len
-                    | :math:`k` -- number of actual data bytes in a block
-                    | Can be omitted if ``ecc_len`` is supplied
-
-                ecc_len
-                    | :math:`(n - k)` -- number of parity bytes in a block
-                    |  Can be omitted if ``message_len`` is supplied
-
-                primitive
-                    :math:`a` -- primitive value for :py:class:`GF256`
-
-                polynomial
-                    :math:`P` -- irreducible polynomial for :py:class:`GF256`
             )",
             "block_len"_a = py::none(), "message_len"_a = py::none(), "ecc_len"_a = py::none(),
             "primitive"_a = 2, "polynomial"_a = 0x11d)
@@ -356,11 +331,7 @@ PYBIND11_MODULE(ffrs, m) {
             "buffer"_a)
 
         .def("encode_blocks", cast_args(&PyRS256::py_encode_blocks), R"(
-            Encode blocks
-
-            .. note::
-                The size of ``buffer`` should be a multiple of :py:attr:`RS256.default_block_msg_len`
-                to allow concatenating the results of multiple calls to :py:meth:`encode_blocks`.
+            Encode the input buffer in blocks, storing the parity bytes right next to their corresponding block
             )",
             "buffer"_a, "block_len"_a = py::none())
 
