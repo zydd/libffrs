@@ -50,7 +50,6 @@ using RS256 = ffrs::RS<GF,
     // ffrs::rs_encode_basic,
     // ffrs::rs_encode_basic_v2,
     // ffrs::rs_encode_lut_pw2<256>::type,
-    // ffrs::rs_encode_slice_pw2<uint64_t, 8, 256, 16>::type,
     ffrs::rs_encode_slice_pw2_dispatch<255>::type,
 
     // ffrs::rs_synds_basic<256>::type,

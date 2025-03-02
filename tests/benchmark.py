@@ -73,7 +73,7 @@ def benchmark_peak(
         start_time = time.time()
 
         times = timeit.repeat(
-            f'rs.{method}(data, {block_size})',
+            f'rs.{method}(data)',
 
             # operation in a large block of memory to (hopefully) flush CPU cache
             setup=f'random.randbytes({cpu_cache_flush_size})',
@@ -144,23 +144,24 @@ if __name__ == '__main__':
         # ('method', ecc_len, block_size)
 
         # Max block size
-        ('encode_blocks', 2, 255 - 2),
-        ('encode_blocks', 4, 255 - 4),
-        ('encode_blocks', 6, 255 - 6),
-        ('encode_blocks', 8, 255 - 8),
-        ('encode_blocks', 10, 255 - 10),
-        ('encode_blocks', 12, 255 - 12),
-        ('encode_blocks', 14, 255 - 14),
-        ('encode_blocks', 16, 255 - 16),
-        ('encode_blocks', 24, 255 - 24),
-        ('encode_blocks', 32, 255 - 32),
-        ('encode_blocks', 64, 255 - 64),
-        ('encode_blocks', 128, 255 - 128),
+        ('encode_blocks', 2, 255),
+        ('encode_blocks', 4, 255),
+        ('encode_blocks', 6, 255),
+        ('encode_blocks', 8, 255),
+        ('encode_blocks', 10, 255),
+        ('encode_blocks', 12, 255),
+        ('encode_blocks', 14, 255),
+        ('encode_blocks', 16, 255),
+        ('encode_blocks', 20, 255),
+        ('encode_blocks', 24, 255),
+        ('encode_blocks', 32, 255),
+        ('encode_blocks', 64, 255),
+        ('encode_blocks', 128, 255),
     ]
 
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             ecc_len = int(arg)
-            benchmark_peak('encode_blocks', ecc_len, 255 - ecc_len)
+            benchmark_peak('encode_blocks', ecc_len, 255)
     else:
         run_benchmarks(config)
