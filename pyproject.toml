@@ -32,3 +32,6 @@ docs = ["Sphinx>=7.2.0", "furo==2023.9.10"]
 
 # [project.scripts]
 # my-script = "ffrs.module:function"
+
+[tool.distutils.egg_info]
+egg_base = "build"

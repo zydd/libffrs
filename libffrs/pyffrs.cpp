@@ -21,7 +21,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <libffrs/reed_solomon.hpp>
+#include "reed_solomon.hpp"
 
 #include "util.hpp"
 
@@ -235,7 +235,7 @@ private:
 };
 
 
-PYBIND11_MODULE(ffrs, m) {
+PYBIND11_MODULE(libffrs, m) {
     m.attr("__version__") = VERSION_INFO;
 #if defined(__clang__)
     m.attr("compiler_info") = __VERSION__;

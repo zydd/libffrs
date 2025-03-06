@@ -10,8 +10,8 @@ __version__ = '0.1.0'
 
 ext_modules = [
     pybind11.setup_helpers.Pybind11Extension(
-        'ffrs',
-        ['src/pyffrs.cpp'],
+        'libffrs',
+        ['libffrs/pyffrs.cpp'],
         define_macros=[('VERSION_INFO', f'"{__version__}"')],
         include_dirs=['include'],
         cxx_std=17
@@ -19,7 +19,7 @@ ext_modules = [
 ]
 
 setuptools.setup(
-    name='libffrs',
+    name='ffrs',
     version=__version__,
     author='Gabriel Machado',
     author_email='gabriel_machado@live.com',
@@ -27,6 +27,7 @@ setuptools.setup(
     description='Fairly Fast & Flexible ECC',
     long_description='',
     ext_modules=ext_modules,
+    packages=["ffrs"],
     cmdclass={'build_ext': pybind11.setup_helpers.build_ext},
     zip_safe=False,
     python_requires='>=3.7',
