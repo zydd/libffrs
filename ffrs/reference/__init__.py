@@ -33,6 +33,9 @@ class F:
         v = (self.x * rhs.x) % self.p
         return F(self.p, v)
 
+    def _mul(self, rhs):
+        return self.__mul__(rhs)
+
     def __floordiv__(self, rhs):
         assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
         return self.__mul__(rhs.inv())
@@ -74,7 +77,10 @@ class P:
     def __init__(self, N, x):
         self.N = N
 
-        self.x = [N(a) for a in x]
+        if type(x) == int:
+            self.x = GF.poly_from_int(N.p, x)
+        else:
+            self.x = [N(a) for a in x]
 
         self._norm()
 
@@ -321,7 +327,7 @@ class Fp(P):
 
 
 class GF:
-    def __init__(self, p, k, a=None, poly=None):
+    def __init__(self, p, k=1, a=None, poly=None):
         if a is None:
             a, poly = next(GF.irr_polynomials(p, k, p))
 
@@ -349,7 +355,7 @@ class GF:
         return Fp(self, self.exp_table[i % (self.p ** self.k - 1)])
 
     def __call__(self, x):
-        return Fp(self, x)
+        return Fp(self, x) if self.k > 1 else F(self.p, x)
 
     def __repr__(self):
         return f'GF{self.p ** self.k}({self.a}, {self.poly_to_int(self.p, self.poly)})'

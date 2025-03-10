@@ -21,6 +21,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "ntt.hpp"
 #include "reed_solomon.hpp"
 
 #include "util.hpp"
@@ -51,6 +52,7 @@ using RS256 = ffrs::RS<GF,
     // ffrs::rs_encode_basic_v2,
     // ffrs::rs_encode_lut_pw2<256>::type,
     ffrs::rs_encode_slice_pw2_dispatch<255>::type,
+    // ffrs::rs_encode_ntt<uint64_t>::type,
 
     // ffrs::rs_synds_basic<256>::type,
     ffrs::rs_synds_lut_pw2<uint32_t, 255>::type,
@@ -61,6 +63,9 @@ using RS256 = ffrs::RS<GF,
 
     ffrs::rs_decode
     >;
+
+template<typename GF>
+using NTT256x8 = ffrs::NTT<GF, ffrs::ntt_eval<__uint128_t>::type>;
 
 
 class PyGF256 : public GF256 {
@@ -105,16 +110,30 @@ public:
         return poly_eval(buf.data, buf.size, x);
     }
     inline py::bytearray py_poly_eval8(buffer_ro<uint8_t> buf1, buffer_ro<uint64_t> buf2) {
-        if (buf2.size != sizeof(uint64_t))
-            throw py::value_error("x must have 8 bytes");
+        if (buf2.size > sizeof(uint64_t))
+            throw py::value_error("can evaluate polynomial 8 points at most");
         uint64_t res = poly_eval_wide(buf1.data, buf1.size, buf2.data[0]);
-        return py::bytearray(reinterpret_cast<const char *>(&res), sizeof(uint64_t));
+        return py::bytearray(reinterpret_cast<const char *>(&res), std::min(buf2.size, sizeof(uint64_t)));
     }
     inline py::bytearray py_mul8(buffer_ro<uint64_t> buf1, buffer_ro<uint64_t> buf2) {
         if (buf1.size != sizeof(uint64_t) || buf2.size != sizeof(uint64_t))
             throw py::value_error("Can only multiply 8-byte wide arrays");
         uint64_t res = mul_wide(buf1.data[0], buf2.data[0]);
         return py::bytearray(reinterpret_cast<const char *>(&res), sizeof(uint64_t));
+    }
+};
+
+
+class PyNTT256x8 : public NTT256x8<PyGF256> {
+public:
+    inline PyNTT256x8(uint8_t primitive, uint16_t poly1, std::optional<uint8_t> root):
+        NTT256x8<PyGF256>(PyGF256(primitive, poly1), root.value_or(primitive))
+    { }
+
+    inline py::bytearray py_ntt8(buffer_ro<uint8_t> buf) {
+
+        uint64_t res = ntt(buf.data, buf.size);
+        return py::bytearray(reinterpret_cast<const char *>(&res), std::min(buf.size, sizeof(uint64_t)));
     }
 };
 
@@ -297,6 +316,26 @@ PYBIND11_MODULE(libffrs, m) {
             )", "p1"_a, "p2"_a)
         .doc() = R"(
             Finite-field operations optimized for :math:`GF(2^8)`
+        )";
+
+    py::class_<PyNTT256x8>(m, "NTT256x8")
+        .def_property_readonly("gf", [](PyNTT256x8& self) -> auto const& { return self.gf; })
+
+        .def(py::init<uint8_t, uint16_t, std::optional<uint8_t>>(), R"(
+            Instantiate type NTT computation over :math:`GF(p^n)/P`
+
+            Args:
+                primitive : :math:`a` -- primitive value used to generate the field
+                polynomial : :math:`P` -- irreducible polynomial used to generate the field
+                root : :math:`\alpha` -- root of unity for NTT computation
+            )",
+            "primitive"_a = 2, "poly1"_a = 0x11d, "root"_a = py::none()
+        )
+        .def("ntt8", cast_args(&PyNTT256x8::py_ntt8), R"(
+            Number Theoretical Transform
+        )", "buffer"_a)
+        .doc() = R"(
+            NTT for :math:`GF(2^8)`
         )";
 
     py::class_<PyRS256>(m, "RS256")

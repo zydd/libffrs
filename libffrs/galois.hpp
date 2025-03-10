@@ -225,6 +225,13 @@ public:
 
 template<typename Word>
 struct gf_wide_mul {
+    static constexpr Word repeat_byte(uint8_t n) {
+        Word p = 0;
+        for (size_t i = 0; i < sizeof(Word); ++i)
+            p |= Word(n) << (i * 8);
+        return p;
+    }
+
     template<typename GFT, typename GF>
     class type {
         static_assert(std::is_same_v<GFT, uint8_t>);
@@ -259,21 +266,15 @@ struct gf_wide_mul {
     protected:
         inline void init() {
             auto& gf = GF::cast(this);
-            polyw = _repeat_byte(gf.poly1);
+            assert((gf.poly1 & 0x80) == 0);
+            polyw = repeat_byte(gf.poly1);
         }
 
     private:
         Word polyw;
-
-        static constexpr Word _repeat_byte(uint8_t n) {
-            Word p = 0;
-            for (size_t i = 0; i < sizeof(Word); ++i)
-                p |= Word(n) << (i * 8);
-            return p;
-        }
-        static constexpr Word rep_0x80 = _repeat_byte(0x80);
-        static constexpr Word rep_0x7f = _repeat_byte(0x7f);
-        static constexpr Word rep_0x01 = _repeat_byte(0x01);
+        static constexpr Word rep_0x80 = repeat_byte(0x80);
+        static constexpr Word rep_0x7f = repeat_byte(0x7f);
+        static constexpr Word rep_0x01 = repeat_byte(0x01);
     };
 };
 

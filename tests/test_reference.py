@@ -1,29 +1,6 @@
 from ffrs.reference import *
 
 
-def irr_polynomials(p, k, primitive=None):
-    PN = lambda n: P(lambda x: F(p, x), GF.poly_from_int(p, n))
-    field_charac = p ** k
-
-    if primitive is None:
-        for poly in range(field_charac, 2 * field_charac):
-            poly = PN(poly)
-
-            try:
-                yield next(GF.primitives(p, k, poly)), GF.poly_to_int(p, poly)
-            except StopIteration:
-                pass
-    else:
-        if type(primitive) == int:
-            primitive = PN(primitive)
-
-        for poly in range(field_charac, 2 * field_charac):
-            poly = PN(poly)
-
-            if GF.is_primitive(p, k, poly, primitive):
-                yield GF.poly_to_int(p, primitive), GF.poly_to_int(p, poly)
-
-
 def test_reference():
     GF2 = GF(2, 1, 1)
     GF256 = GF(2, 8)

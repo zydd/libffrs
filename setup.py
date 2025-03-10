@@ -13,7 +13,7 @@ ext_modules = [
         'libffrs',
         ['libffrs/pyffrs.cpp'],
         define_macros=[('VERSION_INFO', f'"{__version__}"')],
-        include_dirs=['include'],
+        include_dirs=['libffrs'],
         cxx_std=17
     ),
 ]
