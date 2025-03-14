@@ -31,28 +31,26 @@ namespace ffrs {
 
 
 template<typename T, template<class, class>typename...Fs>
-class GF : public detail::CRTP<GF<T, Fs...>, Fs<T, GF<T, Fs...>>...>  {
+class GF : public detail::CRTP<Fs<T, GF<T, Fs...>>...>  {
+public:
+    using detail::CRTP<Fs<T, GF<T, Fs...>>...>::CRTP;
+};
+
+
+template<typename T, typename GF>
+class gf_data {
 public:
     using GFT = T;
-
     const GFT prime;
     const GFT power;
     const GFT primitive;
     const GFT poly1;
     const size_t field_elements;
 
-    GF(GF const&) = delete;
-    GF& operator=(GF const&) = delete;
-
-    GF(GF&&) = default;
-    GF& operator=(GF&&) = default;
-
-    inline GF(GFT prime, GFT power, GFT primitive, GFT poly1):
+    inline gf_data(GFT prime, GFT power, GFT primitive, GFT poly1):
         prime(prime), power(power), primitive(primitive), poly1(poly1),
         field_elements(detail::ipow(prime, power))
-    {
-        detail::CRTP<GF<T, Fs...>, Fs<T, GF<T, Fs...>>...>::init();
-    }
+    { }
 };
 
 
@@ -102,7 +100,7 @@ public:
         return r;
     }
 
-    inline void init() {
+    inline gf_mul_cpu_pw2() {
         auto& gf = GF::cast(this);
         iter = int(detail::ilog2_floor(gf.field_elements >> 1));
     }
@@ -158,9 +156,10 @@ struct gf_exp_log_lut {
         }
 
     protected:
-        inline void init() {
+        inline type() {
             auto& gf = GF::cast(this);
-            auto gf_cpu = ffrs::GF<GFT, MulOperation>(gf.prime, gf.power, gf.primitive, gf.poly1);
+            using GF_mul = ffrs::GF<GFT, ffrs::gf_data, MulOperation>;
+            auto gf_cpu = GF_mul(typename GF_mul::gf_data(gf.prime, gf.power, gf.primitive, gf.poly1));
 
             GFT x = 1;
             for (size_t i = 0; i < gf.field_elements; ++i) {
@@ -190,10 +189,10 @@ struct gf_mul_lut {
         }
 
     protected:
-        inline void init() {
+        inline type() {
             auto& gf = GF::cast(this);
-
-            auto gf_cpu = ffrs::GF<GFT, MulOperation>(gf.prime, gf.power, gf.primitive, gf.poly1);
+            using GF_mul = ffrs::GF<GFT, ffrs::gf_data, MulOperation>;
+            auto gf_cpu = GF_mul(typename GF_mul::gf_data(gf.prime, gf.power, gf.primitive, gf.poly1));
 
             for (size_t i = 0; i < gf.field_elements; ++i) {
                 for (size_t j = 0; j < gf.field_elements; ++j)
@@ -264,7 +263,7 @@ struct gf_wide_mul {
         }
 
     protected:
-        inline void init() {
+        inline type() {
             auto& gf = GF::cast(this);
             assert((gf.poly1 & 0x80) == 0);
             polyw = repeat_byte(gf.poly1);

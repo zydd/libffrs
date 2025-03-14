@@ -100,40 +100,23 @@ struct bit_array {
 
 
 // Curiously Recurring Template Pattern
-
-template<typename T, typename...Fs>
+template<typename...Fs>
 class CRTP : public Fs... {
 public:
     template<typename F>
-    static constexpr T const& cast(F _this) {
-        return static_cast<T const&>(*_this);
+    static constexpr CRTP const& cast(F _this) {
+        return static_cast<CRTP const&>(*_this);
     }
 
     template<typename F>
-    static constexpr T& cast_mut(F _this) {
-        return static_cast<T&>(*_this);
+    static constexpr CRTP& cast_mut(F _this) {
+        return static_cast<CRTP&>(*_this);
     }
 
-protected:
-    // base class constructors are always called first
-    // define an `init` method to make sure it's called after GF is initialized
-    // this method needs to be called from the subclasses constructors
-    inline void init() { init_mixins<Fs...>(); }
-
-private:
-    template <typename Fs0>
-    auto try_init_mixin(int) -> decltype(Fs0::init()) { return this->Fs0::init(); }
-
-    template <typename Fs0>
-    auto try_init_mixin(long) -> void { }
-
-    template<typename Fs0, typename...Fss>
-    inline void init_mixins() {
-        try_init_mixin<Fs0>(0);
-
-        if constexpr (sizeof...(Fss) > 0)
-            init_mixins<Fss...>();
-    }
+    template<typename...F0>
+    inline CRTP(F0&&... f0):
+        F0(std::move(f0))...
+    { }
 };
 
 

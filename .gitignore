@@ -2,3 +2,4 @@
 /docs/generated
 __pycache__/
 .vscode/
+*.out

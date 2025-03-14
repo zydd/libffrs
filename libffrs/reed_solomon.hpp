@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <cstddef>
 #include <new>
 
 #include "detail.hpp"
@@ -27,23 +28,27 @@
 
 namespace ffrs {
 
+using size_t = std::size_t;
+
 
 template<typename GF, template<class, class>typename...Fs>
-class RS : public detail::CRTP<RS<GF, Fs...>, Fs<GF, RS<GF, Fs...>>...>  {
+class RS : public detail::CRTP<Fs<GF, RS<GF, Fs...>>...>  {
+public:
+    using detail::CRTP<Fs<GF, RS>...>::CRTP;
+};
+
+
+template<typename GF, typename RS>
+class rs_data {
 public:
     using GFT = typename GF::GFT;
     const GF gf;
     const GFT ecc_len;
-
-    RS(RS const&) = delete;
-    RS& operator=(RS const&) = delete;
-
-    inline RS(GF&& gf, GFT ecc_len):
+    inline rs_data(GF&& gf, GFT ecc_len):
         gf(std::move(gf)), ecc_len(ecc_len)
-    {
-        detail::CRTP<RS<GF, Fs...>, Fs<GF, RS<GF, Fs...>>...>::init();
-    }
+    { }
 };
+
 
 
 template<size_t MaxEccLen>
@@ -56,7 +61,7 @@ struct rs_generator {
         GFT generator_roots[MaxEccLen] = {};
 
     protected:
-        inline void init() {
+        inline type() {
             auto& rs = RS::cast(this);
 
             auto temp = (GFT *) alloca(rs.ecc_len + 1);
@@ -140,7 +145,7 @@ struct rs_encode_lut_pw2 {
         }
 
     protected:
-        inline void init() {
+        inline type() {
             auto& rs = RS::cast(this);
             for (size_t i = 0; i < rs.gf.field_elements; ++i) {
                 auto data = (uint8_t *) alloca(rs.ecc_len + 1);
@@ -307,7 +312,7 @@ struct rs_encode_ntt {
         }
 
     protected:
-        inline void init() {
+        inline type() {
             auto& rs = RS::cast(this);
             roots_of_unity = 0;
             for (size_t i = 0; i < sizeof(Word); ++i)
@@ -332,9 +337,9 @@ struct rs_encode_slice_pw2_dispatch {
         }
 
     protected:
-        void init() {
+        inline type() {
             auto& rs = RS::cast_mut(this);
-            _dispatch.init[rs.ecc_len](rs);
+            _dispatch.init[rs.ecc_len](static_cast<RS&>(rs));
             _encode = _dispatch.encode[rs.ecc_len];
         }
 
@@ -426,7 +431,7 @@ struct rs_synds_lut_pw2 {
         }
 
     protected:
-        inline void init() {
+        inline type() {
             auto& rs = RS::cast(this);
 
             size_t i = 0;
@@ -532,7 +537,7 @@ struct rs_roots_eval_lut_pw2 {
             return count;
         }
     protected:
-        inline void init() {
+        inline type() {
             auto& rs = RS::cast(this);
             for (unsigned i = 0; i < 256; ++i)
                 err_poly_roots.u8[i] = rs.gf.inv(rs.gf.exp(uint8_t(i)));

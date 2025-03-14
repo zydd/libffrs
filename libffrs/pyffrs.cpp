@@ -31,6 +31,7 @@ using namespace pybind11::literals;
 
 
 using GF256 = ffrs::GF<uint8_t,
+    ffrs::gf_data,
     ffrs::gf_add_xor,
 
     ffrs::gf_exp_log_lut<ffrs::gf_mul_cpu_pw2, 256>::type,
@@ -45,7 +46,7 @@ using GF256 = ffrs::GF<uint8_t,
     >;
 
 template<typename GF>
-using RS256 = ffrs::RS<GF,
+using RS256 = ffrs::RS<GF, ffrs::rs_data,
     ffrs::rs_generator<256>::type,
 
     // ffrs::rs_encode_basic,
@@ -65,13 +66,13 @@ using RS256 = ffrs::RS<GF,
     >;
 
 template<typename GF>
-using NTT256x8 = ffrs::NTT<GF, ffrs::ntt_eval<__uint128_t>::type>;
+using NTT256x8 = ffrs::NTT<GF, ffrs::ntt_data, ffrs::ntt_eval<__uint128_t>::type>;
 
 
 class PyGF256 : public GF256 {
 public:
     inline PyGF256(uint8_t primitive, uint16_t poly1):
-        GF256(2, 8, primitive, poly1 & 0xff)
+        GF256(gf_data(2, 8, primitive, poly1 & 0xff))
     { }
 
     inline py::bytearray py_poly_add(buffer_ro<uint8_t> buf1, buffer_ro<uint8_t> buf2) {
@@ -127,11 +128,10 @@ public:
 class PyNTT256x8 : public NTT256x8<PyGF256> {
 public:
     inline PyNTT256x8(uint8_t primitive, uint16_t poly1, std::optional<uint8_t> root):
-        NTT256x8<PyGF256>(PyGF256(primitive, poly1), root.value_or(primitive))
+        NTT256x8<PyGF256>(ntt_data(PyGF256(primitive, poly1), root.value_or(primitive)))
     { }
 
     inline py::bytearray py_ntt8(buffer_ro<uint8_t> buf) {
-
         uint64_t res = ntt(buf.data, buf.size);
         return py::bytearray(reinterpret_cast<const char *>(&res), std::min(buf.size, sizeof(uint64_t)));
     }
@@ -162,7 +162,7 @@ public:
     }
 
     inline PyRS256(uint8_t ecc_len, size_t block_size, uint8_t primitive, uint16_t polynomial):
-        RS256<PyGF256>(PyGF256(primitive, polynomial), ecc_len)
+        RS256<PyGF256>(rs_data(PyGF256(primitive, polynomial), ecc_len))
     {
         set_default_block_size(block_size);
     }

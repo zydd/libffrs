@@ -31,20 +31,21 @@ namespace ffrs {
 
 
 template<typename GF, template<class, class>typename...Fs>
-class NTT : public detail::CRTP<NTT<GF, Fs...>, Fs<GF, NTT<GF, Fs...>>...>  {
+class NTT : public detail::CRTP<Fs<GF, NTT<GF, Fs...>>...>  {
+public:
+    using detail::CRTP<Fs<GF, NTT>...>::CRTP;
+};
+
+template<typename GF, typename RS>
+class ntt_data {
 public:
     using GFT = typename GF::GFT;
     const GF gf;
     const GFT root_of_unity;
 
-    NTT(NTT const&) = delete;
-    NTT& operator=(NTT const&) = delete;
-
-    inline NTT(GF&& gf, GFT root):
-        gf(std::move(gf)), root_of_unity(root)
-    {
-        detail::CRTP<NTT<GF, Fs...>, Fs<GF, NTT<GF, Fs...>>...>::init();
-    }
+    inline ntt_data(GF&& gf, GFT root_of_unity):
+        gf(std::move(gf)), root_of_unity(root_of_unity)
+    { }
 };
 
 
@@ -79,7 +80,7 @@ struct ntt_eval {
             return r;
         }
 
-        inline void init() {
+        inline type() {
             auto& ntt = NTT::cast(this);
             assert((ntt.gf.poly1 & 0x80) == 0);
             polyw = _repeat_byte(ntt.gf.poly1);
