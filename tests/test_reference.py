@@ -70,7 +70,7 @@ def test_reference():
                 assert_eq(a, b, (-a + b), (b - a))
 
     for p in [2,3,5,7,11,13,127,257]:
-        test_field(PrimeField(p))
+        test_field(GF(p))
 
     test_field(GF2)
     test_field(GF256)

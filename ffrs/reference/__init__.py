@@ -464,38 +464,3 @@ class GF:
                     res[j].append(i)
                     break
         return res
-
-class PrimeField:
-    def __init__(self, prime, primitive=None):
-        if primitive is None:
-            primitive = next(self.primitives(prime))
-
-        self.p = prime
-        self.a = primitive
-        self.k = 1
-
-    def __call__(self, x):
-        return F(self.p, x)
-
-    def __repr__(self):
-        return f'F({self.p}, {self.a})'
-
-    def gen(self, i):
-        return F(self.p, self.a ** i)
-
-    @staticmethod
-    def primitives(p):
-        for i in range(1, p):
-            prim = F(p, i)
-
-            count = 1
-            x = prim * prim
-
-            while x != prim:
-                x = x * prim
-                count += 1
-                if count > p:
-                    break
-            else:
-                if count == p-1:
-                    yield i
