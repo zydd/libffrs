@@ -29,6 +29,8 @@
 
 namespace ffrs {
 
+using size_t = std::size_t;
+
 
 template<typename T, template<class, class>typename...Fs>
 class GF : public detail::CRTP<Fs<T, GF<T, Fs...>>...>  {

@@ -50,7 +50,6 @@ public:
 };
 
 
-
 template<size_t MaxEccLen>
 struct rs_generator {
     template<typename GF, typename RS>
@@ -296,7 +295,7 @@ private:
 };
 
 
-template<typename Word>
+template<typename NTT>
 struct rs_encode_ntt {
     template<typename GF, typename RS>
     class type {
@@ -304,23 +303,12 @@ struct rs_encode_ntt {
         using GFT = typename GF::GFT;
 
         inline void encode(const GFT input[], size_t input_size, GFT output[]) {
-            auto& rs = RS::cast(this);
-            Word res = rs.gf.poly_eval_wide(input, input_size, roots_of_unity);
-            size_t ecc_len = std::min(size_t(rs.ecc_len), sizeof(Word));
-            for (size_t i = 0; i < ecc_len; ++i)
-                output[i] = reinterpret_cast<const GFT *>(&res)[i];
+            // auto& rs = RS::cast(this);
+            // Word res = rs.gf.poly_eval_wide(input, input_size, roots_of_unity);
+            // size_t ecc_len = std::min(size_t(rs.ecc_len), sizeof(Word));
+            // for (size_t i = 0; i < ecc_len; ++i)
+            //     output[i] = reinterpret_cast<const GFT *>(&res)[i];
         }
-
-    protected:
-        inline type() {
-            auto& rs = RS::cast(this);
-            roots_of_unity = 0;
-            for (size_t i = 0; i < sizeof(Word); ++i)
-                reinterpret_cast<GFT *>(&roots_of_unity)[i] = rs.gf.pow(rs.gf.primitive, i);
-        }
-
-    private:
-        Word roots_of_unity;
     };
 };
 

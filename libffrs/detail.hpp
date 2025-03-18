@@ -27,6 +27,9 @@
 // #endif
 
 namespace ffrs {
+
+using size_t = std::size_t;
+
 namespace detail {
 
 template<typename T, unsigned Bits>
