@@ -19,12 +19,12 @@ def randbytes(n, start=0, stop=256):
 def test_ntt8():
     a = randbytes(6)
     res = NTT.ntt8(a)
-    ref = ntt(GF256, GF256(NTT.gf.primitive), a[::-1])
+    ref = ntt(GF256, GF256(NTT.gf.primitive), a)
     print(list(a))
     print("ref", [int(x) for x in ref])
     print("res", list(res))
 
-    ref2 = ffrs.GF256().poly_eval8(a, bytearray(int(GF256(NTT.gf.primitive).pow(i)) for i in range(len(a))))
+    ref2 = ffrs.GF256().poly_eval8(a[::-1], bytearray(int(GF256(NTT.gf.primitive).pow(i)) for i in range(len(a))))
     print("ref2", list(ref2))
     assert [int(x) for x in ref] == list(res) == list(ref2)
 

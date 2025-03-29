@@ -36,7 +36,7 @@ public:
     using detail::CRTP<Fs<GF, NTT>...>::CRTP;
 };
 
-template<typename GF, typename RS>
+template<typename GF, typename NTT>
 class ntt_data {
 public:
     using GFT = typename GF::GFT;
@@ -49,60 +49,66 @@ public:
 };
 
 
-template<typename Word>
-struct ntt_eval {
+template<typename GF, typename NTT>
+class ntt_eval {
+public:
+    using Word = typename GF::wide_mul_word_t;
+
+    inline Word ntt(const uint8_t data[], const size_t size, Word r = 0) const {
+        auto& ntt = NTT::cast(this);
+        for (size_t i = 0; i < size; ++i)
+            r = ntt.gf.mul_wide(r, _ntt_eval_roots) ^ (data[i] * rep_0x01);
+        return r;
+    }
+
+    inline ntt_eval() {
+        auto& ntt = NTT::cast(this);
+        assert((ntt.gf.poly1 & 0x80) == 0);
+        _ntt_eval_polyw = GF::repeat_byte(ntt.gf.poly1);
+
+        _ntt_eval_roots = 0;
+        for (size_t i = 0; i < sizeof(Word); ++i)
+            _ntt_eval_roots |= Word(ntt.gf.pow(ntt.root_of_unity, i)) << (i * 8);
+    }
+
+private:
+    Word _ntt_eval_polyw;
+    Word _ntt_eval_roots;
+    Word rep_0x01 = GF::repeat_byte(0x01);
+};
+
+
+template<size_t MaxFieldElements>
+struct ntt_eval_lut {
     template<typename GF, typename NTT>
     class type {
     public:
-        using wide_mul_word_t = Word;
-
-        inline Word mul_wide(Word a, Word b) const {
-            Word r = 0;
-            for (int i = 7; i >= 0; --i) {
-                Word m = r & rep_0x80;
-
-                // static_assert((gf.poly1 & 0x80) == 0); // needed for the next statement
-                m = m - (m >> 7);
-
-                r = ((r & rep_0x7f) << 1) ^ (polyw & m);
-
-                Word n = (a & (rep_0x01 << i)) >> i;
-                n = (n << 8) - n;
-
-                r ^= b & n;
-            }
-            return r;
-        }
+        using GFT = typename GF::GFT;
+        using Word = typename GF::wide_mul_word_t;
 
         inline Word ntt(const uint8_t data[], const size_t size, Word r = 0) const {
+            auto& ntt = NTT::cast(this);
             for (size_t i = 0; i < size; ++i)
-                r = mul_wide(r, roots) ^ (data[i] * rep_0x01);
+                r ^= ntt._ntt_eval_term[i][data[i]];
             return r;
         }
 
         inline type() {
             auto& ntt = NTT::cast(this);
-            assert((ntt.gf.poly1 & 0x80) == 0);
-            polyw = _repeat_byte(ntt.gf.poly1);
-
-            roots = 0;
-            for (size_t i = 0; i < sizeof(Word); ++i)
-                roots |= Word(ntt.gf.pow(ntt.root_of_unity, i)) << (i * 8);
-        }
+            for (size_t x = 0; x < MaxFieldElements; ++x) {
+                for (size_t i = 0; i < MaxFieldElements; ++i) {
+                    _ntt_eval_term[i][x] = 0;
+                    for (size_t j = 0; j < sizeof(Word) / sizeof(GFT); ++j) {
+                        GFT a = ntt.gf.pow(ntt.root_of_unity, i * j);
+                        // reinterpret_cast<GFT *>(_ntt_eval_term[i])[j] = ntt.gf.mul(a, i);
+                        _ntt_eval_term[i][x] |= Word(ntt.gf.mul(a, x)) << (j * 8);
+                    }
+                }
+            }
+        };
 
     private:
-        Word polyw;
-        Word roots;
-
-        static constexpr Word _repeat_byte(uint8_t n) {
-            Word p = 0;
-            for (size_t i = 0; i < sizeof(Word); ++i)
-                p |= Word(n) << (i * 8);
-            return p;
-        }
-        static constexpr Word rep_0x80 = _repeat_byte(0x80);
-        static constexpr Word rep_0x7f = _repeat_byte(0x7f);
-        static constexpr Word rep_0x01 = _repeat_byte(0x01);
+        Word _ntt_eval_term[MaxFieldElements][MaxFieldElements];
     };
 };
 

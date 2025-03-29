@@ -295,21 +295,31 @@ private:
 };
 
 
-template<typename NTT>
-struct rs_encode_ntt {
-    template<typename GF, typename RS>
-    class type {
-    public:
-        using GFT = typename GF::GFT;
+template<typename GF, typename RS>
+class rs_ntt_data {
+public:
+    using GFT = typename GF::GFT;
+    const GFT root_of_unity;
 
-        inline void encode(const GFT input[], size_t input_size, GFT output[]) {
-            // auto& rs = RS::cast(this);
-            // Word res = rs.gf.poly_eval_wide(input, input_size, roots_of_unity);
-            // size_t ecc_len = std::min(size_t(rs.ecc_len), sizeof(Word));
-            // for (size_t i = 0; i < ecc_len; ++i)
-            //     output[i] = reinterpret_cast<const GFT *>(&res)[i];
-        }
-    };
+    inline rs_ntt_data(GFT root_of_unity):
+        root_of_unity(root_of_unity)
+    { }
+};
+
+
+template<typename GF, typename RS>
+class rs_encode_ntt {
+public:
+    using GFT = typename GF::GFT;
+    using Word = typename GF::wide_mul_word_t;
+
+    inline void encode(const GFT input[], size_t input_size, GFT output[]) {
+        auto& rs = RS::cast(this);
+        Word res = rs.ntt(input, input_size);
+        size_t ecc_len = std::min(size_t(rs.ecc_len), sizeof(Word));
+        for (size_t i = 0; i < ecc_len; ++i)
+            output[i] = reinterpret_cast<const GFT *>(&res)[i];
+    }
 };
 
 

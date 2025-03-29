@@ -46,14 +46,25 @@ using GF256 = ffrs::GF<uint8_t,
     >;
 
 template<typename GF>
+using NTT256x8 = ffrs::NTT<GF,
+    ffrs::ntt_data,
+    // ffrs::ntt_eval
+    ffrs::ntt_eval_lut<256>::type
+    >;
+
+template<typename GF>
 using RS256 = ffrs::RS<GF, ffrs::rs_data,
-    ffrs::rs_generator<256>::type,
+    ffrs::rs_generator<255>::type,
 
     // ffrs::rs_encode_basic,
     // ffrs::rs_encode_basic_v2,
     // ffrs::rs_encode_lut_pw2<256>::type,
     ffrs::rs_encode_slice_pw2_dispatch<255>::type,
-    // ffrs::rs_encode_ntt<uint64_t>::type,
+
+    ffrs::rs_ntt_data,
+    // // ffrs::ntt_eval,
+    // ffrs::ntt_eval_lut<256>::type,
+    // ffrs::rs_encode_ntt,
 
     // ffrs::rs_synds_basic<256>::type,
     ffrs::rs_synds_lut_pw2<uint32_t, 255>::type,
@@ -64,9 +75,6 @@ using RS256 = ffrs::RS<GF, ffrs::rs_data,
 
     ffrs::rs_decode
     >;
-
-template<typename GF>
-using NTT256x8 = ffrs::NTT<GF, ffrs::ntt_data, ffrs::ntt_eval<__uint128_t>::type>;
 
 
 class PyGF256 : public GF256 {
@@ -162,7 +170,7 @@ public:
     }
 
     inline PyRS256(uint8_t ecc_len, size_t block_size, uint8_t primitive, uint16_t polynomial):
-        RS256<PyGF256>(rs_data(PyGF256(primitive, polynomial), ecc_len))
+        RS256<PyGF256>(rs_data(PyGF256(primitive, polynomial), ecc_len), rs_ntt_data(primitive))
     {
         set_default_block_size(block_size);
     }
