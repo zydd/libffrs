@@ -2,6 +2,7 @@ import pytest
 
 from ffrs.reference import GF
 from ffrs.reference.linalg import *
+from ffrs.reference.ntt import vandermonde_ntt
 
 GF256 = GF(2, 8)
 

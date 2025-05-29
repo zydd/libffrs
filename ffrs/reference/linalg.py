@@ -90,15 +90,15 @@ def print_mat(mat):
     print(f" {[int(x) for x in mat[-1]]}]")
 
 
-def vandermonde_ntt(w, n):
-    res = [[None for _ in range(n)] for _ in range(n)]
-    for i in range(n):
-        for j in range(n):
-            res[i][j] = w.pow(i * j)
-    return res
-
-
 def vec_add(a, b):
     assert len(a) == len(b)
     return [x + y for x, y in zip(a, b)]
 
+
+def circulant(c):
+    n = len(c)
+    res = [[None for _ in range(n)] for _ in range(n)]
+    for i in range(n):
+        for j in range(n):
+            res[i][j] = c[(i - j) % n]
+    return res

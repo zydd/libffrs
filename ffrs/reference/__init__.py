@@ -451,14 +451,13 @@ class GF:
                 if GF.is_primitive(p, k, poly, primitive):
                     yield GF.poly_to_int(p, primitive), GF.poly_to_int(p, poly)
 
-    @staticmethod
-    def primitive_roots_of_unity(GF):
+    def primitive_roots_of_unity(self):
         res = dict()
-        field_elements = GF.p ** GF.k
+        field_elements = self.p ** self.k
 
         for i in range(2, field_elements):
             for j in range(2, field_elements):
-                if GF(i).pow(j) == 1:
+                if self(i).pow(j) == 1:
                     if j not in res:
                         res[j] = []
                     res[j].append(i)
