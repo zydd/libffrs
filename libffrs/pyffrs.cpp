@@ -1,7 +1,7 @@
 /**************************************************************************
  * pyffrs.cpp
  *
- * Copyright 2024 Gabriel Machado
+ * Copyright 2025 Gabriel Machado
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@
 
 #include "pygf256.hpp"
 #include "pyrs256.hpp"
+#include "pygfi32.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -97,4 +98,5 @@ PYBIND11_MODULE(libffrs, m) {
 
     PyGF256::register_class(m);
     PyRS256::register_class(m);
+    PyGFi32::register_class(m);
 }

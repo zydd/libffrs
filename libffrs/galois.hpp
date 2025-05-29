@@ -1,7 +1,7 @@
 /**************************************************************************
  * galois.hpp
  *
- * Copyright 2024 Gabriel Machado
+ * Copyright 2025 Gabriel Machado
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,16 +56,23 @@ public:
 };
 
 
+/*************
+ * Prime Field
+ *************/
+
+
 template<typename GFT, typename GF>
-class gf_add_ring {
+class gf_add_mod {
 public:
     inline GFT add(GFT const& lhs, GFT const& rhs) const {
         auto& gf = GF::cast(this);
+        // assert(gf.power == 1);
         return (lhs + rhs) % gf.prime;
     }
 
     inline GFT sub(GFT const& lhs, GFT const& rhs) const {
         auto& gf = GF::cast(this);
+        // assert(gf.power == 1);
         if (lhs >= rhs)
             return (lhs - rhs) % gf.prime;
         else
@@ -75,49 +82,50 @@ public:
 
 
 template<typename GFT, typename GF>
-struct gf_add_xor {
-    inline GFT add(GFT const& lhs, GFT const& rhs) const { return lhs ^ rhs; }
-    inline GFT sub(GFT const& lhs, GFT const& rhs) const { return lhs ^ rhs; }
-};
-
-
-template<typename GFT, typename GF>
-class gf_mul_cpu_pw2 {
-public:
-    inline GFT mul(GFT const& a, GFT const& b) const {
-        auto& gf = GF::cast(this);
-
-        GFT r = 0;
-
-        for (int i = iter; i >= 0; --i) {
-            if (r & (gf.field_elements >> 1))
-                r = (r << 1) ^ gf.poly1;
-            else
-                r = (r << 1);
-
-            if (a & (1 << i))
-                r ^= b;
-        }
-
-        return r;
-    }
-
-    inline gf_mul_cpu_pw2() {
-        auto& gf = GF::cast(this);
-        iter = int(detail::ilog2_floor(gf.field_elements >> 1));
-    }
-private:
-    int iter;
-};
-
-
-template<typename GFT, typename GF>
-class gf_mul_cpu_prime {
+class gf_mul_mod {
 public:
     inline GFT mul(GFT const& lhs, GFT const& rhs) const {
         auto& gf = GF::cast(this);
-        return (lhs * rhs) % gf.prime;
+        // assert(gf.power == 1);
+        GFT res;
+        if (__builtin_mul_overflow(lhs, rhs, &res))
+            res = 1;
+        return res % gf.prime;
     }
+};
+
+
+/*********
+ * Generic
+ *********/
+
+
+template<template<class, class>typename MulOperation, size_t MaxFieldElements>
+struct gf_mul_lut {
+    template<typename GFT, typename GF>
+    class type {
+    public:
+        static_assert(MaxFieldElements <= 4096); // limit 16MB
+
+        inline GFT mul(GFT const& a, GFT const& b) const {
+            auto& gf = GF::cast(this);
+            return _mul[a * gf.field_elements + b];
+        }
+
+    protected:
+        inline type() {
+            auto& gf = GF::cast(this);
+            using GF_mul = ffrs::GF<GFT, ffrs::gf_data, MulOperation>;
+            auto gf_cpu = GF_mul(typename GF_mul::gf_data(gf.prime, gf.power, gf.primitive, gf.poly1));
+
+            for (size_t i = 0; i < gf.field_elements; ++i) {
+                for (size_t j = 0; j < gf.field_elements; ++j)
+                    _mul[i * gf.field_elements + j] = gf_cpu.mul(i, j);
+            }
+        }
+    private:
+        GFT _mul[MaxFieldElements * MaxFieldElements] = {};
+    };
 };
 
 
@@ -174,108 +182,6 @@ struct gf_exp_log_lut {
     private:
         std::array<GFT, MaxFieldElements> _exp = {};
         std::array<GFT, MaxFieldElements> _log = {};
-    };
-};
-
-
-template<template<class, class>typename MulOperation, size_t MaxFieldElements>
-struct gf_mul_lut {
-    template<typename GFT, typename GF>
-    class type {
-    public:
-        static_assert(MaxFieldElements <= 4096); // limit 16MB
-
-        inline GFT mul(GFT const& a, GFT const& b) const {
-            auto& gf = GF::cast(this);
-            return _mul[a * gf.field_elements + b];
-        }
-
-    protected:
-        inline type() {
-            auto& gf = GF::cast(this);
-            using GF_mul = ffrs::GF<GFT, ffrs::gf_data, MulOperation>;
-            auto gf_cpu = GF_mul(typename GF_mul::gf_data(gf.prime, gf.power, gf.primitive, gf.poly1));
-
-            for (size_t i = 0; i < gf.field_elements; ++i) {
-                for (size_t j = 0; j < gf.field_elements; ++j)
-                    _mul[i * gf.field_elements + j] = gf_cpu.mul(i, j);
-            }
-        }
-    private:
-        GFT _mul[MaxFieldElements * MaxFieldElements] = {};
-    };
-};
-
-
-template<typename GFT, typename GF>
-class gf_mul_exp_log_lut {
-public:
-    inline GFT mul(GFT const& a, GFT const& b) const {
-        if (a == 0 || b == 0)
-            return 0;
-
-        auto& gf = GF::cast(this);
-        size_t r = gf.log(a) + gf.log(b);
-        if (r >= gf.field_elements-1)
-            r -= gf.field_elements-1;
-
-        return gf.exp(GFT(r));
-    }
-};
-
-
-template<typename Word>
-struct gf_wide_mul {
-    template<typename GFT, typename GF>
-    class type {
-        static_assert(std::is_same_v<GFT, uint8_t>);
-
-    public:
-        using wide_mul_word_t = Word;
-
-        inline Word mul_wide(Word a, Word b) const {
-            Word r = 0;
-            for (int i = 7; i >= 0; --i) {
-                Word m = r & rep_0x80;
-
-                // static_assert((gf.poly1 & 0x80) == 0); // needed for the next statement
-                m = m - (m >> 7);
-
-                r = ((r & rep_0x7f) << 1) ^ (polyw & m);
-
-                Word n = (a & (rep_0x01 << i)) >> i;
-                n = (n << 8) - n;
-
-                r ^= b & n;
-            }
-            return r;
-        }
-
-        inline Word poly_eval_wide(const uint8_t poly[], const size_t size, const Word x, Word r = 0) const {
-            for (size_t i = 0; i < size; ++i)
-                r = mul_wide(r, x) ^ (poly[i] * rep_0x01);
-            return r;
-        }
-
-        static constexpr Word repeat_byte(uint8_t n) {
-            Word p = 0;
-            for (size_t i = 0; i < sizeof(Word); ++i)
-                p |= Word(n) << (i * 8);
-            return p;
-        }
-
-    protected:
-        Word polyw;
-
-        inline type() {
-            auto& gf = GF::cast(this);
-            assert((gf.poly1 & 0x80) == 0);
-            polyw = repeat_byte(gf.poly1);
-        }
-
-        static constexpr Word rep_0x80 = repeat_byte(0x80);
-        static constexpr Word rep_0x7f = repeat_byte(0x7f);
-        static constexpr Word rep_0x01 = repeat_byte(0x01);
     };
 };
 
@@ -477,18 +383,6 @@ struct gf_poly {
 
 
 template<typename GFT, typename GF>
-struct gf_poly_deriv_pw2 {
-    template<typename T>
-    inline size_t poly_deriv(T poly[], size_t size) const {
-        for (size_t i = 1; i < size; ++i)
-            poly[size - i] = (i & 1) ? poly[size - i - 1] : 0;
-
-        return size - 1;
-    }
-};
-
-
-template<typename GFT, typename GF>
 struct gf_poly_deriv_prime {
     template<typename T>
     inline size_t poly_deriv(T poly[], size_t size) const {
@@ -499,5 +393,131 @@ struct gf_poly_deriv_prime {
         return size - 1;
     }
 };
+
+
+/********
+ * Base 2
+ ********/
+
+
+template<typename GFT, typename GF>
+struct gf_add_xor {
+    inline GFT add(GFT const& lhs, GFT const& rhs) const { return lhs ^ rhs; }
+    inline GFT sub(GFT const& lhs, GFT const& rhs) const { return lhs ^ rhs; }
+};
+
+
+template<typename GFT, typename GF>
+class gf_mul_cpu_pw2 {
+public:
+    inline GFT mul(GFT const& a, GFT const& b) const {
+        auto& gf = GF::cast(this);
+
+        GFT r = 0;
+
+        for (int i = iter; i >= 0; --i) {
+            if (r & (gf.field_elements >> 1))
+                r = (r << 1) ^ gf.poly1;
+            else
+                r = (r << 1);
+
+            if (a & (1 << i))
+                r ^= b;
+        }
+
+        return r;
+    }
+
+    inline gf_mul_cpu_pw2() {
+        auto& gf = GF::cast(this);
+        iter = int(detail::ilog2_floor(gf.field_elements >> 1));
+    }
+private:
+    int iter;
+};
+
+template<typename GFT, typename GF>
+class gf_mul_exp_log_lut {
+public:
+    inline GFT mul(GFT const& a, GFT const& b) const {
+        if (a == 0 || b == 0)
+            return 0;
+
+        auto& gf = GF::cast(this);
+        size_t r = gf.log(a) + gf.log(b);
+        if (r >= gf.field_elements-1)
+            r -= gf.field_elements-1;
+
+        return gf.exp(GFT(r));
+    }
+};
+
+
+template<typename Word>
+struct gf_wide_mul {
+    template<typename GFT, typename GF>
+    class type {
+        static_assert(std::is_same_v<GFT, uint8_t>);
+
+    public:
+        using wide_mul_word_t = Word;
+
+        inline Word mul_wide(Word a, Word b) const {
+            Word r = 0;
+            for (int i = 7; i >= 0; --i) {
+                Word m = r & rep_0x80;
+
+                // static_assert((gf.poly1 & 0x80) == 0); // needed for the next statement
+                m = m - (m >> 7);
+
+                r = ((r & rep_0x7f) << 1) ^ (polyw & m);
+
+                Word n = (a & (rep_0x01 << i)) >> i;
+                n = (n << 8) - n;
+
+                r ^= b & n;
+            }
+            return r;
+        }
+
+        inline Word poly_eval_wide(const uint8_t poly[], const size_t size, const Word x, Word r = 0) const {
+            for (size_t i = 0; i < size; ++i)
+                r = mul_wide(r, x) ^ (poly[i] * rep_0x01);
+            return r;
+        }
+
+        static constexpr Word repeat_byte(uint8_t n) {
+            Word p = 0;
+            for (size_t i = 0; i < sizeof(Word); ++i)
+                p |= Word(n) << (i * 8);
+            return p;
+        }
+
+    protected:
+        Word polyw;
+
+        inline type() {
+            auto& gf = GF::cast(this);
+            assert((gf.poly1 & 0x80) == 0);
+            polyw = repeat_byte(gf.poly1);
+        }
+
+        static constexpr Word rep_0x80 = repeat_byte(0x80);
+        static constexpr Word rep_0x7f = repeat_byte(0x7f);
+        static constexpr Word rep_0x01 = repeat_byte(0x01);
+    };
+};
+
+template<typename GFT, typename GF>
+struct gf_poly_deriv_pw2 {
+    template<typename T>
+    inline size_t poly_deriv(T poly[], size_t size) const {
+        for (size_t i = 1; i < size; ++i)
+            poly[size - i] = (i & 1) ? poly[size - i - 1] : 0;
+
+        return size - 1;
+    }
+};
+
 
 }
