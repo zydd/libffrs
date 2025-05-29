@@ -7,7 +7,7 @@ def ntt(GF, w, arr):
 
 
 def intt(GF, w, arr):
-    return ntt(GF, w.inv(), arr)
+    return [x  // GF(len(arr)) for x in ntt(GF, w.inv(), arr)]
 
 
 def vandermonde_ntt(w, n):

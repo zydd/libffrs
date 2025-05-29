@@ -37,9 +37,12 @@ public:
     inline buffer_adpator(const pybind11::buffer& o):
         buffer(std::move(o)),
         info(buffer.request(false)),
-        size(size_t(info.size)),
+        size(size_t(info.size) / sizeof(T)),
         data(reinterpret_cast<T *>(info.ptr))
-    { }
+    {
+        if (info.size % sizeof(T) != 0)
+            throw pybind11::value_error("Invalid buffer size");
+    }
 };
 
 }

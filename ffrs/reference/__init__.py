@@ -39,6 +39,10 @@ class F:
     def __floordiv__(self, rhs):
         assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
         return self.__mul__(rhs.inv())
+    
+    def pow(self, rhs):
+        v = (self.x ** rhs) % self.p
+        return F(self.p, v)
 
     def __repr__(self):
         return f'F{self.p}[{self.x}]'

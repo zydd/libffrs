@@ -29,12 +29,39 @@
 namespace py = pybind11;
 
 
+template<typename GFT, typename GF>
+class ntt_naive {
+public:
+    inline void ntt(const GFT root, const GFT input[], size_t input_size, GFT output[]) const {
+        auto& gf = GF::cast(this);
+        for (size_t i = 0; i < input_size; ++i) {
+            GFT acc = 0;
+            for (size_t j = 0; j < input_size; ++j) {
+                GFT exp = gf.pow(root, i * j);
+                // GFT exp = 1;
+                // for (size_t k = 0; k < i*j; ++k)
+                //     exp = (exp * root) % gf.prime;
+
+                GFT prod = gf.mul(input[j], exp);
+                // GFT prod = (input[j] * exp) % gf.prime;
+
+                acc = gf.add(acc, prod);
+                // acc = (acc + prod) % gf.prime;
+            }
+            output[i] = acc;
+        }
+    }
+};
+
+
 using GFi32 = ffrs::GF<uint32_t,
     ffrs::gf_data,
     ffrs::gf_add_mod,
 
     ffrs::gf_mul_mod,
-    ffrs::gf_exp_log_lut<ffrs::gf_mul_mod, 65536>::type
+    ffrs::gf_exp_log_lut<ffrs::gf_mul_mod, 65537>::type,
+
+    ntt_naive
     >;
 
 
@@ -44,6 +71,34 @@ public:
         GFi32(gf_data(prime, 1, primitive, 0))
     { }
 
+    uint8_t rbo8(uint8_t b) {
+        return ((b * 0x80200802ull) & 0x0884422110ull) * 0x0101010101ull >> 32;
+    }
+
+    uint64_t rbo64(uint64_t b) {
+        b = ((b >> 1) & 0x5555555555555555ull) | ((b & 0x5555555555555555ull) << 1);
+        b = ((b >> 2) & 0x3333333333333333ull) | ((b & 0x3333333333333333ull) << 2);
+        b = ((b >> 4) & 0x0f0f0f0f0f0f0f0full) | ((b & 0x0f0f0f0f0f0f0f0full) << 4);
+        b = ((b >> 8) & 0x00ff00ff00ff00ffull) | ((b & 0x00ff00ff00ff00ffull) << 8);
+        b = ((b >> 16) & 0x0000ffff0000ffffull) | ((b & 0x0000ffff0000ffffull) << 16);
+        b = (b >> 32) | (b << 32);
+        return b;
+    }
+
+    inline py::bytearray py_ntt(buffer_ro<GFT> buf, GFT root) {
+        if (buf.size == 0 || (buf.size & (buf.size - 1)) != 0)
+            throw py::value_error("Buffer size must be a power of two");
+
+        auto res =  py::bytearray(nullptr, buf.size * sizeof(GFT));
+
+
+        auto data = PyByteArray_AsString(res.ptr());
+        GFT *data_ptr = reinterpret_cast<GFT *>(data);
+
+        ntt(root, buf.data, buf.size, data_ptr);
+
+        return res;
+    }
 
     static inline void register_class(py::module &m) {
         using namespace pybind11::literals;
@@ -71,8 +126,9 @@ public:
             .def("exp", &PyGFi32::exp, R"(Exponential function: :math:`a^{\text{value}}`)", "value"_a)
             .def("log", &PyGFi32::log, R"(Logarithm: :math:`\log_a (\text{value})`)", "value"_a)
             .def("pow", &PyGFi32::pow, R"(Power: :math:`\text{base}^\text{exponent}`)", "base"_a, "exponent"_a)
+            .def("ntt", cast_args(&PyGFi32::py_ntt), R"(Number-theoretic transform (NTT) on a buffer)", "buf"_a, "root"_a)
             .doc() = R"(
-                Finite-field operations optimized for :math:`GF(2^8)`
+                Finite-field operations for prime fields <= 65537
             )";
     }
 };
