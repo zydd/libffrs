@@ -17,7 +17,7 @@ def randbytes(n, start=0, stop=256):
 
 
 def test_ntt8():
-    a = randbytes(6)
+    a = randbytes(8)
     res = NTT.ntt8(a)
     ref = ntt(GF256, GF256(NTT.gf.primitive), a)
     print(list(a))

@@ -15,14 +15,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import functools
 import itertools
+import ffrs.reference.ntt
 import pytest
 import random
 
 import ffrs
 
-GF256 = ffrs.GF256()
 
+GF256 = ffrs.GF256()
+GF256_ref = ffrs.reference.GF(2, 8, GF256.primitive, GF256.poly1 | 0x100)
 
 random.seed(42)
 
@@ -177,7 +180,7 @@ def test_poly_eval():
             assert GF256.poly_eval(a, roots[i]) == 0
 
 
-def test_poly_eval8():
+def test_mul8():
     for _ in range(256):
         a = randbytes(8)
         b = randbytes(8)
@@ -185,3 +188,14 @@ def test_poly_eval8():
         ref = bytearray(map(lambda a: GF256.mul(*a), zip(a, b)))
 
         assert GF256.mul8(a, b) == ref
+
+
+def test_poly_eval8():
+    for _ in range(32):
+        a = randbytes(8)
+        b = bytearray(int(GF256_ref.gen(i)) for i in range(len(a)))
+
+        res = list(GF256.poly_eval8(a, b))
+        ref = [int(x) for x in ffrs.reference.ntt.ntt(GF256_ref, GF256_ref.a, a[::-1])]
+
+        assert res == ref

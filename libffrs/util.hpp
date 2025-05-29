@@ -41,7 +41,7 @@ public:
         data(reinterpret_cast<T *>(info.ptr))
     {
         if (info.size % sizeof(T) != 0)
-            throw pybind11::value_error("Invalid buffer size");
+            throw pybind11::value_error("Invalid buffer size: " + std::to_string(info.size));
     }
 };
 

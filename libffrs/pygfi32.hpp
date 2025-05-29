@@ -32,7 +32,8 @@ namespace py = pybind11;
 template<typename GFT, typename GF>
 class ntt_naive {
 public:
-    inline void ntt(const GFT root, const GFT input[], size_t input_size, GFT output[]) const {
+    template<typename T, typename U>
+    inline void ntt(const GFT root, const T input[], size_t input_size, U output[]) const {
         auto& gf = GF::cast(this);
         for (size_t i = 0; i < input_size; ++i) {
             GFT acc = 0;
@@ -75,27 +76,56 @@ public:
         return ((b * 0x80200802ull) & 0x0884422110ull) * 0x0101010101ull >> 32;
     }
 
-    uint64_t rbo64(uint64_t b) {
-        b = ((b >> 1) & 0x5555555555555555ull) | ((b & 0x5555555555555555ull) << 1);
-        b = ((b >> 2) & 0x3333333333333333ull) | ((b & 0x3333333333333333ull) << 2);
-        b = ((b >> 4) & 0x0f0f0f0f0f0f0f0full) | ((b & 0x0f0f0f0f0f0f0f0full) << 4);
-        b = ((b >> 8) & 0x00ff00ff00ff00ffull) | ((b & 0x00ff00ff00ff00ffull) << 8);
-        b = ((b >> 16) & 0x0000ffff0000ffffull) | ((b & 0x0000ffff0000ffffull) << 16);
-        b = (b >> 32) | (b << 32);
+    uint32_t rbo32(uint32_t b) {
+        b = ((b >> 1) & 0x55555555) | ((b & 0x55555555) << 1);
+        b = ((b >> 2) & 0x33333333) | ((b & 0x33333333) << 2);
+        b = ((b >> 4) & 0x0f0f0f0f) | ((b & 0x0f0f0f0f) << 4);
+        b = ((b >> 8) & 0x00ff00ff) | ((b & 0x00ff00ff) << 8);
+        b = (b >> 16) | (b << 16);
         return b;
     }
 
-    inline py::bytearray py_ntt(buffer_ro<GFT> buf, GFT root) {
+    inline py::bytearray py_ntt(buffer_ro<uint32_t> buf, GFT root) {
         if (buf.size == 0 || (buf.size & (buf.size - 1)) != 0)
-            throw py::value_error("Buffer size must be a power of two");
+            throw py::value_error("Buffer size must be a power of two: " + std::to_string(buf.size));
 
-        auto res =  py::bytearray(nullptr, buf.size * sizeof(GFT));
-
+        auto res =  py::bytearray(nullptr, buf.size * sizeof(uint32_t));
 
         auto data = PyByteArray_AsString(res.ptr());
         GFT *data_ptr = reinterpret_cast<GFT *>(data);
 
         ntt(root, buf.data, buf.size, data_ptr);
+
+        return res;
+    }
+
+    inline py::bytearray py_ntt16(buffer_ro<uint16_t> buf, GFT root) {
+        if (buf.size == 0 || (buf.size & (buf.size - 1)) != 0)
+            throw py::value_error("Buffer size must be a power of two: " + std::to_string(buf.size));
+
+        auto res =  py::bytearray(nullptr, buf.size * sizeof(uint16_t));
+
+        auto data = PyByteArray_AsString(res.ptr());
+        uint16_t *data_ptr = reinterpret_cast<uint16_t *>(data);
+
+        ntt(root, buf.data, buf.size, data_ptr);
+
+        return res;
+    }
+
+    inline py::bytearray py_ntt_blocks16(buffer_ro<uint16_t> buf, GFT root, size_t block_size) {
+        if (block_size == 0 || (block_size & (block_size - 1)) != 0)
+            throw py::value_error("Block size must be a power of two: " + std::to_string(block_size));
+        if (buf.size % block_size != 0)
+            throw py::value_error("Buffer size must be a multiple of block_size: " + std::to_string(buf.size));
+
+        auto res =  py::bytearray(nullptr, buf.size * sizeof(uint16_t));
+
+        auto data = PyByteArray_AsString(res.ptr());
+        uint16_t *data_ptr = reinterpret_cast<uint16_t *>(data);
+
+        for (size_t offset = 0; offset < buf.size; offset += block_size)
+            ntt(root, buf.data + offset, block_size, data_ptr);
 
         return res;
     }
@@ -127,6 +157,7 @@ public:
             .def("log", &PyGFi32::log, R"(Logarithm: :math:`\log_a (\text{value})`)", "value"_a)
             .def("pow", &PyGFi32::pow, R"(Power: :math:`\text{base}^\text{exponent}`)", "base"_a, "exponent"_a)
             .def("ntt", cast_args(&PyGFi32::py_ntt), R"(Number-theoretic transform (NTT) on a buffer)", "buf"_a, "root"_a)
+            .def("ntt_blocks16", cast_args(&PyGFi32::py_ntt_blocks16), R"(Number-theoretic transform (NTT) on 16-bit buffer blocks)", "buf"_a, "root"_a, "block_size"_a)
             .doc() = R"(
                 Finite-field operations for prime fields <= 65537
             )";

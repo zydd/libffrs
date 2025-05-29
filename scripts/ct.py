@@ -58,21 +58,21 @@ def naive_ntt(a, w=w, q=q):
     return out
 
 def naive_intt(a, gen=w, modulus=q):
-  deg_d = len(a)
-  out = [0] * deg_d
+    deg_d = len(a)
+    out = [0] * deg_d
 
-  omegas = [0] * deg_d
-  omegas[0] = 1
-  for i in range(1, len(omegas)):
-    omegas[i] = omegas[i-1] * pow(gen, -1, modulus) % modulus
+    omegas = [0] * deg_d
+    omegas[0] = 1
+    for i in range(1, len(omegas)):
+        omegas[i] = omegas[i-1] * pow(gen, -1, modulus) % modulus
 
-  for i in range(deg_d):
-    for j in range(deg_d):
-      out[i] = (out[i] + a[j] * omegas[i * j % deg_d]) % modulus
+    for i in range(deg_d):
+        for j in range(deg_d):
+            out[i] = (out[i] + a[j] * omegas[i * j % deg_d]) % modulus
 
-  # Scale it down before returning.
-  scaler = pow(deg_d, -1, modulus)
-  return [i * scaler % modulus for i in out]
+    # Scale it down before returning.
+    scaler = pow(deg_d, -1, modulus)
+    return [i * scaler % modulus for i in out]
 
 
 def brv(x, n):

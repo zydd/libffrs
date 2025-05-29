@@ -1,7 +1,7 @@
 
 #  benchmark.py
 #
-#  Copyright 2024 Gabriel Machado
+#  Copyright 2025 Gabriel Machado
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -33,57 +33,64 @@ def get_system_info():
     cpu = None
 
     if platform.system() == "Windows":
-        command = 'wmic cpu get name'
+        command = "wmic cpu get name"
         output = subprocess.check_output(command, shell=True).decode()
-        cpu = output.split('\n')[1].strip()
+        cpu = output.split("\n")[1].strip()
     elif platform.system() == "Linux":
         command = r"grep '^\s*model name' /proc/cpuinfo"
         output = subprocess.check_output(command, shell=True).decode()
-        for line in output.split('\n'):
-            cpu = re.sub(r'.*model name.*:\s*(.*)', r'\1', line, 1).strip()
+        for line in output.split("\n"):
+            cpu = re.sub(r".*model name.*:\s*(.*)", r"\1", line, 1).strip()
             break
 
     info = platform.platform()
     if cpu:
-        info = '\n'.join([info, cpu])
+        info = "\n".join([info, cpu])
     return info
 
 
-def benchmark_peak(
-        method, ecc_len, block_size,
-        input_size=100 * 1000 * 1000,  # 100 MB
-        cpu_cache_flush_size=50 * 1000 * 1000,  # 50 MB
-        duration=5, update_interval=1, cooldown=5):
-
-    print(f'\n{method} ecc_len: {ecc_len} block_size: {block_size}')
-    RS256 = ffrs.RS256(ecc_len=ecc_len)
+def benchmark_throughput(
+        benchmark_config,
+        input_size=100 * 2**20,  # 100 MB
+        cpu_cache_flush_size=50 * 2**20,  # 50 MB
+        duration=5, update_interval=1, cooldown=5
+    ):
 
     number = 1
     repeat = 5
 
-    best_time = float('inf')
+    best_time = float("inf")
 
     # some cool down time seems to make the test results more repeatable
-    time.sleep(cooldown)
+    while cooldown > 0:
+        print(f"Cooldown {cooldown:2}", end="\r")
+        cooldown -= 1
+        time.sleep(1)
 
     data = random.randbytes(input_size)
 
     elapsed_time = 0
     while elapsed_time < duration:
+        code, env = benchmark_config
         start_time = time.time()
 
+        env.update(dict(
+            data=data,
+            random=random,
+        ))
+
         times = timeit.repeat(
-            f'rs.{method}(data)',
-
-            # operation in a large block of memory to (hopefully) flush CPU cache
-            setup=f'random.randbytes({cpu_cache_flush_size})',
-
-            number=number, repeat=repeat,
-            globals=dict(rs=RS256, data=data, random=random))
+            code,
+            # operation on a large chunk of memory to hopefully flush CPU cache
+            setup=f"random.randbytes({cpu_cache_flush_size})",
+            number=number,
+            repeat=repeat,
+            globals=env,
+        )
 
         best_time = min(best_time, min(times))
         throughput = input_size * number / min(times)
-        print(f'Encode speed: {throughput * 1e-6:.3f} MB/s (repeat: {repeat})')
+        print(f"Speed: {throughput * 1e-6:.3f} MB/s (repeat: {repeat})")
 
         end_time = time.time()
         elapsed_time += end_time - start_time
@@ -91,15 +98,22 @@ def benchmark_peak(
         repeat = max(1, round(repeat * update_interval / (end_time - start_time)))
 
     peak_throughput = input_size / best_time
-    print(f'Peak: {peak_throughput * 1e-6:.3f} MB/s')
+    print(f"Peak: {peak_throughput * 1e-6:.3f} MB/s")
     return peak_throughput
 
 
-def run_benchmarks(config):
+def enc_benchmark(method, ecc_len, block_size):
+    print(f"\n{method} ecc_len: {ecc_len} block_size: {block_size}")
+    RS256 = ffrs.RS256(ecc_len=ecc_len)
+
+    return (f"rs.{method}(data)", dict(rs=RS256))
+
+
+def run_enc_benchmarks(config):
     table = []
 
     try:
-        with open('benchmark.csv', mode='r') as file:
+        with open("benchmark.csv", mode="r") as file:
             reader = csv.reader(file)
             for row in reader:
                 table.append(row)
@@ -109,7 +123,7 @@ def run_benchmarks(config):
     if table:
         assert len(table) == len(config) + 1
     else:
-        table = [['method', 'ecc_len', 'block_size']]
+        table = [["method", "ecc_len", "block_size"]]
         for cfg in config:
             table.append(list(map(str, cfg)))
 
@@ -117,8 +131,8 @@ def run_benchmarks(config):
 
     throughput = []
     for method, ecc_len, block_size in config:
-        thr = benchmark_peak(method, ecc_len, block_size)
-        throughput.append(f'{thr * 1e-6:.2f} MB/s')
+        thr = benchmark_throughput(enc_benchmark(method, ecc_len, block_size))
+        throughput.append(f"{thr * 1e-6:.2f} MB/s")
 
     if ffrs.compiler_info in header:
         index = header.index(ffrs.compiler_info)
@@ -132,36 +146,61 @@ def run_benchmarks(config):
             row.append(thr)
 
 
-    with open('benchmark.csv', mode='w', newline='') as file:
+    with open("benchmark.csv", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerows(table)
 
 
-if __name__ == '__main__':
+def ntt_benchmark(block_size):
+    print(f"\nntt block_size: {block_size * 2} bytes")
+    GF = ffrs.GFi32(65537, 3)
+    w = next(i for i in range(2, GF.prime) if i**block_size % GF.prime == 1)
+
+    return (f"gf.ntt_blocks16(data, {w}, {block_size})", dict(gf=GF))
+
+def show_help():
+    print("benchmark.py [enc|ntt]")
+
+
+def main():
     print(get_system_info())
 
     config = [
-        # ('method', ecc_len, block_size)
+        # ("method", ecc_len, block_size)
 
         # Max block size
-        ('encode_blocks', 2, 255),
-        ('encode_blocks', 4, 255),
-        ('encode_blocks', 6, 255),
-        ('encode_blocks', 8, 255),
-        ('encode_blocks', 10, 255),
-        ('encode_blocks', 12, 255),
-        ('encode_blocks', 14, 255),
-        ('encode_blocks', 16, 255),
-        ('encode_blocks', 20, 255),
-        ('encode_blocks', 24, 255),
-        ('encode_blocks', 32, 255),
-        ('encode_blocks', 64, 255),
-        ('encode_blocks', 128, 255),
+        ("encode_blocks", 2, 255),
+        ("encode_blocks", 4, 255),
+        ("encode_blocks", 6, 255),
+        ("encode_blocks", 8, 255),
+        ("encode_blocks", 10, 255),
+        ("encode_blocks", 12, 255),
+        ("encode_blocks", 14, 255),
+        ("encode_blocks", 16, 255),
+        ("encode_blocks", 20, 255),
+        ("encode_blocks", 24, 255),
+        ("encode_blocks", 32, 255),
+        ("encode_blocks", 64, 255),
+        ("encode_blocks", 128, 255),
     ]
 
-    if len(sys.argv) > 1:
-        for arg in sys.argv[1:]:
-            ecc_len = int(arg)
-            benchmark_peak('encode_blocks', ecc_len, 255)
+    if len(sys.argv) < 2:
+        return show_help()
+
+    fn = sys.argv[1]
+
+    if fn == "enc":
+        if len(sys.argv) > 2:
+            for arg in sys.argv[2:]:
+                ecc_len = int(arg)
+                benchmark_throughput(enc_benchmark("encode_blocks", ecc_len, 255))
+        else:
+            run_enc_benchmarks(config)
+    elif fn == "ntt":
+        benchmark_throughput(ntt_benchmark(256//2), input_size=1 * 2**20)
     else:
-        run_benchmarks(config)
+        return show_help()
+
+
+if __name__ == "__main__":
+    main()

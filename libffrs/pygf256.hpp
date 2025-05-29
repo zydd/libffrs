@@ -87,13 +87,13 @@ public:
         return poly_eval(buf.data, buf.size, x);
     }
     inline py::bytearray py_poly_eval8(buffer_ro<uint8_t> buf1, buffer_ro<uint64_t> buf2) {
-        if (buf2.size > sizeof(uint64_t))
-            throw py::value_error("can evaluate polynomial 8 points at most");
+        if (buf2.size > 1)
+            throw py::value_error("Invalid buffer size");
         uint64_t res = poly_eval_wide(buf1.data, buf1.size, buf2.data[0]);
-        return py::bytearray(reinterpret_cast<const char *>(&res), std::min(buf2.size, sizeof(uint64_t)));
+        return py::bytearray(reinterpret_cast<const char *>(&res), sizeof(uint64_t));
     }
     inline py::bytearray py_mul8(buffer_ro<uint64_t> buf1, buffer_ro<uint64_t> buf2) {
-        if (buf1.size != sizeof(uint64_t) || buf2.size != sizeof(uint64_t))
+        if (buf1.size != 1 || buf2.size != 1)
             throw py::value_error("Can only multiply 8-byte wide arrays");
         uint64_t res = mul_wide(buf1.data[0], buf2.data[0]);
         return py::bytearray(reinterpret_cast<const char *>(&res), sizeof(uint64_t));
