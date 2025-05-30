@@ -41,7 +41,7 @@ class TestRS:
     def test_encode(self, rs):
         size_u16 = rs.block_len // 2
         ecc_u16 = rs.ecc_len // 2
-        buf = [random.randrange(0, 0x10000) for _ in range(size_u16 - ecc_u16)] + [0] * ecc_u16
+        buf = [random.randrange(0, 2**16) for _ in range(size_u16 - ecc_u16)] + [0] * ecc_u16
 
         w = GF65537(rs.roots_of_unity[round(math.log2(size_u16))])
 
@@ -52,6 +52,9 @@ class TestRS:
         rs.encode(res)
         res = to_int_list(res, 2)
 
+        res2 = rs.gf.ntt16(to_bytearray(buf, 2), w)
+        res2 = to_int_list(res2, 2)
+
         assert res_i == buf
         assert ref[:ecc_u16] == res[-ecc_u16:]
 
@@ -61,7 +64,7 @@ class TestRS:
         size_u16 = rs.block_len // 2
         ecc_u16 = rs.ecc_len // 2
         msg_u16 = rs.message_len // 2
-        buf = [random.randrange(0, 0x10000) for _ in range(msg_u16 * blocks)]
+        buf = [random.randrange(1, 2**16) for _ in range(msg_u16 * blocks)]
 
         w = GF65537(rs.roots_of_unity[round(math.log2(size_u16))])
 

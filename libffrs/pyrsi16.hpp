@@ -106,7 +106,10 @@ public:
     inline void py_encode(buffer_rw<uint16_t> buf) {
         auto root = get_root_of_unity(default_block_size / sizeof(uint16_t));
         size_t msg_size = buf.size - ecc_len / sizeof(uint16_t);
-        gf.ntt(root, &buf.data[0], msg_size, &buf.data[msg_size], ecc_len / sizeof(uint16_t));
+
+        std::vector<uint16_t> temp(buf.size);
+        gf.ntt(root, &buf[0], buf.size, &temp[0], buf.size);
+        std::copy_n(&temp[0], ecc_len / sizeof(uint16_t), &buf[msg_size]);
     }
 
     inline py::bytearray py_encode_blocks(buffer_ro<uint16_t> buf) {
@@ -127,32 +130,31 @@ public:
         if (input_remainder > 0)
             output_size += input_remainder + ecc_len;
 
-        auto output = py::bytearray();
-        PyByteArray_Resize(output.ptr(), output_size * sizeof(uint16_t));
-        if (size_t(PyByteArray_Size(output.ptr())) != output_size * sizeof(uint16_t))
-            throw std::runtime_error("Failed to allocate memory");
+        // Allocate extra space to compute NTT
+        auto output = py::bytearray(nullptr, (output_size + input_block_size) * sizeof(uint16_t));
         auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
+        std::fill_n(output_data, output_size + input_block_size, 0);
 
         for (size_t block = 0; block < buf.size / input_block_size; ++block) {
             auto output_block = &output_data[block * output_block_size];
-            std::copy_n(&buf.data[block * input_block_size], input_block_size, output_block);
-            // encode(output_block, input_block_size, &output_block[input_block_size]);
-            gf.ntt(root, &output_block[0], input_block_size, &output_block[input_block_size], ecc_len);
+            gf.ntt(root, &buf.data[block * input_block_size], input_block_size, &output_block[input_block_size], output_block_size);
+            std::copy_n(&buf[block * input_block_size], input_block_size, &output_block[0]);
         }
 
         if (input_remainder > 0) {
             auto output_block = &output_data[output_size - input_remainder - ecc_len];
-            std::copy_n(&buf.data[buf.size - input_remainder], input_remainder, output_block);
-            // encode(output_block, input_remainder, &output_block[input_remainder]);
-            gf.ntt(root, &output_block[0], input_remainder, &output_block[input_remainder], ecc_len);
+            gf.ntt(root, &buf[buf.size - input_remainder], input_remainder, &output_block[input_remainder], output_block_size);
+            std::copy_n(&buf[buf.size - input_remainder], input_remainder, output_block);
         }
 
+        // Remove extra space
+        PyByteArray_Resize(output.ptr(), output_size * sizeof(uint16_t));
         return output;
     }
 
     // inline bool py_decode(buffer_rw<uint8_t> buf) {
     //     size_t msg_size = buf.size - ecc_len;
-    //     return decode(buf.data, msg_size, &buf.data[msg_size]);
+    //     return decode(buf, msg_size, &buf[msg_size]);
     // }
 
     // inline py::bytearray py_synds(buffer_ro<uint8_t> buf) {
@@ -162,7 +164,7 @@ public:
     //     size_t msg_size = buf.size - ecc_len;
     //     synds_array_t synds_arr;
 
-    //     synds(buf.data, msg_size, &buf.data[msg_size], synds_arr);
+    //     synds(buf, msg_size, &buf[msg_size], synds_arr);
 
     //     return py::bytearray(reinterpret_cast<const char *>(synds_arr), ecc_len);
     // }

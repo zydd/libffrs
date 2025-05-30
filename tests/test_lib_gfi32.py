@@ -87,3 +87,25 @@ def test_ntt():
 
     assert res_i == buf
     assert ref == res
+
+
+def test_ntt16():
+    size = 16
+    w = next(i for i in range(2, GF.prime) if i**size % GF.prime == 1)
+    buf = [random.randrange(0, 2**16) for _ in range(size)]
+
+    res_buf = GF.ntt16(to_bytearray(buf, 2), w)
+    res = to_int_list(res_buf, 2)
+
+    ref = to_int_list(ref_ntt.ntt(GF_ref, GF_ref(w), buf))
+    res_i = to_int_list(ref_ntt.intt(GF_ref, GF_ref(w), ref))
+
+    print()
+    print("w:", w)
+    print("input:      ", buf)
+    print("reference:  ", ref)
+    print("result:     ", res)
+    print("invert:     ", res_i)
+
+    assert res_i == buf
+    assert ref == res

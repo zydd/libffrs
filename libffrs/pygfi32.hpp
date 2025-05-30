@@ -39,15 +39,8 @@ public:
             GFT acc = 0;
             for (size_t j = 0; j < input_size; ++j) {
                 GFT exp = gf.pow(root, i * j);
-                // GFT exp = 1;
-                // for (size_t k = 0; k < i*j; ++k)
-                //     exp = (exp * root) % gf.prime;
-
                 GFT prod = gf.mul(input[j], exp);
-                // GFT prod = (input[j] * exp) % gf.prime;
-
                 acc = gf.add(acc, prod);
-                // acc = (acc + prod) % gf.prime;
             }
             output[i] = acc;
         }
@@ -59,15 +52,12 @@ template<typename GFT, typename GF>
 class ntt_ct_iter {
 public:
     template<typename T, typename U>
-    inline void fntt(const GFT root, const T input[], size_t input_size, U output[], size_t output_size) const {
+    inline void ntt(const GFT root, const T input[], size_t input_size, U output[], size_t output_size) const {
         auto& gf = GF::cast(this);
+        copy_rbo(input, input_size, output, output_size);
 
-        assert(input_size == output_size);
-        auto size = output_size;
-        copy_rbo(input, size, output);
-
-        for (size_t stride = 1, exp_f = size >> 1; stride < size; stride <<= 1, exp_f >>= 1) {
-            for (size_t start = 0; start < size; start += stride * 2) {
+        for (size_t stride = 1, exp_f = output_size >> 1; stride < output_size; stride <<= 1, exp_f >>= 1) {
+            for (size_t start = 0; start < output_size; start += stride * 2) {
                 // For each pair of the CT butterfly operation.
                 for (size_t i = start; i < start + stride; ++i) {
                     // j = i - start
@@ -86,16 +76,15 @@ public:
 
 private:
     template<typename T, typename U>
-    inline void copy_rbo(const T input[], size_t size, U output[]) const {
+    inline void copy_rbo(const T input[], size_t input_size, U output[], size_t output_size) const {
         output[0] = input[0];
-        output[size - 1] = input[size - 1];
 
-        if (size <= 2)
+        if (output_size <= 2)
             return;
 
         size_t l, rev = 0;
-        for (size_t i = 1; i < size - 1; ++i) {
-            for (l = size >> 1; rev + l >= size; l >>= 1);
+        for (size_t i = 1; i < input_size; ++i) {
+            for (l = output_size >> 1; rev + l >= output_size; l >>= 1);
             rev = (rev & (l - 1)) + l;
             // rev = rbo16(i) >> (16 - nbits);
             output[rev] = input[i];
@@ -117,7 +106,7 @@ using GFi32 = ffrs::GF<uint32_t,
     ffrs::gf_add_mod,
     ffrs::gf_mul_mod,
     ffrs::gf_exp_log_lut<ffrs::gf_mul_mod, 65537>::type,
-    ntt_naive,
+    // ntt_naive,
     ntt_ct_iter
     >;
 
@@ -137,7 +126,7 @@ public:
         auto data = PyByteArray_AsString(res.ptr());
         GFT *data_ptr = reinterpret_cast<GFT *>(data);
 
-        fntt(root, buf.data, buf.size, data_ptr, buf.size);
+        ntt(root, buf.data, buf.size, data_ptr, buf.size);
 
         return res;
     }
@@ -151,7 +140,7 @@ public:
         auto data = PyByteArray_AsString(res.ptr());
         uint16_t *data_ptr = reinterpret_cast<uint16_t *>(data);
 
-        fntt(root, buf.data, buf.size, data_ptr, buf.size);
+        ntt(root, buf.data, buf.size, data_ptr, buf.size);
 
         return res;
     }
@@ -167,7 +156,7 @@ public:
         uint16_t *data_ptr = reinterpret_cast<uint16_t *>(data);
 
         for (size_t offset = 0; offset < buf.size; offset += block_size)
-            fntt(root, &data_ptr[offset], block_size, &data_ptr[offset], block_size);
+            ntt(root, &buf[offset], block_size, &data_ptr[offset], block_size);
 
         return res;
     }
@@ -198,6 +187,7 @@ public:
             .def("log", &PyGFi32::log, R"(Logarithm: :math:`\log_a (\text{value})`)", "value"_a)
             .def("pow", &PyGFi32::pow, R"(Power: :math:`\text{base}^\text{exponent}`)", "base"_a, "exponent"_a)
             .def("ntt", cast_args(&PyGFi32::py_ntt), R"(Number-theoretic transform (NTT) on a buffer)", "buf"_a, "root"_a)
+            .def("ntt16", cast_args(&PyGFi32::py_ntt16), R"(Number-theoretic transform (NTT) on a buffer)", "buf"_a, "root"_a)
             .def("ntt_blocks16", cast_args(&PyGFi32::py_ntt_blocks16), R"(Number-theoretic transform (NTT) on 16-bit buffer blocks)", "buf"_a, "root"_a, "block_size"_a)
             .doc() = R"(
                 Finite-field operations for prime fields <= 65537

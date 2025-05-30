@@ -43,6 +43,10 @@ public:
         if (info.size % sizeof(T) != 0)
             throw pybind11::value_error("Invalid buffer size: " + std::to_string(info.size));
     }
+
+    inline T& operator[](size_t idx) {
+        return data[idx];
+    }
 };
 
 }
