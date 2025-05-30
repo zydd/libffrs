@@ -26,7 +26,7 @@ def prime_root(n):
         # print("p:", p, end='\r')
         if p % n == 1: yield p
 
-n = 8
+n = 16
 q = next(prime_root(2**16))
 q = 65537
 # q = 167772161  # 167772161 % 2**25 == 1
@@ -58,20 +58,20 @@ def naive_ntt(a, w=w, q=q):
     return out
 
 def naive_intt(a, gen=w, modulus=q):
-    deg_d = len(a)
-    out = [0] * deg_d
+    size = len(a)
+    out = [0] * size
 
-    omegas = [0] * deg_d
+    omegas = [0] * size
     omegas[0] = 1
     for i in range(1, len(omegas)):
         omegas[i] = omegas[i-1] * pow(gen, -1, modulus) % modulus
 
-    for i in range(deg_d):
-        for j in range(deg_d):
-            out[i] = (out[i] + a[j] * omegas[i * j % deg_d]) % modulus
+    for i in range(size):
+        for j in range(size):
+            out[i] = (out[i] + a[j] * omegas[i * j % size]) % modulus
 
     # Scale it down before returning.
-    scaler = pow(deg_d, -1, modulus)
+    scaler = pow(size, -1, modulus)
     return [i * scaler % modulus for i in out]
 
 
@@ -80,29 +80,31 @@ def brv(x, n):
     return int(''.join(reversed(bin(x)[2:].zfill(n))), 2)
 
 
-def ntt_iter(a, w=w, q=q):
-    deg_d = len(a)
+def ntt_iter(a, root=w, q=q):
+    size = len(a)
 
     # Start with stride = 1.
     stride = 1
 
     # Shuffle the input array in bit-reversal order.
-    nbits = int(math.log2(deg_d))
-    res = [a[brv(i, nbits)] for i in range(deg_d)]
+    nbits = int(math.log2(size))
+    res = [a[brv(i, nbits)] for i in range(size)]
 
     # Pre-compute the generators used in different stages of the recursion.
-    gens = [w ** (2**i) % q for i in range(nbits)]
+    # gens = [root ** (2**i) % q for i in range(nbits)]
     # The first layer uses the lowest (2nd) root of unity, hence the last one.
-    gen_ptr = len(gens) - 1
+    gen_ptr = nbits - 1
 
     # Iterate until the last layer.
-    while stride < deg_d:
+    while stride < size:
         # For each stride, iterate over all N//(stride*2) slices.
-        for start in range(0, deg_d, stride * 2):
+        for start in range(0, size, stride * 2):
             # For each pair of the CT butterfly operation.
             for i in range(start, start + stride):
                 # Compute the omega multiplier. Here j = i - start.
-                zp = gens[gen_ptr] ** (i - start) % q
+                # zp = gens[gen_ptr] ** (i - start) % q
+                # zp = root ** (2 ** gen_ptr * (i - start)) % q
+                zp = pow(root, (1 << gen_ptr) * (i - start))
 
                 # Cooley-Tukey butterfly.
                 a = res[i]
@@ -119,13 +121,13 @@ def ntt_iter(a, w=w, q=q):
 
 
 def intt_iter(a, gen=w, q=q):
-    deg_d = len(a)
+    size = len(a)
 
     # Start with stride = N/2.
-    stride = deg_d // 2
+    stride = size // 2
 
     # Shuffle the input array in bit-reversal order.
-    nbits = int(math.log2(deg_d))
+    nbits = int(math.log2(size))
     res = a[:]
 
     # Pre-compute the inverse generators used in different stages of the recursion.
@@ -137,7 +139,7 @@ def intt_iter(a, gen=w, q=q):
     # Iterate until the last layer.
     while stride > 0:
             # For each stride, iterate over all N//(stride*2) slices.
-            for start in range(0, deg_d, stride * 2):
+            for start in range(0, size, stride * 2):
                 # For each pair of the CT butterfly operation.
                 for i in range(start, start + stride):
                     # Compute the omega multiplier. Here j = i - start.
@@ -155,10 +157,10 @@ def intt_iter(a, gen=w, q=q):
             gen_ptr += 1
 
     # Scale it down before returning.
-    scaler = pow(deg_d, -1, q)
+    scaler = pow(size, -1, q)
 
     # Reverse shuffle and return.
-    return [(res[brv(i, nbits)] * scaler) % q for i in range(deg_d)]
+    return [(res[brv(i, nbits)] * scaler) % q for i in range(size)]
 
 
 a = [random.randint(0, q - 1) for _ in range(n)]

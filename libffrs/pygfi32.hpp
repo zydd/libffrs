@@ -55,12 +55,70 @@ public:
 };
 
 
+template<typename GFT, typename GF>
+class ntt_ct_iter {
+public:
+    template<typename T, typename U>
+    inline void fntt(const GFT root, const T input[], size_t input_size, U output[], size_t output_size) const {
+        auto& gf = GF::cast(this);
+
+        assert(input_size == output_size);
+        auto size = output_size;
+        copy_rbo(input, size, output);
+
+        for (size_t stride = 1, exp_f = size >> 1; stride < size; stride <<= 1, exp_f >>= 1) {
+            for (size_t start = 0; start < size; start += stride * 2) {
+                // For each pair of the CT butterfly operation.
+                for (size_t i = start; i < start + stride; ++i) {
+                    // j = i - start
+                    GFT w = gf.pow(root, exp_f * (i - start));
+
+                    // Cooley-Tukey butterfly
+                    T a = output[i];
+                    T b = output[i+stride];
+                    GFT m = gf.mul(w, b);
+                    output[i] = gf.add(a, m);
+                    output[i+stride] = gf.sub(a, m);
+                }
+            }
+        }
+    }
+
+private:
+    template<typename T, typename U>
+    inline void copy_rbo(const T input[], size_t size, U output[]) const {
+        output[0] = input[0];
+        output[size - 1] = input[size - 1];
+
+        if (size <= 2)
+            return;
+
+        size_t l, rev = 0;
+        for (size_t i = 1; i < size - 1; ++i) {
+            for (l = size >> 1; rev + l >= size; l >>= 1);
+            rev = (rev & (l - 1)) + l;
+            // rev = rbo16(i) >> (16 - nbits);
+            output[rev] = input[i];
+        }
+    }
+
+    uint16_t rbo16(uint16_t b) const {
+        b = ((b >> 1) & 0x5555) | ((b & 0x5555) << 1);
+        b = ((b >> 2) & 0x3333) | ((b & 0x3333) << 2);
+        b = ((b >> 4) & 0x0f0f) | ((b & 0x0f0f) << 4);
+        b = ((b >> 8)         ) | ((b         ) << 8);
+        return b;
+    }
+};
+
+
 using GFi32 = ffrs::GF<uint32_t,
     ffrs::gf_data,
     ffrs::gf_add_mod,
     ffrs::gf_mul_mod,
     ffrs::gf_exp_log_lut<ffrs::gf_mul_mod, 65537>::type,
-    ntt_naive
+    ntt_naive,
+    ntt_ct_iter
     >;
 
 
@@ -69,19 +127,6 @@ public:
     inline PyGFi32(uint32_t prime, uint32_t primitive):
         GFi32(gf_data(prime, 1, primitive, 0))
     { }
-
-    uint8_t rbo8(uint8_t b) {
-        return ((b * 0x80200802ull) & 0x0884422110ull) * 0x0101010101ull >> 32;
-    }
-
-    uint32_t rbo32(uint32_t b) {
-        b = ((b >> 1) & 0x55555555) | ((b & 0x55555555) << 1);
-        b = ((b >> 2) & 0x33333333) | ((b & 0x33333333) << 2);
-        b = ((b >> 4) & 0x0f0f0f0f) | ((b & 0x0f0f0f0f) << 4);
-        b = ((b >> 8) & 0x00ff00ff) | ((b & 0x00ff00ff) << 8);
-        b = (b >> 16) | (b << 16);
-        return b;
-    }
 
     inline py::bytearray py_ntt(buffer_ro<uint32_t> buf, GFT root) {
         if (!ffrs::detail::is_power_of_two(buf.size))
@@ -92,7 +137,7 @@ public:
         auto data = PyByteArray_AsString(res.ptr());
         GFT *data_ptr = reinterpret_cast<GFT *>(data);
 
-        ntt(root, buf.data, buf.size, data_ptr, buf.size);
+        fntt(root, buf.data, buf.size, data_ptr, buf.size);
 
         return res;
     }
@@ -106,7 +151,7 @@ public:
         auto data = PyByteArray_AsString(res.ptr());
         uint16_t *data_ptr = reinterpret_cast<uint16_t *>(data);
 
-        ntt(root, buf.data, buf.size, data_ptr, buf.size);
+        fntt(root, buf.data, buf.size, data_ptr, buf.size);
 
         return res;
     }
@@ -118,12 +163,11 @@ public:
             throw py::value_error("Buffer size must be a multiple of block_size: " + std::to_string(buf.size));
 
         auto res =  py::bytearray(nullptr, buf.size * sizeof(uint16_t));
-
         auto data = PyByteArray_AsString(res.ptr());
         uint16_t *data_ptr = reinterpret_cast<uint16_t *>(data);
 
         for (size_t offset = 0; offset < buf.size; offset += block_size)
-            ntt(root, buf.data + offset, block_size, data_ptr, block_size);
+            fntt(root, &data_ptr[offset], block_size, &data_ptr[offset], block_size);
 
         return res;
     }

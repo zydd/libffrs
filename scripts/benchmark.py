@@ -203,9 +203,9 @@ def main():
         else:
             run_enc_benchmarks(config)
     elif fn == "ntt":
-        benchmark_throughput(ntt_benchmark(256//2), input_size=1 * 2**20)
+        benchmark_throughput(ntt_benchmark(1024//2), input_size=1 * 2**20)
     elif fn == "enci16":
-        benchmark_throughput(enci16_benchmark(2048, 200), input_size=1 * 2**20)
+        benchmark_throughput(enci16_benchmark(4096, 400), input_size=1 * 2**20)
     else:
         return show_help()
 
