@@ -102,11 +102,17 @@ def benchmark_throughput(
     return peak_throughput
 
 
-def enc_benchmark(method, ecc_len, block_size):
-    print(f"\n{method} ecc_len: {ecc_len} block_size: {block_size}")
-    RS256 = ffrs.RS256(ecc_len=ecc_len)
+def enc256_benchmark(method, ecc_len, block_size):
+    print(f"\n{method}block_size: {block_size} ecc_len: {ecc_len} ")
+    RS256 = ffrs.RS256(block_size, ecc_len=ecc_len)
 
     return (f"rs.{method}(data)", dict(rs=RS256))
+
+def enci16_benchmark(block_size, ecc_len):
+    print(f"\nencode_blocks block_size: {block_size} ecc_len: {ecc_len}")
+    RSi16 = ffrs.RSi16(block_size, ecc_len=ecc_len)
+
+    return (f"rs.encode_blocks(data)", dict(rs=RSi16))
 
 
 def run_enc_benchmarks(config):
@@ -131,7 +137,7 @@ def run_enc_benchmarks(config):
 
     throughput = []
     for method, ecc_len, block_size in config:
-        thr = benchmark_throughput(enc_benchmark(method, ecc_len, block_size))
+        thr = benchmark_throughput(enc256_benchmark(method, ecc_len, block_size))
         throughput.append(f"{thr * 1e-6:.2f} MB/s")
 
     if ffrs.compiler_info in header:
@@ -193,11 +199,13 @@ def main():
         if len(sys.argv) > 2:
             for arg in sys.argv[2:]:
                 ecc_len = int(arg)
-                benchmark_throughput(enc_benchmark("encode_blocks", ecc_len, 255))
+                benchmark_throughput(enc256_benchmark("encode_blocks", ecc_len, 255))
         else:
             run_enc_benchmarks(config)
     elif fn == "ntt":
         benchmark_throughput(ntt_benchmark(256//2), input_size=1 * 2**20)
+    elif fn == "enci16":
+        benchmark_throughput(enci16_benchmark(2048, 200), input_size=1 * 2**20)
     else:
         return show_help()
 

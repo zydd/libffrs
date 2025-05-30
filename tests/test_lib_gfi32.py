@@ -3,40 +3,14 @@ import pytest
 import random
 
 import ffrs
-import ffrs.reference
 import ffrs.reference.ntt as ref_ntt
+
+from common import *
 
 
 GF = ffrs.GFi32(65537, 3)
-GF_ref = lambda x: ffrs.reference.F(GF.prime, x)
+GF_ref = ffrs.reference.GF(65537, 1, 3)
 random.seed(42)
-
-
-def to_int_list(buf, size, byteorder="little"):
-    return [int.from_bytes(buf[i:i+size], byteorder) for i in range(0, len(buf), size)]
-
-
-def from_int_list(lst, size, byteorder="little"):
-    buf = bytearray(len(lst) * size)
-    for i, v in enumerate(lst):
-        buf[i * size:(i + 1) * size] = int.to_bytes(v, size, byteorder)
-    return buf
-
-
-def field_samples(start=0):
-    samples = 1000
-    n = 16
-
-    # Yield first n elements
-    for i in range(start, min(n, GF.field_elements)):
-        yield i
-
-    # Yield last n elements
-    for i in range(max(n, GF.field_elements - n), GF.field_elements):
-        yield i
-
-    for _ in range(samples - 2 * n):
-        yield random.randrange(start, GF.field_elements)
 
 
 @pytest.mark.parametrize('fn, id', [
@@ -46,7 +20,7 @@ def field_samples(start=0):
     (GF.div, 1),
 ])
 def test_scalar_identity(fn, id):
-    for a in field_samples():
+    for a in sample_field(GF):
         assert fn(a, id) == a, a
 
 
@@ -54,7 +28,7 @@ def test_scalar_identity(fn, id):
     (GF.exp, GF.log),
 ])
 def test_scalar_inverse1(fn1, fn2):
-    for a in field_samples(start=1):
+    for a in sample_field(GF, start=1):
         assert fn2(fn1(a)) == a, a
 
 
@@ -63,7 +37,7 @@ def test_scalar_inverse1(fn1, fn2):
     (GF.mul, GF.div),
 ])
 def test_scalar_inverse2(fn1, fn2):
-    for a, b in itertools.product(field_samples(), field_samples(start=1)):
+    for a, b in itertools.product(sample_field(GF), sample_field(GF, start=1)):
         res = fn1(a, b)
         res_inv = fn2(res, b)
         assert res_inv == a, (a, b)
@@ -74,39 +48,42 @@ def test_scalar_inverse2(fn1, fn2):
     GF.mul,
 ])
 def test_scalar_commutativity(fn):
-    for a, b in itertools.product(field_samples(), field_samples()):
+    for a, b in itertools.product(sample_field(GF), sample_field(GF)):
         assert fn(a, b) == fn(b, a)
 
 
 def test_scalar_inv_div():
-    for a in field_samples(start=1):
+    for a in sample_field(GF, start=1):
         assert GF.inv(a) == GF.div(1, a) != 0
 
 
 def test_scalar_inv_inv():
-    for a in field_samples(start=1):
+    for a in sample_field(GF, start=1):
         assert GF.inv(a) == GF.div(1, a) != 0
 
 
 def test_scalar_exp_pow():
-    for a in field_samples():
+    for a in sample_field(GF):
         assert GF.exp(a) == GF.pow(GF.primitive, a) != 0
 
 
 def test_ntt():
-    size = 8
+    size = 16
     w = next(i for i in range(2, GF.prime) if i**size % GF.prime == 1)
     buf = [random.randrange(0, GF.prime) for _ in range(size)]
 
-    res_buf = GF.ntt(from_int_list(buf, 4), w)
+    res_buf = GF.ntt(to_bytearray(buf, 4), w)
     res = to_int_list(res_buf, 4)
 
-    ref = [int(x) for x in ref_ntt.ntt(GF_ref, GF_ref(w), buf)]
+    ref = to_int_list(ref_ntt.ntt(GF_ref, GF_ref(w), buf))
+    res_i = to_int_list(ref_ntt.intt(GF_ref, GF_ref(w), ref))
 
     print()
-    print("w:",w )
+    print("w:", w)
     print("input:      ", buf)
     print("reference:  ", ref)
     print("result:     ", res)
+    print("invert:     ", res_i)
 
+    assert res_i == buf
     assert ref == res

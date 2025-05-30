@@ -352,35 +352,35 @@ class GF:
         self.k = k # power
         self.poly = poly # irreducible polynomial
         self.a = self(a) # primitive element
+        self.field_elements = p ** k
 
         self._init_exp_log_tables()
 
     def gen(self, i):
-        return Fp(self, self.exp_table[i % (self.p ** self.k - 1)])
+        return Fp(self, self.exp_table[i % (self.field_elements - 1)])
 
     def __call__(self, x):
         return Fp(self, x) if self.k > 1 else F(self.p, x)
 
     def __repr__(self):
-        return f'GF{self.p ** self.k}({self.a}, {self.poly_to_int(self.p, self.poly)})'
+        return f'GF{self.field_elements}({self.a}, {self.poly_to_int(self.p, self.poly)})'
 
     def minimal_polynomials(self):
-        for i in range(1, self.p ** self.k - 1):
+        for i in range(1, self.field_elements - 1):
             a = self.gen(i)
-            for j in range(self.p ** self.k + 1, self.p ** (self.k + 1) - 1):
+            for j in range(self.field_elements + 1, self.p ** (self.k + 1) - 1):
                 m = P(self, map(int, GF.poly_from_int(self.p, j)))
                 mod = m.eval(a)
                 if int(mod) == 0:
                     yield i, m
 
     def _init_exp_log_tables(self):
-        field_charac = self.p ** self.k
-        exp = [0] * field_charac
-        log = [0] * field_charac
+        exp = [0] * self.field_elements
+        log = [0] * self.field_elements
 
         a = self.a
         x = self(1)
-        for i in range(field_charac):
+        for i in range(self.field_elements):
             exp[i] = int(x)
             log[int(x)] = i
             x = x._mul(a)
@@ -457,10 +457,8 @@ class GF:
 
     def primitive_roots_of_unity(self):
         res = dict()
-        field_elements = self.p ** self.k
-
-        for i in range(2, field_elements):
-            for j in range(2, field_elements):
+        for i in range(2, self.field_elements):
+            for j in range(2, self.field_elements):
                 if self(i).pow(j) == 1:
                     if j not in res:
                         res[j] = []

@@ -33,7 +33,8 @@ print(f"vntt  {[int(x) for x in arr_v]}")
 
 assert arr_n == arr_v
 
-arr_r = intt(GF256, w, arr_n)
+# arr_r = intt(GF256, w, arr_n)
+arr_r = ntt(GF256, w.inv(), arr_n)
 arr_vr = matmul(GF256, v_i, arr_v)
 arr_vwr = matmul(GF256, v_w_i, arr_v)
 print()

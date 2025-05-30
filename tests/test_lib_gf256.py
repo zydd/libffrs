@@ -23,14 +23,13 @@ import random
 
 import ffrs
 
+from common import randbytes
+
 
 GF256 = ffrs.GF256()
 GF256_ref = ffrs.reference.GF(2, 8, GF256.primitive, GF256.poly1 | 0x100)
 
 random.seed(42)
-
-def randbytes(n, start=0, stop=256):
-    return bytearray(random.randrange(start=start, stop=stop) for _ in range(n))
 
 
 @pytest.mark.parametrize('fn, id', [

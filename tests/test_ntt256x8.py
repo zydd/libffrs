@@ -4,6 +4,8 @@ import ffrs
 from ffrs.reference import GF
 from ffrs.reference.ntt import ntt
 
+from common import randbytes
+
 NTT = ffrs.NTT256x8()
 
 
@@ -11,9 +13,6 @@ GF256 = GF(2, 8, NTT.gf.primitive, NTT.gf.poly1 | 0x100)
 
 
 random.seed(42)
-
-def randbytes(n, start=0, stop=256):
-    return bytearray(random.randrange(start=start, stop=stop) for _ in range(n))
 
 
 def test_ntt8():

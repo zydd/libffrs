@@ -33,9 +33,9 @@ template<typename GFT, typename GF>
 class ntt_naive {
 public:
     template<typename T, typename U>
-    inline void ntt(const GFT root, const T input[], size_t input_size, U output[]) const {
+    inline void ntt(const GFT root, const T input[], size_t input_size, U output[], size_t output_size) const {
         auto& gf = GF::cast(this);
-        for (size_t i = 0; i < input_size; ++i) {
+        for (size_t i = 0; i < output_size; ++i) {
             GFT acc = 0;
             for (size_t j = 0; j < input_size; ++j) {
                 GFT exp = gf.pow(root, i * j);
@@ -58,10 +58,8 @@ public:
 using GFi32 = ffrs::GF<uint32_t,
     ffrs::gf_data,
     ffrs::gf_add_mod,
-
     ffrs::gf_mul_mod,
     ffrs::gf_exp_log_lut<ffrs::gf_mul_mod, 65537>::type,
-
     ntt_naive
     >;
 
@@ -86,36 +84,36 @@ public:
     }
 
     inline py::bytearray py_ntt(buffer_ro<uint32_t> buf, GFT root) {
-        if (buf.size == 0 || (buf.size & (buf.size - 1)) != 0)
-            throw py::value_error("Buffer size must be a power of two: " + std::to_string(buf.size));
+        if (!ffrs::detail::is_power_of_two(buf.size))
+            throw py::value_error("Buffer size must be a power of 2: " + std::to_string(buf.size));
 
         auto res =  py::bytearray(nullptr, buf.size * sizeof(uint32_t));
 
         auto data = PyByteArray_AsString(res.ptr());
         GFT *data_ptr = reinterpret_cast<GFT *>(data);
 
-        ntt(root, buf.data, buf.size, data_ptr);
+        ntt(root, buf.data, buf.size, data_ptr, buf.size);
 
         return res;
     }
 
     inline py::bytearray py_ntt16(buffer_ro<uint16_t> buf, GFT root) {
-        if (buf.size == 0 || (buf.size & (buf.size - 1)) != 0)
-            throw py::value_error("Buffer size must be a power of two: " + std::to_string(buf.size));
+        if (!ffrs::detail::is_power_of_two(buf.size))
+            throw py::value_error("Buffer size must be a power of 2: " + std::to_string(buf.size));
 
         auto res =  py::bytearray(nullptr, buf.size * sizeof(uint16_t));
 
         auto data = PyByteArray_AsString(res.ptr());
         uint16_t *data_ptr = reinterpret_cast<uint16_t *>(data);
 
-        ntt(root, buf.data, buf.size, data_ptr);
+        ntt(root, buf.data, buf.size, data_ptr, buf.size);
 
         return res;
     }
 
     inline py::bytearray py_ntt_blocks16(buffer_ro<uint16_t> buf, GFT root, size_t block_size) {
-        if (block_size == 0 || (block_size & (block_size - 1)) != 0)
-            throw py::value_error("Block size must be a power of two: " + std::to_string(block_size));
+        if (!ffrs::detail::is_power_of_two(block_size))
+            throw py::value_error("Block size must be a power of 2: " + std::to_string(block_size));
         if (buf.size % block_size != 0)
             throw py::value_error("Buffer size must be a multiple of block_size: " + std::to_string(buf.size));
 
@@ -125,7 +123,7 @@ public:
         uint16_t *data_ptr = reinterpret_cast<uint16_t *>(data);
 
         for (size_t offset = 0; offset < buf.size; offset += block_size)
-            ntt(root, buf.data + offset, block_size, data_ptr);
+            ntt(root, buf.data + offset, block_size, data_ptr, block_size);
 
         return res;
     }
@@ -134,13 +132,12 @@ public:
         using namespace pybind11::literals;
 
         py::class_<PyGFi32>(m, "GFi32")
-            .def_property_readonly("prime", [](PyGFi32& self) { return self.prime; }, "Always 2")
-            .def_property_readonly("power", [](PyGFi32& self) { return self.power; }, "Always 8")
+            .def_property_readonly("prime", [](PyGFi32& self) { return self.prime; }, ":math:`p`")
+            .def_property_readonly("power", [](PyGFi32& self) { return self.power; }, "Always 1")
             .def_property_readonly("primitive", [](PyGFi32& self) { return self.primitive; }, "Primitive value used to generate the field")
-            .def_property_readonly("poly1", [](PyGFi32& self) { return self.poly1; }, "Masked irreducible polynomial, excluding MSb")
-            .def_property_readonly("field_elements", [](PyGFi32& self) { return self.field_elements; }, "Always 256")
+            .def_property_readonly("field_elements", [](PyGFi32& self) { return self.field_elements; }, ":math:`p`")
             .def(py::init<uint32_t, uint32_t>(), R"(
-                Instantiate type for operations over :math:`GF(p^n)/P`
+                Instantiate type for operations over :math:`GF(p)`
 
                 Args:
                     prime : :math:`p` -- prime order of the field

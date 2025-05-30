@@ -29,6 +29,7 @@
 #include "pygf256.hpp"
 #include "pyrs256.hpp"
 #include "pygfi32.hpp"
+#include "pyrsi16.hpp"
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -99,4 +100,5 @@ PYBIND11_MODULE(libffrs, m) {
     PyGF256::register_class(m);
     PyRS256::register_class(m);
     PyGFi32::register_class(m);
+    PyRSi16::register_class(m);
 }

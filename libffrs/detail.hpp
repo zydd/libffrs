@@ -1,7 +1,7 @@
 /**************************************************************************
  * detail.hpp
  *
- * Copyright 2024 Gabriel Machado
+ * Copyright 2025 Gabriel Machado
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -122,9 +122,15 @@ public:
     { }
 };
 
+template<typename T>
+constexpr bool is_power_of_two(T a) {
+    return a && (a & (a - 1)) == 0;
+}
 
-constexpr size_t ilog2_floor(size_t a) {
-    size_t r = 0;
+
+template<typename T>
+constexpr T ilog2_floor(T a) {
+    T r = 0;
     while (a >>= 1)
         r += 1;
     return r;
