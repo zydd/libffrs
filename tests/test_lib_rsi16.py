@@ -18,6 +18,7 @@
 import math
 import pytest
 import random
+import functools
 
 import ffrs
 import ffrs.reference
@@ -26,15 +27,15 @@ import ffrs.reference.ntt
 
 from common import to_int_list, to_bytearray
 
-random.seed(42)
+random.seed(44)
 
-GF65537 = ffrs.reference.GF(65537, 1, 3)
+gfref = ffrs.reference.GF(65537, 1, 3)
 GF = ffrs.GFi32(65537, 3)
 
 
 @pytest.mark.parametrize('rs', [
-    ffrs.RSi16(16, ecc_len=4),
-    ffrs.RSi16(256, ecc_len=200),
+    ffrs.RSi16(32, ecc_len=8),
+    ffrs.RSi16(256, ecc_len=8),
     ffrs.RSi16(512, ecc_len=20),
 ])
 class TestRS:
@@ -43,10 +44,10 @@ class TestRS:
         ecc_u16 = rs.ecc_len // 2
         buf = [random.randrange(0, 2**16) for _ in range(size_u16 - ecc_u16)] + [0] * ecc_u16
 
-        w = GF65537(rs.roots_of_unity[round(math.log2(size_u16))])
+        w = gfref(rs.roots_of_unity[round(math.log2(size_u16))])
 
-        ref = to_int_list(ffrs.reference.ntt.ntt(GF65537, GF65537(w), buf))
-        res_i = to_int_list(ffrs.reference.ntt.intt(GF65537, GF65537(w), ref))
+        ref = to_int_list(ffrs.reference.ntt.ntt(gfref, gfref(w), buf))
+        res_i = to_int_list(ffrs.reference.ntt.intt(gfref, gfref(w), ref))
 
         res = to_bytearray(buf, 2)
         rs.encode(res)
@@ -66,10 +67,10 @@ class TestRS:
         msg_u16 = rs.message_len // 2
         buf = [random.randrange(1, 2**16) for _ in range(msg_u16 * blocks)]
 
-        w = GF65537(rs.roots_of_unity[round(math.log2(size_u16))])
+        w = gfref(rs.roots_of_unity[round(math.log2(size_u16))])
 
-        buf_ntt = [to_int_list(ffrs.reference.ntt.ntt(GF65537, GF65537(w), buf[msg_u16 * blk:msg_u16 * (blk + 1)] + [0] * ecc_u16)) for blk in range(blocks)]
-        res_i = [to_int_list(ffrs.reference.ntt.intt(GF65537, GF65537(w), buf_ntt[blk])) for blk in range(blocks)]
+        buf_ntt = [to_int_list(ffrs.reference.ntt.ntt(gfref, gfref(w), buf[msg_u16 * blk:msg_u16 * (blk + 1)] + [0] * ecc_u16)) for blk in range(blocks)]
+        res_i = [to_int_list(ffrs.reference.ntt.intt(gfref, gfref(w), buf_ntt[blk])) for blk in range(blocks)]
         res_i = [item for sublist in res_i for item in sublist[:-ecc_u16]]
 
         res = rs.encode_blocks(to_bytearray(buf, 2))

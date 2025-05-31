@@ -18,7 +18,7 @@ random.seed(42)
 def test_ntt8():
     a = randbytes(8)
     res = NTT.ntt8(a)
-    ref = ntt(GF256, GF256(NTT.gf.primitive), a)
+    ref = ntt(GF256, GF256(NTT.gf.primitive), list(a))
     print(list(a))
     print("ref", [int(x) for x in ref])
     print("res", list(res))

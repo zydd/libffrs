@@ -195,6 +195,6 @@ def test_poly_eval8():
         b = bytearray(int(GF256_ref.gen(i)) for i in range(len(a)))
 
         res = list(GF256.poly_eval8(a, b))
-        ref = [int(x) for x in ffrs.reference.ntt.ntt(GF256_ref, GF256_ref.a, a[::-1])]
+        ref = [int(x) for x in ffrs.reference.ntt.ntt(GF256_ref, GF256_ref.a, list(a[::-1]))]
 
         assert res == ref
