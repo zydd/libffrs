@@ -19,44 +19,11 @@
 #include <optional>
 
 #include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-
-#include "ntt.hpp"
-#include "reed_solomon.hpp"
-
-#include "util.hpp"
 
 #include "pygf256.hpp"
-#include "pyrs256.hpp"
 #include "pygfi32.hpp"
+#include "pyrs256.hpp"
 #include "pyrsi16.hpp"
-
-namespace py = pybind11;
-using namespace pybind11::literals;
-
-
-
-template<typename GF>
-using NTT256x8 = ffrs::NTT<GF,
-    ffrs::ntt_data,
-    // ffrs::ntt_eval
-    ffrs::ntt_eval_lut<256>::type
-    >;
-
-
-
-class PyNTT256x8 : public NTT256x8<PyGF256> {
-public:
-    inline PyNTT256x8(uint8_t primitive, uint16_t poly1, std::optional<uint8_t> root):
-        NTT256x8<PyGF256>(ntt_data(PyGF256(primitive, poly1), root.value_or(primitive)))
-    { }
-
-    inline py::bytearray py_ntt8(buffer_ro<uint8_t> buf) {
-        uint64_t res = ntt(buf.data, buf.size);
-        return py::bytearray(reinterpret_cast<const char *>(&res), std::min(buf.size, sizeof(uint64_t)));
-    }
-};
-
 
 
 PYBIND11_MODULE(libffrs, m) {
@@ -76,26 +43,6 @@ PYBIND11_MODULE(libffrs, m) {
     m.doc() = R"(
         FFRS main module
     )";
-
-    py::class_<PyNTT256x8>(m, "NTT256x8")
-        .def_property_readonly("gf", [](PyNTT256x8& self) -> auto const& { return self.gf; })
-
-        .def(py::init<uint8_t, uint16_t, std::optional<uint8_t>>(), R"(
-            Instantiate type NTT computation over :math:`GF(p^n)/P`
-
-            Args:
-                primitive : :math:`a` -- primitive value used to generate the field
-                polynomial : :math:`P` -- irreducible polynomial used to generate the field
-                root : :math:`\alpha` -- root of unity for NTT computation
-            )",
-            "primitive"_a = 2, "poly1"_a = 0x11d, "root"_a = py::none()
-        )
-        .def("ntt8", cast_args(&PyNTT256x8::py_ntt8), R"(
-            Number Theoretical Transform
-        )", "buffer"_a)
-        .doc() = R"(
-            NTT for :math:`GF(2^8)`
-        )";
 
     PyGF256::register_class(m);
     PyRS256::register_class(m);

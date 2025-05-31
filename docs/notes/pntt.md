@@ -302,7 +302,7 @@ Deduction for Cooley-Tukey fails because $n$ is odd, resulting in $\omega^{2ij -
 
 ---
 
-<!-- 
+<!--
 ---
 
 $$

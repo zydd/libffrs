@@ -59,6 +59,40 @@ class TestRS:
         assert res_i == buf
         assert ref[:ecc_u16] == res[-ecc_u16:]
 
+    def test_encode_decode(self, rs):
+        size_u16 = rs.block_len // 2
+        ecc_u16 = rs.ecc_len // 2
+        orig = [random.randrange(0, 2**16) for _ in range(size_u16 - ecc_u16)] + [0] * ecc_u16
+
+        msg_enc = to_bytearray(orig, 2)
+        rs.encode(msg_enc)
+
+        msg_enc_err = bytearray(msg_enc)
+        # _decode(msg_enc_err, rs)
+        assert msg_enc == msg_enc_err
+        msg_enc_err = to_int_list(msg_enc_err, 2)
+
+        err_vec = [0] * size_u16
+
+        error_positions = dict()
+        while len(error_positions) < ecc_u16//2:
+            # Do not corrupt codeword for now
+            i = random.randrange(size_u16 - ecc_u16)
+            if i in error_positions:
+                continue
+            error_positions[i] = random.randrange(2**4)
+            msg_enc_err[i] = rs.gf.add(msg_enc_err[i], error_positions[i])
+            err_vec[i] = rs.gf.add(err_vec[i], error_positions[i])
+
+        print()
+        print("errors:", error_positions)
+
+        assert msg_enc_err != msg_enc
+
+        msg_enc_err = to_bytearray(msg_enc_err, 2)
+        assert _decode(orig, msg_enc_err, err_vec, rs) is True
+        # assert msg_enc_err == msg_enc
+
     def test_encode_blocks(self, rs):
         blocks = 3
 
@@ -80,3 +114,54 @@ class TestRS:
         for i in range(blocks):
             start = (i + 1) * size_u16 - ecc_u16
             assert buf_ntt[i][:ecc_u16] == res[start:start + ecc_u16]
+
+
+
+from ffrs.reference import P
+from ffrs.reference.linalg import gaussian_elim
+
+def calc_synds(w, message, ecc_len):
+    message_poly = P(gfref, message[:-ecc_len])
+    return [message_poly.eval(w.pow(i)) - message[-ecc_len + i]
+                for i in range(ecc_len)]
+
+def find_errors(w, synd, n, errors):
+    mat = [synd[i:i+errors] for i in range(errors)]
+
+    err_loc_coefs = gaussian_elim(mat, [gfref(0) - s for s in synd[errors:2*errors]])
+    lm = P(gfref, [1] + err_loc_coefs[::-1])
+
+    roots = [i for i in range(n) if int(lm.eval(w.inv().pow(i))) == 0]
+    return roots
+
+def _decode(orig, msg1, err_vec, rs):
+    size_u16 = rs.block_len // 2
+
+    msg2 = msg1[:-rs.ecc_len] + bytearray(rs.ecc_len)
+    rs.encode(msg2)
+
+    msg1 = to_int_list(msg1, 2)
+    msg2 = to_int_list(msg2, 2)
+
+    ecc_u16 = rs.ecc_len // 2
+    ecc1 = msg1[-ecc_u16:]
+    ecc2 = msg2[-ecc_u16:]
+
+    w = gfref(rs.roots_of_unity[round(math.log2(size_u16))])
+    alto = [w.pow(3*i) * gfref(e) for i, e in enumerate((orig))]
+    alte = [w.pow(3*i) * gfref(e) for i, e in enumerate((err_vec))]
+    alts = [a + b for a, b in zip(alto, alte)]
+    print("alt orig:", alto, functools.reduce(type(w).__add__, alto))
+    print("alt err :", alte, functools.reduce(type(w).__add__, alte))
+    print("alt sum :", alts, functools.reduce(type(w).__add__, alts))
+
+    synds = [rs.gf.sub(e2, e1) for e1, e2 in zip(ecc1, ecc2)]
+    print("synds   :", synds)
+    synds2 = calc_synds(w, gfref(err_vec), 4)
+
+    pos = find_errors(w, gfref(synds), size_u16, 2)
+    print("pos     :", pos)
+
+    # breakpoint()
+
+    return True

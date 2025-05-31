@@ -16,6 +16,8 @@
  * limitations under the License.
  **************************************************************************/
 
+# pragma once
+
 #include <optional>
 
 #include <pybind11/pybind11.h>
@@ -218,7 +220,7 @@ private:
             std::optional<uint16_t> block_len,
             std::optional<uint16_t> message_len,
             std::optional<uint16_t> ecc_len) {
-        
+
         uint16_t res;
         if (ecc_len) {
             res = *ecc_len;

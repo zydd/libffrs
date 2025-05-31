@@ -21,7 +21,6 @@
 #include <optional>
 
 #include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
 
 #include "reed_solomon.hpp"
 #include "util.hpp"
@@ -53,9 +52,23 @@ class ntt_ct_iter {
 public:
     template<typename T, typename U>
     inline void ntt(const GFT root, const T input[], size_t input_size, U output[], size_t output_size) const {
-        auto& gf = GF::cast(this);
         copy_rbo(input, input_size, output, output_size);
+        ntt_butterfly(root, input, input_size, output, output_size);
+    }
 
+    template<typename T, typename U>
+    inline void ntt_rbo(const GFT root, const T input[], size_t input_size, U output[], size_t output_size) const {
+        if (output_size < input_size)
+            throw std::runtime_error("Output buffer smaller than input");
+
+        std::copy_n(input, input_size, output);
+        ntt_butterfly(root, input, input_size, output, output_size);
+    }
+
+private:
+    template<typename T, typename U>
+    inline void ntt_butterfly(const GFT root, const T /*input*/[], size_t /*input_size*/, U output[], size_t output_size) const {
+        auto& gf = GF::cast(this);
         for (size_t stride = 1, exp_f = output_size >> 1; stride < output_size; stride <<= 1, exp_f >>= 1) {
             for (size_t start = 0; start < output_size; start += stride * 2) {
                 // For each pair of the CT butterfly operation.
@@ -74,7 +87,6 @@ public:
         }
     }
 
-private:
     template<typename T, typename U>
     inline void copy_rbo(const T input[], size_t input_size, U output[], size_t output_size) const {
         output[0] = input[0];
@@ -117,7 +129,7 @@ public:
         GFi32(gf_data(prime, 1, primitive, 0))
     { }
 
-    inline py::bytearray py_ntt(buffer_ro<uint32_t> buf, GFT root) {
+    inline py::bytearray py_ntt(buffer_ro<GFT> buf, GFT root) {
         if (!ffrs::detail::is_power_of_two(buf.size))
             throw py::value_error("Buffer size must be a power of 2: " + std::to_string(buf.size));
 

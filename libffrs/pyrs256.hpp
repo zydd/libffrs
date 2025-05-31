@@ -16,6 +16,8 @@
  * limitations under the License.
  **************************************************************************/
 
+# pragma once
+
 #include <optional>
 
 #include <pybind11/pybind11.h>
