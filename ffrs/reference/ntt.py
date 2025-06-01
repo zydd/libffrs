@@ -7,7 +7,7 @@ def ntt(GF, w, arr):
 
 
 def intt(GF, w, arr):
-    return [x  // GF(len(arr)) for x in ntt(GF, w.inv(), arr)]
+    return [x // GF(len(arr)) for x in ntt(GF, w.inv(), arr)]
 
 
 def vandermonde_ntt(w, n):
@@ -15,6 +15,15 @@ def vandermonde_ntt(w, n):
     for i in range(n):
         for j in range(n):
             res[i][j] = w.pow(i * j)
+    return res
+
+
+def vandermonde_intt(w, n):
+    n_int = int(n)
+    res = [[None for _ in range(n_int)] for _ in range(n_int)]
+    for i in range(n_int):
+        for j in range(n_int):
+            res[i][j] = w.pow(i * j) // n
     return res
 
 

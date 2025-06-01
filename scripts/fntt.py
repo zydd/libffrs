@@ -1,12 +1,14 @@
-# https://cryptographycaffe.sandboxaq.com/posts/ntt-02/
-
 import collections
 import itertools
 import math
 import random
 
-from ffrs.reference import F
 import  ffrs.reference.ntt as ref_ntt
+import ffrs.reference
+from ffrs.reference.util import *
+import ffrs.reference.ntt as ntt
+import ffrs.reference.linalg as lin
+
 
 def primes():
     marked = collections.defaultdict(list)
@@ -20,35 +22,15 @@ def primes():
             marked[x * x].append(x)
             yield x
 
+
 def prime_root(n):
     for p in primes():
         if p < n: continue
         # print("p:", p, end='\r')
         if p % n == 1: yield p
 
-n = 16
-q = next(prime_root(2**16))
-q = 65537
-# q = 167772161  # 167772161 % 2**25 == 1
 
-print("q:", q)
-
-GF = lambda x: F(q, x)
-
-
-# Nth root of unity
-w = next(i for i in range(2, q) if i**n % q == 1)
-# 2Nth root of unity
-psi = next(i for i in range(2, q) if i**2 % q == w and i**n % q == -1 % q)
-
-
-print("w:", w)
-print("psi:", psi)
-# w = psi
-# assert pow(w, n, q) == 1
-
-
-def naive_ntt(a, w=w, q=q):
+def naive_ntt(a, w, q):
     out = [0] * len(a)
 
     for i in range(len(a)):
@@ -57,7 +39,8 @@ def naive_ntt(a, w=w, q=q):
 
     return out
 
-def naive_intt(a, gen=w, modulus=q):
+
+def naive_intt(a, gen, modulus):
     size = len(a)
     out = [0] * size
 
@@ -75,20 +58,22 @@ def naive_intt(a, gen=w, modulus=q):
     return [i * scaler % modulus for i in out]
 
 
-def brv(x, n):
-    """ Reverses a n-bit number """
-    return int(''.join(reversed(bin(x)[2:].zfill(n))), 2)
-
-
-def ntt_iter(a, root=w, q=q):
+def ct_ntt_iter(a, root, q, start_pos=None, end_pos=None):
+    """https://cryptographycaffe.sandboxaq.com/posts/ntt-02/"""
     size = len(a)
+
+    if start_pos is None:
+        start_pos = 0
+
+    if end_pos is None:
+        end_pos = size
 
     # Start with stride = 1.
     stride = 1
 
     # Shuffle the input array in bit-reversal order.
     nbits = int(math.log2(size))
-    res = [a[brv(i, nbits)] for i in range(size)]
+    res = rbo_sorted(a)
 
     # Pre-compute the generators used in different stages of the recursion.
     # gens = [root ** (2**i) % q for i in range(nbits)]
@@ -98,14 +83,14 @@ def ntt_iter(a, root=w, q=q):
     # Iterate until the last layer.
     while stride < size:
         # For each stride, iterate over all N//(stride*2) slices.
-        for start in range(0, size // 2, stride * 2):
+        print("-" * 10)
+        for start in filter(lambda x: x >= start_pos, range(0, end_pos, stride * 2)):
             # For each pair of the CT butterfly operation.
+            print(f"butterfly: [{start:2} {start + stride:2}]  [{start + stride:2} {start + 2 * stride:2}]")
             for i in range(start, start + stride):
                 # Compute the omega multiplier. Here j = i - start.
                 # zp = gens[gen_ptr] ** (i - start) % q
-                # zp = root ** (2 ** gen_ptr * (i - start)) % q
-                zp = pow(root, (1 << gen_ptr) * (i - start))
-                print((1 << gen_ptr), (i - start))
+                zp = root ** ((i - start) << gen_ptr) % q
 
                 # Cooley-Tukey butterfly.
                 a = res[i]
@@ -121,7 +106,8 @@ def ntt_iter(a, root=w, q=q):
     return res
 
 
-def intt_iter(a, gen=w, q=q):
+def gs_intt_iter(a, gen, q):
+    """https://cryptographycaffe.sandboxaq.com/posts/ntt-02/"""
     size = len(a)
 
     # Start with stride = N/2.
@@ -159,33 +145,66 @@ def intt_iter(a, gen=w, q=q):
 
     # Scale it down before returning.
     scaler = pow(size, -1, q)
+    res = [i * scaler % q for i in res]
 
     # Reverse shuffle and return.
-    return [(res[brv(i, nbits)] * scaler) % q for i in range(size)]
+    return rbo_sorted(res)
 
 
+n = 16
+# q = next(prime_root(2**16))
+q = 65537
+
+print("q:", q)
+
+GF = ffrs.reference.GF(q)
+
+
+# Nth root of unity
+w = next(i for i in range(2, q) if i**n % q == 1)
+# 2Nth root of unity
+psi = next(i for i in range(2, q) if i**2 % q == w and i**n % q == -1 % q)
+
+
+print("w:", w)
+print("psi:", psi)
+w = int(GF(w).inv())
+
+# test data
 a = [random.randint(0, q - 1) for _ in range(n)]
 print("a:   ", a)
 print()
 
-a_ntt_naive = naive_ntt(a)
-a_ntt_ref = [int(x) for x in ref_ntt.ntt(GF, GF(w), a)]
-a_ntt = ntt_iter(a)
+a_ntt_naive = naive_ntt(a, w, q)
+a_ntt_ref = to_int_list(ref_ntt.ntt(GF, GF(w), a))
+a_ntt = ct_ntt_iter(a, w, q)
 print("naive:  ", a_ntt_naive)
 print("ref:    ", a_ntt_ref)
 print("iter:   ", a_ntt)
+
+v = ntt.vandermonde_ntt(GF(w), len(a))
+v_iref = ntt.vandermonde_intt(GF(w).inv(), GF(len(a)))
+v_i = lin.inverse(GF, v)
+assert v_i == v_iref
+
+a_ntt_v = lin.matmul(GF, v, GF(a))
+print("ntt v:  ", to_int_list(a_ntt_v))
+
 print()
 
-assert a_ntt_naive == a_ntt_ref == a_ntt
 
-a_intt_naive = naive_intt(a_ntt_naive)
-a_intt_ref = [int(x) for x in ref_ntt.intt(GF, GF(w), a_ntt)]
-a_intt = intt_iter(a_ntt)
-print("naive: ", a_intt_naive)
-print("ref:   ", a_intt_ref)
-print("iter:  ", a_intt)
+a_intt_naive = naive_intt(a_ntt, w, q)
+a_intt_ref = to_int_list(ref_ntt.intt(GF, GF(w), a_ntt))
+a_intt = gs_intt_iter(a_ntt, w, q)
+a_intt_v = to_int_list(lin.matmul(GF, v_i, GF(a_ntt)))
+a_intt_inv = to_int_list([GF(x) // GF(len(a)) for x in ct_ntt_iter(a_ntt, int(GF(w).inv()), q)])
+print("naive:  ", a_intt_naive)
+print("ref:    ", a_intt_ref)
+print("iter:   ", a_intt)
+print("intt v: ", a_intt_v)
+print("ntt inv:", a_intt_inv)
 print()
 
-assert a == a_intt_naive
-assert a == a_intt_ref
-assert a == a_intt
+
+assert a_ntt_naive == a_ntt_ref == a_ntt == a_ntt_v
+assert a == a_intt_naive == a_intt_ref ==  a_intt == a_intt_v == a_intt_inv

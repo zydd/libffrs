@@ -118,7 +118,7 @@ public:
 
     template<typename...F0>
     inline CRTP(F0&&... f0):
-        F0(std::move(f0))...
+        F0(f0)...
     { }
 };
 

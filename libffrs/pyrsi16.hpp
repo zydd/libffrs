@@ -65,8 +65,6 @@ public:
 
     template<typename T>
     inline void encode(const T input[], size_t input_size, GFT output[], size_t output_size) {
-        py_assert(output_size >= input_size);
-
         std::copy_n(input, input_size, output);
         // auto& gf = RS::cast(this).gf;
         // gf.copy_rbo(input, input_size, output, output_size);
