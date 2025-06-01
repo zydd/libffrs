@@ -1,7 +1,7 @@
 
-#  common.py
+#  util.py
 #
-#  Copyright 2024 Gabriel Machado
+#  Copyright 2025 Gabriel Machado
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -15,9 +15,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import math
 import random
 
 import ffrs.reference
+
 
 def sample_field(GF, start=0, samples=1000):
     if GF.field_elements < samples:
@@ -60,7 +62,15 @@ def to_int_list(v, sizeof=None, byteorder="little"):
         return [int.from_bytes(v[i:i+sizeof], byteorder) for i in range(0, len(v), sizeof)]
 
 
-
 def randbytes(n, start=0, stop=256):
     return bytearray(random.randrange(start=start, stop=stop) for _ in range(n))
 
+
+def rbo(max, i):
+    nbits = round(math.log2(max))
+    return int(bin(i)[2:].zfill(nbits)[::-1], 2)
+
+
+def rbo_sorted(a):
+    assert len(a) and len(a) & (len(a) - 1) == 0, "len(a) must be a power of 2"
+    return [a[rbo(len(a), i)] for i in range(len(a))]

@@ -18,28 +18,16 @@
 import math
 import pytest
 import random
-import functools
 
 import ffrs
 import ffrs.reference
 import ffrs.reference.ntt
-
-
-from common import to_int_list, to_bytearray
+from ffrs.reference.util import to_int_list, to_bytearray, rbo_sorted
 
 # random.seed(42)
 
 gfref = ffrs.reference.GF(65537, 1, 3)
-GF = ffrs.GFi32(65537, 3)
-
-def rbo(max, i):
-    nbits = round(math.log2(max))
-    return int(bin(i)[2:].zfill(nbits)[::-1], 2)
-
-def rbo_sorted(a):
-    assert len(a) and len(a) & (len(a) - 1) == 0, "len(a) must be a power of 2"
-    # return list(a)
-    return [a[rbo(len(a), i)] for i in range(len(a))]
+GF = ffrs.GFi16(65537, 3)
 
 
 @pytest.mark.parametrize('rs', [
@@ -95,16 +83,12 @@ class TestRS:
             msg_enc_err[i] = rs.gf.add(msg_enc_err[i], error_positions[i])
             err_vec[i] = rs.gf.add(err_vec[i], error_positions[i])
 
-        print()
-        print("errors:", error_positions)
-
         assert msg_enc_err != msg_enc
 
-        msg_enc_err = to_bytearray(msg_enc_err, 2)
-        res_pos = _find_err_pos(rs, msg_enc_err, orig, err_vec, err_count=len(error_positions))
-        assert set(res_pos) == set(error_positions.keys())
+        msg_enc_err_dec = to_bytearray(msg_enc_err, 2)
+        rs.decode(msg_enc_err_dec)
 
-        # TODO: correct errors
+        assert msg_enc == msg_enc_err_dec
 
     def test_encode_blocks(self, rs):
         blocks = 3
@@ -126,46 +110,3 @@ class TestRS:
             start = (i + 1) * size_u16 - ecc_u16
             assert buf_ntt[i][:ecc_u16] == res[start:start + ecc_u16]
 
-
-from ffrs.reference import P
-from ffrs.reference.linalg import gaussian_elim
-
-def find_errors(w, synd, n, errors):
-    mat = [synd[i:i+errors] for i in range(errors)]
-
-    err_loc_coefs = gaussian_elim(mat, [gfref(0) - s for s in synd[errors:2*errors]])
-    lm = P(gfref, [1] + err_loc_coefs[::-1])
-
-    roots = [i for i in range(n) if int(lm.eval(w.inv().pow(i))) == 0]
-    return roots
-
-def _find_err_pos(rs, msg1, orig, err_vec, err_count):
-    size_u16 = rs.block_len // 2
-    ecc_u16 = rs.ecc_len // 2
-
-    msg2 = msg1[:-rs.ecc_len] + bytearray(rs.ecc_len)
-    rs.encode(msg2)
-
-    msg1 = to_int_list(msg1, 2)
-    msg2 = to_int_list(msg2, 2)
-
-    ecc1 = msg1[-ecc_u16:]
-    ecc2 = msg2[-ecc_u16:]
-
-    w = gfref(rs.roots_of_unity[round(math.log2(size_u16))])
-    synds_ref = [functools.reduce(type(w).__add__, 
-                                  [w.pow(j*i) * gfref(e) for i, e in enumerate(rbo_sorted(err_vec))])
-                                    for j in range(ecc_u16)]
-
-
-    synds = [rs.gf.sub(e2, e1) for e1, e2 in zip(ecc1, ecc2)]
-    print("synds   :", synds)
-    assert synds == synds_ref
-
-    # breakpoint()
-
-    pos = find_errors(w, gfref(synds), size_u16, err_count)
-    pos = [rbo(size_u16, i) for i in pos]
-    print("pos     :", pos)
-
-    return pos

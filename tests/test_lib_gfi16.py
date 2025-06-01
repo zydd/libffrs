@@ -21,11 +21,10 @@ import random
 
 import ffrs
 import ffrs.reference.ntt as ref_ntt
+from ffrs.reference.util import *
 
-from common import *
 
-
-GF = ffrs.GFi32(65537, 3)
+GF = ffrs.GFi16(65537, 3)
 GF_ref = ffrs.reference.GF(65537, 1, 3)
 random.seed(42)
 

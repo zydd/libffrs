@@ -159,7 +159,7 @@ def run_enc_benchmarks(config):
 
 def ntt_benchmark(block_size):
     print(f"\nntt block_size: {block_size * 2} bytes")
-    GF = ffrs.GFi32(65537, 3)
+    GF = ffrs.GFi16(65537, 3)
     w = next(i for i in range(2, GF.prime) if i**block_size % GF.prime == 1)
 
     return (f"gf.ntt_blocks16(data, {w}, {block_size})", dict(gf=GF))

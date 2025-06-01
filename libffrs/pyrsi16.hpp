@@ -25,7 +25,7 @@
 
 #include "reed_solomon.hpp"
 #include "util.hpp"
-#include "pygfi32.hpp"
+#include "pygfi16.hpp"
 
 namespace py = pybind11;
 
@@ -128,7 +128,7 @@ template<typename GF>
 using RSi16 = ffrs::RS<GF, rs_encode_ntt, ffrs::rs_data>;
 
 
-class PyRSi16 : public RSi16<PyGFi32> {
+class PyRSi16 : public RSi16<PyGFi16> {
 public:
     using GFT = rs_data::GFT;
     size_t default_block_size = 256;
@@ -152,7 +152,7 @@ public:
     }
 
     inline PyRSi16(uint16_t ecc_len, size_t block_size, uint16_t primitive):
-        RSi16<PyGFi32>(rs_encode_ntt(block_size), rs_data(PyGFi32(65537, primitive), ecc_len))
+        RSi16<PyGFi16>(rs_encode_ntt(block_size), rs_data(PyGFi16(65537, primitive), ecc_len))
     {
         set_default_block_size(block_size);
     }

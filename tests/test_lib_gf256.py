@@ -16,14 +16,12 @@
 #  limitations under the License.
 
 import itertools
-import ffrs.reference.ntt
 import pytest
 import random
 
 import ffrs
-
-from common import randbytes
-
+import ffrs.reference.ntt
+from ffrs.reference.util import randbytes
 
 GF256 = ffrs.GF256()
 GF256_ref = ffrs.reference.GF(2, 8, GF256.primitive, GF256.poly1 | 0x100)

@@ -20,10 +20,10 @@ import pytest
 from ffrs.reference import *
 from ffrs.reference.linalg import *
 from ffrs.reference.ntt import vandermonde_ntt
+from ffrs.reference.util import sample_field
 
 GF256 = GF(2, 8)
 
-from common import sample_field
 
 fields = [
     GF(p) for p in [2, 3, 5, 7, 11, 13, 127, 257]] + [
