@@ -62,8 +62,8 @@ public:
         return  _nth_roots_of_unity[__builtin_ctzl(n)];
     }
 
-    template<typename T, typename U>
-    inline void encode(const T input[], size_t input_size, U output[], size_t output_size) {
+    template<typename T>
+    inline void encode(const T input[], size_t input_size, GFT output[], size_t output_size) {
         py_assert(output_size >= input_size);
 
         std::copy_n(input, input_size, output);
@@ -76,8 +76,7 @@ protected:
     GFT _nth_roots_of_unity[MaxFieldBits] = {0};
     GFT _roots[65536] = {0};
 
-    template<typename T>
-    inline void ct_butterfly(T data[], size_t output_size) const {
+    inline void ct_butterfly(GFT data[], size_t output_size) const {
         GFT root = get_root_of_unity(output_size);
         auto& gf = RS::cast(this).gf;
         for (size_t stride = 1, exp_f = output_size >> 1; stride < output_size; stride <<= 1, exp_f >>= 1) {
@@ -89,8 +88,8 @@ protected:
                     // GFT w = _roots[exp_f * (i - start)];
 
                     // Cooley-Tukey butterfly
-                    T a = data[i];
-                    T b = data[i+stride];
+                    GFT a = data[i];
+                    GFT b = data[i+stride];
                     GFT m = gf.mul(w, b);
                     data[i] = gf.add(a, m);
                     data[i+stride] = gf.sub(a, m);
@@ -130,15 +129,16 @@ using RSi16 = ffrs::RS<GF, rs_encode_ntt, ffrs::rs_data>;
 
 class PyRSi16 : public RSi16<PyGFi32> {
 public:
-    size_t default_block_size = 255;
+    using GFT = rs_data::GFT;
+    size_t default_block_size = 256;
 
     inline PyRSi16(
-            std::optional<uint16_t> block_size,
+            std::optional<size_t> block_size,
             std::optional<uint16_t> message_len,
             std::optional<uint16_t> ecc_len,
             uint16_t primitive):
         PyRSi16(_get_ecc_len(block_size, message_len, ecc_len),
-                block_size.value_or(255),
+                block_size.value_or(256),
                 primitive)
     {
         if (ecc_len && message_len) {
@@ -169,7 +169,7 @@ public:
     inline void py_encode(buffer_rw<uint16_t> buf) {
         size_t msg_size = buf.size - ecc_len / sizeof(uint16_t);
 
-        std::vector<uint16_t> temp(buf.size);
+        std::vector<GFT> temp(buf.size);
         encode(&buf[0], buf.size, &temp[0], buf.size);
         std::copy_n(&temp[0], ecc_len / sizeof(uint16_t), &buf[msg_size]);
     }
@@ -191,25 +191,27 @@ public:
         if (input_remainder > 0)
             output_size += input_remainder + ecc_len;
 
-        // Allocate extra space to compute NTT
-        auto output = py::bytearray(nullptr, (output_size + input_block_size) * sizeof(uint16_t));
+        auto output = py::bytearray(nullptr, output_size * sizeof(uint16_t));
         auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
-        std::fill_n(output_data, output_size + input_block_size, 0);
+        std::vector<GFT> temp(output_block_size);
 
         for (size_t block = 0; block < buf.size / input_block_size; ++block) {
             auto output_block = &output_data[block * output_block_size];
-            encode(&buf.data[block * input_block_size], input_block_size, &output_block[input_block_size], output_block_size);
             std::copy_n(&buf[block * input_block_size], input_block_size, &output_block[0]);
+
+            std::fill_n(&temp[0], output_block_size, 0);
+            encode(&buf[block * input_block_size], input_block_size, &temp[0], output_block_size);
+            std::copy_n(&temp[0], ecc_len, &output_block[input_block_size]);
         }
 
         if (input_remainder > 0) {
             auto output_block = &output_data[output_size - input_remainder - ecc_len];
-            encode(&buf[buf.size - input_remainder], input_remainder, &output_block[input_remainder], output_block_size);
-            std::copy_n(&buf[buf.size - input_remainder], input_remainder, output_block);
-        }
+            std::copy_n(&buf[buf.size - input_remainder], input_remainder, &output_block[0]);
 
-        // Remove extra space
-        PyByteArray_Resize(output.ptr(), output_size * sizeof(uint16_t));
+            std::fill_n(&temp[0], output_block_size, 0);
+            encode(&buf[buf.size - input_remainder], input_remainder, &temp[0], output_block_size);
+            std::copy_n(&temp[0], ecc_len, &output_block[input_remainder]);
+        }
         return output;
     }
 
@@ -276,7 +278,7 @@ public:
 
 private:
     inline uint16_t _get_ecc_len(
-            std::optional<uint16_t> block_len,
+            std::optional<size_t> block_len,
             std::optional<uint16_t> message_len,
             std::optional<uint16_t> ecc_len) {
 
