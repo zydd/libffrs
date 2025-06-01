@@ -1,5 +1,5 @@
 
-# test_lib_gf256.py
+#  test_lib_gf256.py
 #
 #  Copyright 2024 Gabriel Machado
 #
@@ -15,7 +15,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import functools
 import itertools
 import ffrs.reference.ntt
 import pytest

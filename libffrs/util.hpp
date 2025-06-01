@@ -74,8 +74,14 @@ using cast_arg_t = typename cast_arg<T>::type;
 }
 
 template <typename Return, typename Class, typename...Args>
-static constexpr auto cast_args(Return (Class::*method)(Args...)) {
+constexpr auto cast_args(Return (Class::*method)(Args...)) {
     return [method](Class& self, typename detail::cast_arg<Args>::type...args) {
         return (self.*method)(std::move(args)...);
     };
 }
+
+#define _PY_ASSERT_MSG(c, text) do { if (!(c)) throw std::runtime_error(__FILE__ ":" + std::to_string(__LINE__) + ": Assertion failed: " #c ", " + text); } while(0)
+#define _PY_ASSERT(c)           do { if (!(c)) throw std::runtime_error(__FILE__ ":" + std::to_string(__LINE__) + ": Assertion failed: " #c); } while(0)
+#define _PY_ASSERT_ARG(arg1, arg2, arg3, ...) arg3
+#define _PY_ASSERT_GET(...) _PY_ASSERT_ARG(__VA_ARGS__, _PY_ASSERT_MSG, _PY_ASSERT)
+#define py_assert(...) _PY_ASSERT_GET(__VA_ARGS__)(__VA_ARGS__)

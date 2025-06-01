@@ -1,5 +1,5 @@
 
-#  test_lib_rs.py
+#  test_lib_rs256.py
 #
 #  Copyright 2024 Gabriel Machado
 #

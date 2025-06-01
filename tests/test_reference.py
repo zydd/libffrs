@@ -1,7 +1,27 @@
+
+#  rest_reference.py
+#
+#  Copyright 2025 Gabriel Machado
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
 import pytest
-import random
 
 from ffrs.reference import *
+from ffrs.reference.linalg import *
+from ffrs.reference.ntt import vandermonde_ntt
+
+GF256 = GF(2, 8)
 
 from common import sample_field
 
@@ -63,8 +83,6 @@ def test_field(GF):
 
 
 def test_gf256():
-    GF256 = GF(2, 8)
-
     g = P(GF256, [1])
     i = GF256(1)
     for n in range(4):
@@ -78,4 +96,24 @@ def test_gf256():
         assert int(g.eval(GF256.gen(i))) == 0, (i)
 
     assert len(list(GF.irr_polynomials(2, 8, 2))) == 16
+
+
+@pytest.mark.parametrize('n', [1, 2, 3, 4, 5, 10, 20])
+def test_matmul(n):
+    id1 = identity(GF256, n)
+    id2 = identity(GF256, n)
+    id3 = identity(GF256, n)
+
+    assert id1 == matmul(GF256, id2, id3)
+
+
+@pytest.mark.parametrize('n', [1, 2, 3, 4, 5, 10, 20])
+def test_vandermonde_inverse(n):
+    id = identity(GF256, n)
+    v = vandermonde_ntt(GF256(2), n)
+    vi = inverse(GF256, v)
+
+    assert v == vandermonde_ntt(GF256(2), n)
+    assert id == matmul(GF256, v, vi)
+    assert inverse(GF256, vi) == v
 

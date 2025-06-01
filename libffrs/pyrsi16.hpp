@@ -35,36 +35,97 @@ class rs_encode_ntt {
 public:
     using GFT = typename GF::GFT;
 
-    inline rs_encode_ntt() {
-        auto& gf = RS::cast(this).gf;
+    inline rs_encode_ntt(size_t block_size) {
+        auto& rs = RS::cast(this);
+        py_assert(rs.gf.prime > 0);
+
         for (unsigned i = 0; i < MaxFieldBits; ++i) {
             GFT n = 1 << i;
-            if (n >= gf.field_elements)
+            if (n >= rs.gf.field_elements)
                 break;
 
-            GFT root = gf.exp(gf.div(gf.log(1), n));
-            if (gf.pow(root, n) != 1)
+            GFT root = rs.gf.exp(rs.gf.div(rs.gf.log(1), n));
+            if (rs.gf.pow(root, n) != 1)
                 break;
 
             _nth_roots_of_unity[i] = root;
         }
+
+        GFT r = get_root_of_unity(block_size / sizeof(uint16_t));
+        for (size_t i = 0; i < MaxFieldBits; ++i) {
+            _roots[i] = r;
+            r = rs.gf.pow(r, 2);
+        }
     }
 
-    inline GFT get_root_of_unity(size_t n) {
+    inline GFT get_root_of_unity(size_t n) const {
         return  _nth_roots_of_unity[__builtin_ctzl(n)];
     }
 
-    // inline void encode(const uint8_t input[], size_t input_size, uint8_t output[]) {
-    // }
+    template<typename T, typename U>
+    inline void encode(const T input[], size_t input_size, U output[], size_t output_size) {
+        py_assert(output_size >= input_size);
+
+        std::copy_n(input, input_size, output);
+        // auto& gf = RS::cast(this).gf;
+        // gf.copy_rbo(input, input_size, output, output_size);
+        ct_butterfly(output, output_size);
+    }
 
 protected:
     GFT _nth_roots_of_unity[MaxFieldBits] = {0};
+    GFT _roots[65536] = {0};
+
+    template<typename T>
+    inline void ct_butterfly(T data[], size_t output_size) const {
+        GFT root = get_root_of_unity(output_size);
+        auto& gf = RS::cast(this).gf;
+        for (size_t stride = 1, exp_f = output_size >> 1; stride < output_size; stride <<= 1, exp_f >>= 1) {
+            for (size_t start = 0; start < output_size; start += stride * 2) {
+                // For each pair of the CT butterfly operation.
+                for (size_t i = start; i < start + stride; ++i) {
+                    // j = i - start
+                    GFT w = gf.pow(root, exp_f * (i - start));
+                    // GFT w = _roots[exp_f * (i - start)];
+
+                    // Cooley-Tukey butterfly
+                    T a = data[i];
+                    T b = data[i+stride];
+                    GFT m = gf.mul(w, b);
+                    data[i] = gf.add(a, m);
+                    data[i+stride] = gf.sub(a, m);
+                }
+            }
+        }
+    }
+
+    template<typename T, typename U>
+    inline void copy_rbo(const T input[], size_t input_size, U output[], size_t output_size) const {
+        output[0] = input[0];
+
+        if (output_size <= 2)
+            return;
+
+        size_t l, rev = 0;
+        for (size_t i = 1; i < input_size; ++i) {
+            for (l = output_size >> 1; rev + l >= output_size; l >>= 1);
+            rev = (rev & (l - 1)) + l;
+            // rev = rbo16(i) >> (16 - nbits);
+            output[rev] = input[i];
+        }
+    }
+
+    uint16_t rbo16(uint16_t b) const {
+        b = ((b >> 1) & 0x5555) | ((b & 0x5555) << 1);
+        b = ((b >> 2) & 0x3333) | ((b & 0x3333) << 2);
+        b = ((b >> 4) & 0x0f0f) | ((b & 0x0f0f) << 4);
+        b = ((b >> 8)         ) | ((b         ) << 8);
+        return b;
+    }
 };
 
 template<typename GF>
-using RSi16 = ffrs::RS<GF, ffrs::rs_data,
-    rs_encode_ntt
-    >;
+using RSi16 = ffrs::RS<GF, rs_encode_ntt, ffrs::rs_data>;
 
 
 class PyRSi16 : public RSi16<PyGFi32> {
@@ -90,7 +151,7 @@ public:
     }
 
     inline PyRSi16(uint16_t ecc_len, size_t block_size, uint16_t primitive):
-        RSi16<PyGFi32>(rs_data(PyGFi32(65537, primitive), ecc_len))
+        RSi16<PyGFi32>(rs_encode_ntt(block_size), rs_data(PyGFi32(65537, primitive), ecc_len))
     {
         set_default_block_size(block_size);
     }
@@ -106,11 +167,10 @@ public:
     }
 
     inline void py_encode(buffer_rw<uint16_t> buf) {
-        auto root = get_root_of_unity(default_block_size / sizeof(uint16_t));
         size_t msg_size = buf.size - ecc_len / sizeof(uint16_t);
 
         std::vector<uint16_t> temp(buf.size);
-        gf.ntt(root, &buf[0], buf.size, &temp[0], buf.size);
+        encode(&buf[0], buf.size, &temp[0], buf.size);
         std::copy_n(&temp[0], ecc_len / sizeof(uint16_t), &buf[msg_size]);
     }
 
@@ -118,7 +178,6 @@ public:
         size_t output_block_size = default_block_size / sizeof(uint16_t);
         size_t ecc_len = this->ecc_len / sizeof(uint16_t);
         size_t input_block_size = output_block_size - ecc_len;
-        auto root = get_root_of_unity(output_block_size);
 
         if (buf.size == 0 || output_block_size == 0 || output_block_size <= ecc_len)
             return {};
@@ -139,13 +198,13 @@ public:
 
         for (size_t block = 0; block < buf.size / input_block_size; ++block) {
             auto output_block = &output_data[block * output_block_size];
-            gf.ntt(root, &buf.data[block * input_block_size], input_block_size, &output_block[input_block_size], output_block_size);
+            encode(&buf.data[block * input_block_size], input_block_size, &output_block[input_block_size], output_block_size);
             std::copy_n(&buf[block * input_block_size], input_block_size, &output_block[0]);
         }
 
         if (input_remainder > 0) {
             auto output_block = &output_data[output_size - input_remainder - ecc_len];
-            gf.ntt(root, &buf[buf.size - input_remainder], input_remainder, &output_block[input_remainder], output_block_size);
+            encode(&buf[buf.size - input_remainder], input_remainder, &output_block[input_remainder], output_block_size);
             std::copy_n(&buf[buf.size - input_remainder], input_remainder, output_block);
         }
 

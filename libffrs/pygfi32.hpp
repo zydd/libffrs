@@ -65,6 +65,22 @@ public:
         ntt_butterfly(root, input, input_size, output, output_size);
     }
 
+    template<typename T, typename U>
+    inline void copy_rbo(const T input[], size_t input_size, U output[], size_t output_size) const {
+        output[0] = input[0];
+
+        if (output_size <= 2)
+            return;
+
+        size_t l, rev = 0;
+        for (size_t i = 1; i < input_size; ++i) {
+            for (l = output_size >> 1; rev + l >= output_size; l >>= 1);
+            rev = (rev & (l - 1)) + l;
+            // rev = rbo16(i) >> (16 - nbits);
+            output[rev] = input[i];
+        }
+    }
+
 private:
     template<typename T, typename U>
     inline void ntt_butterfly(const GFT root, const T /*input*/[], size_t /*input_size*/, U output[], size_t output_size) const {
@@ -84,22 +100,6 @@ private:
                     output[i+stride] = gf.sub(a, m);
                 }
             }
-        }
-    }
-
-    template<typename T, typename U>
-    inline void copy_rbo(const T input[], size_t input_size, U output[], size_t output_size) const {
-        output[0] = input[0];
-
-        if (output_size <= 2)
-            return;
-
-        size_t l, rev = 0;
-        for (size_t i = 1; i < input_size; ++i) {
-            for (l = output_size >> 1; rev + l >= output_size; l >>= 1);
-            rev = (rev & (l - 1)) + l;
-            // rev = rbo16(i) >> (16 - nbits);
-            output[rev] = input[i];
         }
     }
 
