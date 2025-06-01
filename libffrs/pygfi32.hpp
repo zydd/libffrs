@@ -115,8 +115,10 @@ private:
 
 using GFi32 = ffrs::GF<uint32_t,
     ffrs::gf_data,
-    ffrs::gf_add_mod,
-    ffrs::gf_mul_mod,
+    // ffrs::gf_add_mod,
+    // ffrs::gf_mul_mod,
+    ffrs::gf_add_i16_shift,
+    ffrs::gf_mul_i16_shift,
     ffrs::gf_exp_log_lut<ffrs::gf_mul_mod, 65537>::type,
     // ntt_naive,
     ntt_ct_iter

@@ -205,7 +205,9 @@ def main():
     elif fn == "ntt":
         benchmark_throughput(ntt_benchmark(1024//2), input_size=1 * 2**20)
     elif fn == "enci16":
-        benchmark_throughput(enci16_benchmark(1024, 100), input_size=1 * 2**20)
+        block_size = 1024
+        ecc_len = block_size // 8
+        benchmark_throughput(enci16_benchmark(block_size, ecc_len), input_size=10 * 2**20)
     else:
         return show_help()
 

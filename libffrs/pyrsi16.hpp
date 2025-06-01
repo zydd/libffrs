@@ -52,9 +52,10 @@ public:
         }
 
         GFT r = get_root_of_unity(block_size / sizeof(uint16_t));
-        for (size_t i = 0; i < MaxFieldBits; ++i) {
-            _roots[i] = r;
-            r = rs.gf.pow(r, 2);
+        for (size_t i = 0; i < (1 << MaxFieldBits); ++i) {
+            // _roots[i] = r;
+            // r = rs.gf.pow(r, 2);
+            _roots[i] = rs.gf.pow(r, i);
         }
     }
 
@@ -76,23 +77,23 @@ protected:
     GFT _nth_roots_of_unity[MaxFieldBits] = {0};
     GFT _roots[65536] = {0};
 
-    inline void ct_butterfly(GFT data[], size_t output_size) const {
-        GFT root = get_root_of_unity(output_size);
+    inline void ct_butterfly(GFT output[], size_t output_size) const {
+        // GFT root = get_root_of_unity(output_size);
         auto& gf = RS::cast(this).gf;
-        for (size_t stride = 1, exp_f = output_size >> 1; stride < output_size; stride <<= 1, exp_f >>= 1) {
-            for (size_t start = 0; start < output_size; start += stride * 2) {
+        for (size_t stride = 1, exp_f = output_size >> 1; stride < output_size; stride *= 2, exp_f >>= 1) {
+            for (size_t start = 0; start < output_size /*input_size*/; start += stride * 2) {
                 // For each pair of the CT butterfly operation.
                 for (size_t i = start; i < start + stride; ++i) {
                     // j = i - start
-                    GFT w = gf.pow(root, exp_f * (i - start));
+                    GFT w = _roots[exp_f * (i - start)];
                     // GFT w = _roots[exp_f * (i - start)];
 
                     // Cooley-Tukey butterfly
-                    GFT a = data[i];
-                    GFT b = data[i+stride];
+                    GFT a = output[i];
+                    GFT b = output[i + stride];
                     GFT m = gf.mul(w, b);
-                    data[i] = gf.add(a, m);
-                    data[i+stride] = gf.sub(a, m);
+                    output[i] = gf.add(a, m);
+                    output[i + stride] = gf.sub(a, m);
                 }
             }
         }

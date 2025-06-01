@@ -95,6 +95,47 @@ public:
 };
 
 
+template<typename GFT, typename GF>
+class gf_add_i16_shift {
+public:
+    inline GFT add(GFT const& lhs, GFT const& rhs) const {
+        uint32_t res = lhs + rhs;
+        if (res > 0x10001)
+            res -= 0x10001;
+        return res;
+    }
+
+    inline GFT sub(GFT const& lhs, GFT const& rhs) const {
+        uint32_t res = lhs - rhs;
+        if (int32_t(res) < 0)
+            res += 0x10001;
+        return res;
+    }
+};
+
+
+template<typename GFT, typename GF>
+class gf_mul_i16_shift {
+public:
+    inline GFT mul(GFT const& lhs, GFT const& rhs) const {
+        uint32_t res = lhs * rhs;
+        if (res == 0 && lhs && rhs)
+            return 1;
+
+        // uint32_t res;
+        // if (__builtin_mul_overflow(lhs, rhs, &res))
+        //     res = 1;
+
+        res = (res & 0xffff) - (res >> 16);
+
+        if (int32_t(res) < 0)
+            res += 0x10001;
+
+        return res;
+    }
+};
+
+
 /*********
  * Generic
  *********/

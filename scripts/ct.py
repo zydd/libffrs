@@ -98,13 +98,14 @@ def ntt_iter(a, root=w, q=q):
     # Iterate until the last layer.
     while stride < size:
         # For each stride, iterate over all N//(stride*2) slices.
-        for start in range(0, size, stride * 2):
+        for start in range(0, size // 2, stride * 2):
             # For each pair of the CT butterfly operation.
             for i in range(start, start + stride):
                 # Compute the omega multiplier. Here j = i - start.
                 # zp = gens[gen_ptr] ** (i - start) % q
                 # zp = root ** (2 ** gen_ptr * (i - start)) % q
                 zp = pow(root, (1 << gen_ptr) * (i - start))
+                print((1 << gen_ptr), (i - start))
 
                 # Cooley-Tukey butterfly.
                 a = res[i]
