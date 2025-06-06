@@ -48,6 +48,9 @@ public:
             if (rs.gf.pow(root, n) != 1)
                 break;
 
+            if (root > rs.gf.prime / 2)
+                root = rs.gf.sub(0, root);
+
             _nth_roots_of_unity[i] = root;
         }
 
@@ -66,9 +69,11 @@ public:
     template<typename T>
     inline void encode(const T input[], size_t input_size, GFT output[], size_t output_size) {
         std::copy_n(input, input_size, output);
-        // auto& gf = RS::cast(this).gf;
-        // gf.copy_rbo(input, input_size, output, output_size);
+        // copy_rbo(input, input_size, output, output_size);
         ct_butterfly(output, output_size);
+
+        // gs_butterfly(output, output_size);
+        // shuffle_rbo(output, output_size);
     }
 
 protected:
@@ -97,6 +102,23 @@ protected:
         }
     }
 
+    inline void gs_butterfly(GFT output[], size_t output_size) const {
+        auto& gf = RS::cast(this).gf;
+
+        for (size_t stride = output_size / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
+            for (size_t start = 0; start < output_size; start += stride * 2) {
+                for (size_t i = start; i < start + stride; ++i) {
+                    // Gentleman-Sande butterfly
+                    GFT w = _roots[(i - start) << exp_f];
+                    GFT a = output[i];
+                    GFT b = output[i + stride];
+                    output[i] = gf.add(a, b);
+                    output[i + stride] = gf.mul(gf.sub(a, b), w);
+                }
+            }
+        }
+    }
+
     template<typename T, typename U>
     inline void copy_rbo(const T input[], size_t input_size, U output[], size_t output_size) const {
         output[0] = input[0];
@@ -110,6 +132,18 @@ protected:
             rev = (rev & (l - 1)) + l;
             // rev = rbo16(i) >> (16 - nbits);
             output[rev] = input[i];
+        }
+    }
+
+    template<typename T>
+    inline void shuffle_rbo(T data[], size_t size) const {
+        size_t l, rev = 0;
+        for (size_t i = 1; i < size; ++i) {
+            for (l = size >> 1; rev + l >= size; l >>= 1);
+            rev = (rev & (l - 1)) + l;
+            // rev = rbo16(i) >> (16 - nbits);
+            if (rev > i)
+                std::swap(data[rev], data[i]);
         }
     }
 
@@ -165,12 +199,17 @@ public:
         default_block_size = block_size;
     }
 
-    inline void py_encode(buffer_rw<uint16_t> buf) {
+    inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
         size_t msg_size = buf.size - ecc_len / sizeof(uint16_t);
 
         std::vector<GFT> temp(buf.size);
         encode(&buf[0], buf.size, &temp[0], buf.size);
-        std::copy_n(&temp[0], ecc_len / sizeof(uint16_t), &buf[msg_size]);
+
+        auto output = py::bytearray(nullptr, buf.size * sizeof(uint16_t));
+        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
+        std::copy_n(&buf[0], msg_size, &output_data[0]);
+        std::copy_n(&temp[0], ecc_len / sizeof(uint16_t), &output_data[msg_size]);
+        return output;
     }
 
     inline py::bytearray py_encode_blocks(buffer_ro<uint16_t> buf) {
@@ -247,7 +286,7 @@ public:
             .def_property_readonly("gf", [](PyRSi16& self) -> auto const& { return self.gf; })
 
             .def_property_readonly("roots_of_unity", [](PyRSi16& self) {
-                return std::vector<uint16_t>(std::begin(self._nth_roots_of_unity), std::end(self._nth_roots_of_unity)); })
+                return std::vector<GFT>(std::begin(self._nth_roots_of_unity), std::end(self._nth_roots_of_unity)); })
 
             .def(py::init<std::optional<uint16_t>, std::optional<uint16_t>, std::optional<uint16_t>, uint16_t>(), R"(
                 Instantiate a Reed-Solomon encoder with the given configuration)",

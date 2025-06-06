@@ -75,10 +75,15 @@ def ct_ntt_iter(a, root, q, start_pos=None, end_pos=None):
     nbits = int(math.log2(size))
     res = rbo_sorted(a)
 
+    roots = [1]
+    for i in range(1, q):
+        roots.append(roots[-1] * root % q)
+
     # Pre-compute the generators used in different stages of the recursion.
     # gens = [root ** (2**i) % q for i in range(nbits)]
     # The first layer uses the lowest (2nd) root of unity, hence the last one.
     gen_ptr = nbits - 1
+    exp_f = size // 2
 
     # Iterate until the last layer.
     while stride < size:
@@ -89,8 +94,8 @@ def ct_ntt_iter(a, root, q, start_pos=None, end_pos=None):
             print(f"butterfly: [{start:2} {start + stride:2}]  [{start + stride:2} {start + 2 * stride:2}]")
             for i in range(start, start + stride):
                 # Compute the omega multiplier. Here j = i - start.
-                # zp = gens[gen_ptr] ** (i - start) % q
-                zp = root ** ((i - start) << gen_ptr) % q
+                # zp = root ** ((i - start) << gen_ptr) % q
+                zp = roots[exp_f * (i - start)]
 
                 # Cooley-Tukey butterfly.
                 a = res[i]
@@ -102,52 +107,43 @@ def ct_ntt_iter(a, root, q, start_pos=None, end_pos=None):
         stride <<= 1
         # Move to the next root of unity.
         gen_ptr -= 1
+        exp_f //= 2
 
     return res
 
 
-def gs_intt_iter(a, gen, q):
+def gs_ntt_iter(a, root, q):
     """https://cryptographycaffe.sandboxaq.com/posts/ntt-02/"""
     size = len(a)
 
-    # Start with stride = N/2.
-    stride = size // 2
-
-    # Shuffle the input array in bit-reversal order.
-    nbits = int(math.log2(size))
     res = a[:]
+    exp_f = 0
 
-    # Pre-compute the inverse generators used in different stages of the recursion.
-    gen = pow(gen, -1, q)
-    gens = [gen ** (2**i) % q for i in range(nbits)]
-    # The first layer uses the highest (d-th) root of unity, hence the first one.
-    gen_ptr = 0
+    roots = [1]
+    for i in range(1, q):
+        roots.append(roots[-1] * root % q)
 
-    # Iterate until the last layer.
+    stride = size // 2
     while stride > 0:
-            # For each stride, iterate over all N//(stride*2) slices.
-            for start in range(0, size, stride * 2):
-                # For each pair of the CT butterfly operation.
-                for i in range(start, start + stride):
-                    # Compute the omega multiplier. Here j = i - start.
-                    zp = gens[gen_ptr] ** (i - start) % q
+        # For each stride, iterate over all N//(stride*2) slices.
+        for start in range(0, size, stride * 2):
+            # For each pair of the CT butterfly operation.
+            for i in range(start, start + stride):
+                # Compute the omega multiplier. Here j = i - start.
+                # zp = root ** ((i - start) << exp_f) % q
+                zp = roots[(i - start) << exp_f]
+                
+                # Gentleman-Sande butterfly.
+                a = res[i]
+                b = res[i+stride]
+                res[i] = (a + b) % q
+                res[i+stride] = ((a - b) * zp) % q
 
-                    # Gentleman-Sande butterfly.
-                    a = res[i]
-                    b = res[i+stride]
-                    res[i] = (a + b) % q
-                    res[i+stride] = ((a - b) * zp) % q
+        # Grow the stride.
+        stride >>= 1
+        # Move to the next root of unity.
+        exp_f += 1
 
-            # Grow the stride.
-            stride >>= 1
-            # Move to the next root of unity.
-            gen_ptr += 1
-
-    # Scale it down before returning.
-    scaler = pow(size, -1, q)
-    res = [i * scaler % q for i in res]
-
-    # Reverse shuffle and return.
     return rbo_sorted(res)
 
 
@@ -178,9 +174,11 @@ print()
 a_ntt_naive = naive_ntt(a, w, q)
 a_ntt_ref = to_int_list(ref_ntt.ntt(GF, GF(w), a))
 a_ntt = ct_ntt_iter(a, w, q)
+a_ntt2 = gs_ntt_iter(a, w, q)
 print("naive:  ", a_ntt_naive)
 print("ref:    ", a_ntt_ref)
-print("iter:   ", a_ntt)
+print("ct-iter:", a_ntt)
+print("gs-iter:", a_ntt2)
 
 v = ntt.vandermonde_ntt(GF(w), len(a))
 v_iref = ntt.vandermonde_intt(GF(w).inv(), GF(len(a)))
@@ -195,16 +193,16 @@ print()
 
 a_intt_naive = naive_intt(a_ntt, w, q)
 a_intt_ref = to_int_list(ref_ntt.intt(GF, GF(w), a_ntt))
-a_intt = gs_intt_iter(a_ntt, w, q)
+a_intt_ct = to_int_list([GF(x) // GF(len(a)) for x in ct_ntt_iter(a_ntt, int(GF(w).inv()), q)])
+a_intt_gs = to_int_list([GF(x) // GF(len(a)) for x in gs_ntt_iter(a_ntt, int(GF(w).inv()), q)])
 a_intt_v = to_int_list(lin.matmul(GF, v_i, GF(a_ntt)))
-a_intt_inv = to_int_list([GF(x) // GF(len(a)) for x in ct_ntt_iter(a_ntt, int(GF(w).inv()), q)])
 print("naive:  ", a_intt_naive)
 print("ref:    ", a_intt_ref)
-print("iter:   ", a_intt)
+print("ct-iter:", a_intt_ct)
+print("gs-iter:", a_intt_gs)
 print("intt v: ", a_intt_v)
-print("ntt inv:", a_intt_inv)
 print()
 
 
 assert a_ntt_naive == a_ntt_ref == a_ntt == a_ntt_v
-assert a == a_intt_naive == a_intt_ref ==  a_intt == a_intt_v == a_intt_inv
+assert a == a_intt_naive == a_intt_ref ==  a_intt_ct == a_intt_v == a_intt_gs

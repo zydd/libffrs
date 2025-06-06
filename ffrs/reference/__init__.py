@@ -358,18 +358,19 @@ class GF:
         if a is None:
             a, poly = next(GF.irr_polynomials(p, k, p))
 
-        if poly is None:
+        if k > 1 and poly is None:
             a, poly = next(GF.irr_polynomials(p, k, a))
 
-        if type(poly) == list:
-            poly = P(lambda x: F(p, x), poly)
-        elif type(poly) == P:
-            poly = poly
-        elif type(poly) == int:
-            poly = self.poly_from_int(p, poly)
-            poly = P(lambda x: F(p, x), poly)
-        else:
-            raise RuntimeError(f'unexpected type: {type(poly)}')
+        if k > 1:
+            if type(poly) == list:
+                poly = P(lambda x: F(p, x), poly)
+            elif type(poly) == P:
+                poly = poly
+            elif type(poly) == int:
+                poly = self.poly_from_int(p, poly)
+                poly = P(lambda x: F(p, x), poly)
+            else:
+                raise RuntimeError(f'unexpected type: {type(poly)}')
 
         self.p = p # prime
         self.k = k # power

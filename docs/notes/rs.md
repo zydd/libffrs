@@ -1,7 +1,7 @@
 Message polynomial:
 
 $$
-m(\alpha^j) = \sum_{i=0}^{k-1} m_i \alpha^{ji}
+m(\omega^j) = \sum_{i=0}^{k-1} m_i \omega^{ji}
 $$
 
 ---
@@ -26,31 +26,31 @@ $$
 $$
 \mathbf V =
 \begin{bmatrix}
-    \alpha^{0\cdot 0}&\alpha ^{0\cdot 1}&\cdots &\alpha ^{0\cdot (l-1)}\\
-    \alpha^{1\cdot 0}&\alpha^{1\cdot 1}&\cdots &\alpha ^{1\cdot (l-1)}\\
+    \omega^{0\cdot 0}&\omega ^{0\cdot 1}&\cdots &\omega ^{0\cdot (l-1)}\\
+    \omega^{1\cdot 0}&\omega^{1\cdot 1}&\cdots &\omega ^{1\cdot (l-1)}\\
     \vdots &\vdots &\ddots &\vdots\\
-    \alpha^{(l-1)\cdot 0}&\alpha ^{(l-1)\cdot 1}&\cdots &\alpha^{(l-1)\cdot (l-1)}
+    \omega^{(l-1)\cdot 0}&\omega ^{(l-1)\cdot 1}&\cdots &\omega^{(l-1)\cdot (l-1)}
 \end{bmatrix}
 $$
 
 
 $$
-\Alpha =
+\omega =
 \begin{bmatrix}
-    \alpha^{0\cdot k}\\
-    \alpha^{1\cdot k}\\
+    \omega^{0\cdot k}\\
+    \omega^{1\cdot k}\\
     \vdots\\
-    \alpha^{(l-1)\cdot k}
+    \omega^{(l-1)\cdot k}
 \end{bmatrix}
 
 \qquad
 
-\Alpha^{\odot-1} =
+\omega^{\odot-1} =
 \begin{bmatrix}
-    \alpha^{-0\cdot k}\\
-    \alpha^{-1\cdot k}\\
+    \omega^{-0\cdot k}\\
+    \omega^{-1\cdot k}\\
     \vdots\\
-    \alpha^{-(l-1)\cdot k}
+    \omega^{-(l-1)\cdot k}
 \end{bmatrix}
 $$
 
@@ -58,16 +58,16 @@ Message polynomial evaluated at $l$ points:
 $$
 M =
 \begin{bmatrix}
-    m(\alpha^0)\\
-    m(\alpha^1)\\
+    m(\omega^0)\\
+    m(\omega^1)\\
     \vdots\\
-    m(\alpha^{l-1})
+    m(\omega^{l-1})
 \end{bmatrix}
 $$
 
 Codeword:
 $$
-C = \mathbf V^{-1} \cdot (\Alpha^{\odot-1} \odot M)
+C = \mathbf V^{-1} \cdot (\omega^{\odot-1} \odot M)
 $$
 
 ---
@@ -78,11 +78,7 @@ Complexity analysis:
 
 - Product with $\mathbf V^{-1}$: inverse NTT, $O(l\log l)$
 
-    > Period of $\alpha^x$ needs to be $\geq n$ for the error locator polynomial to work, that means $\alpha^k \neq 1$.
 
-    > Need to check if FFT algorithm is still able to compute this product when $\alpha$ is not a $k$-th primary root of unity.
-
-    > Backup plan is to chose a primary root of unity with period $\geq n$ and use partial FFT algorithm.
 
 - Hadamard product: element-wise multiplication, $O(l)$
 
@@ -94,10 +90,10 @@ Transmitted message:
 $$
 \bar M = M + S_m =
 \begin{bmatrix}
-    m(\alpha^0) + s_m(\alpha^0)\\
-    m(\alpha^1) + s_m(\alpha^1)\\
+    m(\omega^0) + s_m(\omega^0)\\
+    m(\omega^1) + s_m(\omega^1)\\
     \vdots\\
-    m(\alpha^{l-1}) + s_m(\alpha^{l-1})
+    m(\omega^{l-1}) + s_m(\omega^{l-1})
 \end{bmatrix}
 $$
 
@@ -136,10 +132,10 @@ Decompose syndromes on contributions from transmitted message and transmitted co
 
 $$
 \begin{align*}
-    s(\alpha^j)
-    &= \sum_{i=0}^{n-1} e_i \alpha^{ji}
-    \\&= \sum_{i=0}^{k-1} e_i \alpha^{ji} + \sum_{i=k}^{n-1} e_i \alpha^{ji}
-    \\&= s_m(\alpha^j) + s_c(\alpha^j)
+    s(\omega^j)
+    &= \sum_{i=0}^{n-1} e_i \omega^{ji}
+    \\&= \sum_{i=0}^{k-1} e_i \omega^{ji} + \sum_{i=k}^{n-1} e_i \omega^{ji}
+    \\&= s_m(\omega^j) + s_c(\omega^j)
 \end{align*}
 $$
 
@@ -147,24 +143,24 @@ $$
 $$
 S = S_m + S_c =
 \begin{bmatrix}
-    s_m(\alpha^0)\\
-    s_m(\alpha^1)\\
+    s_m(\omega^0)\\
+    s_m(\omega^1)\\
     \vdots\\
-    s_m(\alpha^{l-1})\\
+    s_m(\omega^{l-1})\\
 \end{bmatrix}
 +
 \begin{bmatrix}
-    s_c(\alpha^0)\\
-    s_c(\alpha^1)\\
+    s_c(\omega^0)\\
+    s_c(\omega^1)\\
     \vdots\\
-    s_c(\alpha^{l-1})
+    s_c(\omega^{l-1})
 \end{bmatrix}
 =
 \begin{bmatrix}
-    s(\alpha^0)\\
-    s(\alpha^1)\\
+    s(\omega^0)\\
+    s(\omega^1)\\
     \vdots\\
-    s(\alpha^{l-1})
+    s(\omega^{l-1})
 \end{bmatrix}
 $$
 
@@ -175,39 +171,39 @@ Recovering syndromes from transmitted message:
 
 $$
 \begin{align*}
-\bar M + \Alpha \odot (\mathbf V \cdot \bar C)
+\bar M + \omega \odot (\mathbf V \cdot \bar C)
 
-&= \bar M + \Alpha \odot (\mathbf V \cdot C) + \Alpha \odot (\mathbf V \cdot E_c)
+&= \bar M + \omega \odot (\mathbf V \cdot C) + \omega \odot (\mathbf V \cdot E_c)
 
-\\ &= \bar M + \Alpha \odot (\mathbf V \cdot \mathbf V^{-1} \cdot (\Alpha^{\odot-1} \odot M)) + \Alpha \odot (\mathbf V \cdot E_c)
+\\ &= \bar M + \omega \odot (\mathbf V \cdot \mathbf V^{-1} \cdot (\omega^{\odot-1} \odot M)) + \omega \odot (\mathbf V \cdot E_c)
 
-\\ &= \bar M + \Alpha \odot \Alpha^{\odot-1} \odot M + \Alpha \odot (\mathbf V \cdot E_c)
+\\ &= \bar M + \omega \odot \omega^{\odot-1} \odot M + \omega \odot (\mathbf V \cdot E_c)
 
-\\ &= \bar M + M + \Alpha \odot (\mathbf V \cdot E_c)
+\\ &= \bar M + M + \omega \odot (\mathbf V \cdot E_c)
 
-\\ &= S_m + \Alpha \odot (\mathbf V \cdot E_c)
+\\ &= S_m + \omega \odot (\mathbf V \cdot E_c)
 
 \\ &=
     \begin{bmatrix}
-        s_m(\alpha^0)\\
-        s_m(\alpha^1)\\
+        s_m(\omega^0)\\
+        s_m(\omega^1)\\
         \vdots\\
-        s_m(\alpha^{l-1})\\
+        s_m(\omega^{l-1})\\
     \end{bmatrix}
     +
     \begin{bmatrix}
-        \alpha^{0\cdot k}\\
-        \alpha^{1\cdot k}\\
+        \omega^{0\cdot k}\\
+        \omega^{1\cdot k}\\
         \vdots\\
-        \alpha^{(l-1)\cdot k}
+        \omega^{(l-1)\cdot k}
     \end{bmatrix}
 
     \odot
 
     \begin{bmatrix}
-        \alpha^{0\cdot 0}&\alpha ^{0\cdot 1}&\cdots &\alpha ^{0\cdot (l-1)}\\
-        \alpha^{1\cdot 0}&\alpha^{1\cdot 1}&\cdots &\alpha ^{1\cdot (l-1)}\\\vdots &\vdots &\ddots &\vdots\\
-        \alpha^{(l-1)\cdot 0}&\alpha ^{(l-1)\cdot 1}&\cdots &\alpha^{(l-1)\cdot (l-1)}
+        \omega^{0\cdot 0}&\omega ^{0\cdot 1}&\cdots &\omega ^{0\cdot (l-1)}\\
+        \omega^{1\cdot 0}&\omega^{1\cdot 1}&\cdots &\omega ^{1\cdot (l-1)}\\\vdots &\vdots &\ddots &\vdots\\
+        \omega^{(l-1)\cdot 0}&\omega ^{(l-1)\cdot 1}&\cdots &\omega^{(l-1)\cdot (l-1)}
     \end{bmatrix}
 
     \begin{bmatrix}
@@ -219,56 +215,56 @@ $$
 
 \\ &=
     \begin{bmatrix}
-        s_m(\alpha^0)\\
-        s_m(\alpha^1)\\
+        s_m(\omega^0)\\
+        s_m(\omega^1)\\
         \vdots\\
-        s_m(\alpha^{l-1})
+        s_m(\omega^{l-1})
     \end{bmatrix}
     +
     \begin{bmatrix}
-        \alpha^{0\cdot k}\\
-        \alpha^{1\cdot k}\\
+        \omega^{0\cdot k}\\
+        \omega^{1\cdot k}\\
         \vdots\\
-        \alpha^{(l-1)\cdot k}
+        \omega^{(l-1)\cdot k}
     \end{bmatrix}
 
     \odot
 
     \begin{bmatrix}
-        \sum_{i=k}^{n-1} e_{i} \alpha^{0 \cdot (i-k)}\\
-        \sum_{i=k}^{n-1} e_{i} \alpha^{1 \cdot (i-k)}\\
+        \sum_{i=k}^{n-1} e_{i} \omega^{0 \cdot (i-k)}\\
+        \sum_{i=k}^{n-1} e_{i} \omega^{1 \cdot (i-k)}\\
         \vdots\\
-        \sum_{i=k}^{n-1} e_{i} \alpha^{(l-1) \cdot (i-k)}
+        \sum_{i=k}^{n-1} e_{i} \omega^{(l-1) \cdot (i-k)}
     \end{bmatrix}
 
 \\ &=
     \begin{bmatrix}
-        s_m(\alpha^0)\\
-        s_m(\alpha^1)\\
+        s_m(\omega^0)\\
+        s_m(\omega^1)\\
         \vdots\\
-        s_m(\alpha^{l-1})
+        s_m(\omega^{l-1})
     \end{bmatrix}
     +
     \begin{bmatrix}
-        \sum_{i=k}^{n-1} e_{i} \alpha^{0 \cdot i}\\
-        \sum_{i=k}^{n-1} e_{i} \alpha^{1 \cdot i}\\
+        \sum_{i=k}^{n-1} e_{i} \omega^{0 \cdot i}\\
+        \sum_{i=k}^{n-1} e_{i} \omega^{1 \cdot i}\\
         \vdots\\
-        \sum_{i=k}^{n-1} e_{i} \alpha^{(l-1) \cdot i}
+        \sum_{i=k}^{n-1} e_{i} \omega^{(l-1) \cdot i}
     \end{bmatrix}
 
 \\ &=
     \begin{bmatrix}
-        s_m(\alpha^0)\\
-        s_m(\alpha^1)\\
+        s_m(\omega^0)\\
+        s_m(\omega^1)\\
         \vdots\\
-        s_m(\alpha^{l-1})
+        s_m(\omega^{l-1})
     \end{bmatrix}
     +
     \begin{bmatrix}
-        s_c(\alpha^0)\\
-        s_c(\alpha^1)\\
+        s_c(\omega^0)\\
+        s_c(\omega^1)\\
         \vdots\\
-        s_c(\alpha^{l-1})
+        s_c(\omega^{l-1})
     \end{bmatrix}
 
 \\ &= S_m + S_c
@@ -276,3 +272,44 @@ $$
 \end{align*}
 $$
 
+
+---
+
+
+$$
+\begin{align*}
+\mathbf V \cdot E_{c0} &=
+\begin{bmatrix}
+    \omega^{0\cdot 0}&\omega ^{0\cdot 1}&\cdots &\omega ^{0\cdot (n-1)}\\
+    \omega^{1\cdot 0}&\omega^{1\cdot 1}&\cdots &\omega ^{1\cdot (n-1)}\\
+    \vdots &\vdots &\ddots &\vdots\\
+    \omega^{(n-1)\cdot 0}&\omega ^{(n-1)\cdot 1}&\cdots &\omega^{(n-1)\cdot (n-1)}
+\end{bmatrix}
+\begin{bmatrix}
+    a_0\\
+    a_0\\
+    a_1\\
+    a_1\\
+    \vdots\\
+    a_{l-1}\\
+    a_{l-1}\\
+    0\\
+    0\\
+    \vdots\\
+\end{bmatrix}
+\\&=
+\begin{bmatrix}
+    \sum_{i=0}^{l-1} a_{i} (\omega^{0 \cdot 2i} + \omega^{0 \cdot (2i + 1)})\\
+    \sum_{i=0}^{l-1} a_{i} (\omega^{1 \cdot 2i} + \omega^{1 \cdot (2i + 1)})\\
+    \vdots\\
+    \sum_{i=0}^{l-1} a_{i} (\omega^{(n-1) \cdot 2i} + \omega^{(n-1) \cdot (2i + 1)})
+\end{bmatrix}
+\\&=
+\begin{bmatrix}
+    \sum_{i=0}^{l-1} a_{i} \omega^{0 \cdot 2i} (1 + \omega^0)\\
+    \sum_{i=0}^{l-1} a_{i} \omega^{1 \cdot 2i} (1 + \omega^1)\\
+    \vdots\\
+    \sum_{i=0}^{l-1} a_{i} \omega^{(n-1) \cdot 2i} (1 + \omega^{n-1})
+\end{bmatrix}
+\end{align*}
+$$
