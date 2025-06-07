@@ -79,7 +79,9 @@ class TestRS:
         msg_enc = to_int_list(rs.encode(to_bytearray(orig, 2)), 2)
 
         msg_enc_err = list(msg_enc)
-        assert msg_enc == msg_enc_err
+
+        assert rs.find_errors(to_bytearray(msg_enc, 2)) == {}
+
 
         error_positions = dict()
 

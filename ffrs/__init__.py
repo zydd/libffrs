@@ -74,19 +74,20 @@ class RSi16(libffrs.RSi16):
         ecc_u16 = self.ecc_len // 2
         w = GF(self.roots_of_unity[round(math.log2(size_u16))])
 
-        msg2 = self.encode(msg1[:-self.ecc_len] + bytearray(self.ecc_len))
+        # msg2 = self.encode(msg1[:-self.ecc_len] + bytearray(self.ecc_len))
 
         msg1_list = to_int_list(msg1, 2)
-        msg2_list = to_int_list(msg2, 2)
+        # msg2_list = to_int_list(msg2, 2)
 
-        ecc1 = self._unmix_ecc(w, msg1_list[-ecc_u16:])
-        ecc2 = self._unmix_ecc(w, msg2_list[-ecc_u16:])
+        # ecc1 = self._unmix_ecc(w, msg1_list[-ecc_u16:])
+        # ecc2 = self._unmix_ecc(w, msg2_list[-ecc_u16:])
 
-        synds = [self.gf.sub(e1, e2) for e1, e2 in zip(ecc1, ecc2)]
-        # print()
-        print("synds:    ", synds)
+        # synds = [self.gf.sub(e1, e2) for e1, e2 in zip(ecc1, ecc2)]
+        # # print()
+        # print("synds:    ", synds)
+        synds = ntt(w, msg1_list)[:ecc_u16]
         if all(s == 0 for s in synds):
-            return msg1[:self.message_len]
+            return {}
         synds = GF(synds)
 
         for err_count in range(ecc_u16 // 2, 0, -1):
