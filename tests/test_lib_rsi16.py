@@ -59,7 +59,9 @@ class TestRS:
         res = rs.encode(to_bytearray(buf, 2))
         res = to_int_list(res, 2)
 
-        ecc_mix = [rs.gf.div(s, int(w.pow(rbo(rs.block_len // 2, (rs.block_len - rs.ecc_len)//2) * j))) for j, s in enumerate(ref[:ecc_u16])]
+        ecc_mix = ref[:ecc_u16]
+        ecc_mix = [rs.gf.sub(0, s) for s in ecc_mix]
+        ecc_mix = [rs.gf.div(s, int(w.pow(rbo(rs.block_len // 2, (rs.block_len - rs.ecc_len)//2) * j))) for j, s in enumerate(ecc_mix)]
         ecc_mix = ecc_mix * (size_u16 // ecc_u16)
         # print("ecc_mix:", ecc_mix)
         ecc_mix = ref_intt(w, ecc_mix)
@@ -79,31 +81,31 @@ class TestRS:
         msg_enc_err = list(msg_enc)
         assert msg_enc == msg_enc_err
 
-        err_vec = [0] * size_u16
-
         error_positions = dict()
+
+        # Always add one error to the codeword
+        if len(error_positions) < max(ecc_u16//2, 1):
+            i = random.randrange(size_u16 - ecc_u16, size_u16)
+            error_positions[i] = random.randrange(2**16)
+            msg_enc_err[i] = rs.gf.add(msg_enc_err[i], error_positions[i])
+
         while len(error_positions) < ecc_u16//2:
-            # Do not corrupt codeword for now
             i = random.randrange(size_u16)
             if i in error_positions:
                 continue
-            # if i < size_u16 - ecc_u16:
-            #     continue
             error_positions[i] = random.randrange(2**16)
             msg_enc_err[i] = rs.gf.add(msg_enc_err[i], error_positions[i])
-            err_vec[i] = rs.gf.add(err_vec[i], error_positions[i])
 
         w = ref_gf(rs.roots_of_unity[round(math.log2(size_u16))])
-        synds = [sum(to_int_list([ref_gf(w).pow(rbo(size_u16, j) * i) * ref_gf(e) for i, e in error_positions.items() ])) % rs.gf.prime for j in range(ecc_u16)]
         print()
         print("errs: ", error_positions)
-        print("synds ex: ", synds)
 
         assert msg_enc_err != msg_enc
 
         msg_enc_err_dec = rs.decode(to_bytearray(msg_enc_err, 2))
 
         assert orig[:-ecc_u16] == to_int_list(msg_enc_err_dec, 2)
+        assert error_positions == rs.find_errors(to_bytearray(msg_enc_err, 2))
 
     def test_encode_blocks(self, rs):
         blocks = 3

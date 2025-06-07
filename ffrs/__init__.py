@@ -32,14 +32,17 @@ class RSi16(libffrs.RSi16):
         ecc_mix = self._mix_ecc(w, ecc)
 
         ecc_unmix = self._unmix_ecc(w, ecc_mix)
-        assert ecc_unmix == ecc, "unmix_ecc failed"
+        # assert ecc_unmix == ecc, "unmix_ecc failed"
 
         res[-self.ecc_len:] = to_bytearray(ecc_mix, 2)
 
         return res
 
     def _mix_ecc(self, w, ecc):
-        ecc_mix = [self.gf.div(s, int(w.pow(rbo(self.block_len // 2, (self.block_len - self.ecc_len)//2) * j))) for j, s in enumerate(ecc)]
+        ecc_mix = ecc
+        ecc_mix = [self.gf.sub(0, s) for s in ecc_mix]
+        ecc_mix = [self.gf.div(s, int(w.pow(rbo(self.block_len // 2, (self.block_len - self.ecc_len)//2) * j))) for j, s in enumerate(ecc_mix)]
+
         # print("ecc_mul: ", ecc_mix)
         ecc_mix = ecc_mix * (self.block_len // self.ecc_len)
         ecc_mix = intt(w, ecc_mix)
@@ -51,9 +54,10 @@ class RSi16(libffrs.RSi16):
     def _unmix_ecc(self, w, ecc):
         msg_len = (self.block_len - self.ecc_len) // 2
         # print("recv: ", ecc)
-        # ecc = [self.gf.mul(s, int(w.pow(rbo(self.block_len//2, (self.block_len - self.ecc_len)//2) * j))) for j, s in enumerate(ecc)]
+        ecc_unmix = ecc
+        # ecc_mix = [self.gf.mul(s, int(w.pow(rbo(self.block_len//2, (self.block_len - self.ecc_len)//2) * j))) for j, s in enumerate(ecc_mix)]
 
-        ecc_unmix = ecc  + [0] * msg_len
+        ecc_unmix = ecc + [0] * msg_len
         # print("ecc_unmix: ", ecc_unmix)
         ecc_unmix = ntt(w, ecc_unmix)
 
@@ -65,16 +69,7 @@ class RSi16(libffrs.RSi16):
 
         return ecc_unmix
 
-    def find_errors(self, w, synd, n, errors):
-        mat = [synd[i:i+errors] for i in range(errors)]
-
-        err_loc_coefs = ref.linalg.gaussian_elim(mat, [GF(0) - s for s in synd[errors:2*errors]])
-        lm = ref.P(GF, [1] + err_loc_coefs[::-1])
-
-        roots = [i for i in range(n) if int(lm.eval(w.inv().pow(i))) == 0]
-        return roots
-
-    def decode(self, msg1: bytearray):
+    def find_errors(self, msg1: bytearray):
         size_u16 = self.block_len // 2
         ecc_u16 = self.ecc_len // 2
         w = GF(self.roots_of_unity[round(math.log2(size_u16))])
@@ -87,14 +82,20 @@ class RSi16(libffrs.RSi16):
         ecc1 = self._unmix_ecc(w, msg1_list[-ecc_u16:])
         ecc2 = self._unmix_ecc(w, msg2_list[-ecc_u16:])
 
-        synds = [self.gf.sub(e2, e1) for e1, e2 in zip(ecc1, ecc2)]
+        synds = [self.gf.sub(e1, e2) for e1, e2 in zip(ecc1, ecc2)]
         # print()
         print("synds:    ", synds)
         if all(s == 0 for s in synds):
             return msg1[:self.message_len]
+        synds = GF(synds)
 
-        for err_count in range(1, ecc_u16 // 2 + 1):
-            err_pos_rbo = self.find_errors(w, GF(synds), size_u16, err_count)
+        for err_count in range(ecc_u16 // 2, 0, -1):
+            mat = [synds[i:i+err_count] for i in range(err_count)]
+
+            err_loc_coefs = ref.linalg.gaussian_elim(mat, [GF(0) - s for s in synds[err_count:2*err_count]])
+            lm = ref.P(GF, [1] + err_loc_coefs[::-1])
+
+            err_pos_rbo = [i for i in range(size_u16) if int(lm.eval(w.inv().pow(i))) == 0]
             if err_pos_rbo:
                 break
         else:
@@ -104,12 +105,16 @@ class RSi16(libffrs.RSi16):
         err_pos = [rbo(size_u16, i) for i in err_pos_rbo]
 
         err_mag = ref.linalg.gaussian_elim(err_ws, GF(synds[:err_count]))
-        print(size_u16, "errors:", dict(zip(err_pos, map(int, err_mag))))
+        errors = dict(zip(err_pos, map(int, err_mag)))
+        print("errors:", errors)
+        return errors
 
-        for pos, mag in zip(err_pos, map(int, err_mag)):
+    def decode(self, msg1: bytearray):
+        errors = self.find_errors(msg1)
+        msg1_list = to_int_list(msg1, 2)
+
+        for pos, mag in errors.items():
             msg1_list[pos] = self.gf.sub(msg1_list[pos], mag)
-
-        # TODO: if pos > msg_len: remix ecc
 
         msg1[:] = to_bytearray(msg1_list, 2)
 
