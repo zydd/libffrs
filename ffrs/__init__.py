@@ -15,40 +15,6 @@ intt = lambda w, x: rbo_sorted(to_int_list(ref.ntt.intt(GF, w, x)))
 
 
 class RSi16(libffrs.RSi16):
-    def encode(self, buf):
-        assert 2**round(math.log2(self.ecc_len // 2)) == self.ecc_len // 2, "ecc_len must be a power of 2"
-        w = GF(self.roots_of_unity[round(math.log2(self.block_size // 2))])
-
-        # enc_ref = ntt(to_int_list(buf, 2))
-        # assert intt(enc_ref) == to_int_list(buf, 2)
-
-        res = libffrs.RSi16.encode(self, buf)
-
-        ecc = to_int_list(res[-self.ecc_len:], 2)
-        # print("ws", [int(w.pow(rbo(self.block_size // 2, (self.block_size - self.ecc_len)//2) * j)) for j, s in enumerate(ecc)])
-        # print("ecc:     ", ecc)
-        # assert enc_ref[:self.ecc_len//2] == ecc
-
-        ecc_mix = ecc
-        # i = rbo(self.block_size // 2, (self.block_size - self.ecc_len) // 2)
-        # w_i = self.gf.pow(self.gf.inv(w), i)
-
-        # ecc_mix = [self.gf.mul(s, self.gf.pow(w_i, j)) for j, s in enumerate(ecc_mix)]
-
-        # print("ecc_mul: ", ecc_mix)
-        # ecc_mix = ecc_mix * (self.block_size // self.ecc_len)
-        # print("w: ", w)
-        # print("wi: ", GF(w).inv())
-        # ecc_mix = intt(w, ecc_mix)
-        # print("ecc_mix: ", ecc_mix)
-
-        ecc_mix = ecc_mix[:self.ecc_len // 2]
-        # ecc_mix = [self.gf.sub(0, s) for s in ecc_mix]
-
-        res[-self.ecc_len:] = to_bytearray(ecc_mix, 2)
-
-        return res
-
     def _mix_ecc(self, w, ecc):
         ecc_mix = ecc
         i = rbo(self.block_size // 2, (self.block_size - self.ecc_len) // 2)

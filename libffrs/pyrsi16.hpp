@@ -35,7 +35,7 @@ class rs_encode_ntt {
 public:
     using GFT = typename GF::GFT;
 
-    inline rs_encode_ntt(size_t block_size) {
+    inline void init() {
         auto& rs = RS::cast(this);
         py_assert(rs.gf.prime > 0);
 
@@ -54,15 +54,25 @@ public:
             _nth_roots_of_unity[i] = root;
         }
 
-        _roots.resize(block_size);
-        _roots_i.resize(block_size);
-        GFT r = get_root_of_unity(block_size);
+        _roots.resize(rs.block_size);
+        _roots_i.resize(rs.block_size);
+        GFT r = get_root_of_unity(rs.block_size);
         GFT r_i = rs.gf.inv(r);
-        for (size_t i = 0; i < block_size; ++i) {
+        for (size_t i = 0; i < rs.block_size; ++i) {
             // _roots[i] = r;
             // r = rs.gf.pow(r, 2);
             _roots[i] = rs.gf.pow(r, i);
             _roots_i[i] = rs.gf.pow(r_i, i);
+        }
+
+        _rbo.resize(rs.block_size);
+        for (size_t i = 0; i < rs.block_size; ++i)
+            _rbo[i] = rbo16(i)  >> (16 - __builtin_ctzl(rs.block_size));
+
+        _ecc_mix_w.resize(rs.ecc_len);
+        for (size_t j = 0; j < rs.ecc_len; ++j) {
+            auto w = _roots_i[_rbo[rs.block_size - rs.ecc_len]];
+            _ecc_mix_w[j] = rs.gf.neg(rs.gf.div(rs.gf.pow(w, j), rs.block_size));
         }
     }
 
@@ -71,45 +81,33 @@ public:
     }
 
     template<typename T>
-    inline void encode(const T input[], size_t input_size, GFT output[], size_t output_size) {
+    inline void encode(const T input[], size_t input_size, GFT output[], size_t block_size) {
         std::copy_n(input, input_size, output);
-        // copy_rbo(input, input_size, output, output_size);
-        ct_butterfly(&_roots[0], output, output_size);
-
-        // gs_butterfly(output, output_size);
-        // shuffle_rbo(output, output_size);
+        ct_butterfly(&_roots[0], output, block_size);
 
         auto& rs = RS::cast(this);
 
-        size_t i = rbo16(rs.block_size - rs.ecc_len) >> (16 - __builtin_ctzl(output_size));
-        GFT w_i = rs.gf.pow(_roots_i[1], i);
-
         for (size_t j = 0; j < rs.ecc_len; ++j)
-            output[j] = rs.gf.sub(0, rs.gf.mul(output[j], rs.gf.pow(w_i, j)));
+            output[j] = rs.gf.mul(output[j], _ecc_mix_w[j]);
 
-        size_t rep = output_size / rs.ecc_len;
-        for (size_t j = 0; j < rs.ecc_len; ++j) {
-            auto x = output[j];
-            for (size_t k = 1; k < rep; ++k) {
-                // FIXME: buffer overflow
-                output[k * rs.ecc_len + j] = x;
-            }
-        }
-        gs_butterfly(&_roots_i[0], output, output_size);
-        for (size_t j = 0; j < rs.ecc_len; ++j)
-            output[j] = rs.gf.div(output[j], output_size);
+        for (size_t j = 1; j < block_size / rs.ecc_len; ++j)
+            std::memcpy(&output[j * rs.ecc_len], output, rs.ecc_len * sizeof(GFT));
+
+        gs_butterfly(&_roots_i[0], output, block_size);
     }
 
 protected:
     GFT _nth_roots_of_unity[MaxFieldBits] = {0};
     std::vector<GFT> _roots;
     std::vector<GFT> _roots_i;
+    std::vector<uint16_t> _rbo;
+    std::vector<GFT> _ecc_mix_w;
 
-    inline void ct_butterfly(const GFT roots[], GFT output[], size_t output_size) const {
-        // GFT root = get_root_of_unity(output_size);
+    inline void ct_butterfly(const GFT roots[], GFT output[], size_t block_size) const {
+        // GFT root = get_root_of_unity(block_size);
         auto& gf = RS::cast(this).gf;
-        for (size_t stride = 1, exp_f = output_size >> 1; stride < output_size; stride *= 2, exp_f >>= 1) {
-            for (size_t start = 0; start < output_size /*input_size*/; start += stride * 2) {
+        for (size_t stride = 1, exp_f = block_size >> 1; stride < block_size; stride *= 2, exp_f >>= 1) {
+            for (size_t start = 0; start < block_size /*input_size*/; start += stride * 2) {
                 // For each pair of the CT butterfly operation.
                 for (size_t i = start; i < start + stride; ++i) {
                     // j = i - start
@@ -127,11 +125,11 @@ protected:
         }
     }
 
-    inline void gs_butterfly(const GFT roots[], GFT output[], size_t output_size) const {
+    inline void gs_butterfly(const GFT roots[], GFT output[], size_t block_size) const {
         auto& gf = RS::cast(this).gf;
 
-        for (size_t stride = output_size / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
-            for (size_t start = 0; start < output_size; start += stride * 2) {
+        for (size_t stride = block_size / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
+            for (size_t start = 0; start < block_size; start += stride * 2) {
                 for (size_t i = start; i < start + stride; ++i) {
                     // Gentleman-Sande butterfly
                     GFT w = roots[(i - start) << exp_f];
@@ -145,15 +143,15 @@ protected:
     }
 
     template<typename T, typename U>
-    inline void copy_rbo(const T input[], size_t input_size, U output[], size_t output_size) const {
+    inline void copy_rbo(const T input[], size_t input_size, U output[], size_t block_size) const {
         output[0] = input[0];
 
-        if (output_size <= 2)
+        if (block_size <= 2)
             return;
 
         size_t l, rev = 0;
         for (size_t i = 1; i < input_size; ++i) {
-            for (l = output_size >> 1; rev + l >= output_size; l >>= 1);
+            for (l = block_size >> 1; rev + l >= block_size; l >>= 1);
             rev = (rev & (l - 1)) + l;
             // rev = rbo16(i) >> (16 - nbits);
             output[rev] = input[i];
@@ -209,9 +207,10 @@ public:
     }
 
     inline PyRSi16(uint16_t ecc_len, size_t block_size, uint16_t primitive):
-        RSi16<PyGFi16>(rs_encode_ntt(block_size), rs_data(PyGFi16(65537, primitive), ecc_len))
+        RSi16<PyGFi16>(rs_data(PyGFi16(65537, primitive), ecc_len))
     {
         set_block_size(block_size);
+        rs_encode_ntt::init();
     }
 
     inline void set_block_size(size_t block_size) {

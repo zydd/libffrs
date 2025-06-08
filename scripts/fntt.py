@@ -88,10 +88,10 @@ def ct_ntt_iter(a, root, q, start_pos=None, end_pos=None):
     # Iterate until the last layer.
     while stride < size:
         # For each stride, iterate over all N//(stride*2) slices.
-        print("-" * 10)
+        # print("-" * 10)
         for start in filter(lambda x: x >= start_pos, range(0, end_pos, stride * 2)):
             # For each pair of the CT butterfly operation.
-            print(f"butterfly: [{start:2} {start + stride:2}]  [{start + stride:2} {start + 2 * stride:2}]")
+            # print(f"butterfly: [{start:2} {start + stride:2}]  [{start + stride:2} {start + 2 * stride:2}]")
             for i in range(start, start + stride):
                 # Compute the omega multiplier. Here j = i - start.
                 # zp = root ** ((i - start) << gen_ptr) % q
@@ -112,9 +112,12 @@ def ct_ntt_iter(a, root, q, start_pos=None, end_pos=None):
     return res
 
 
-def gs_ntt_iter(a, root, q):
+def gs_ntt_iter(a, root, q, end_pos=None):
     """https://cryptographycaffe.sandboxaq.com/posts/ntt-02/"""
     size = len(a)
+
+    if end_pos is None:
+        end_pos = size
 
     res = a[:]
     exp_f = 0
@@ -126,8 +129,12 @@ def gs_ntt_iter(a, root, q):
     stride = size // 2
     while stride > 0:
         # For each stride, iterate over all N//(stride*2) slices.
+        print("-" * 10)
         for start in range(0, size, stride * 2):
             # For each pair of the CT butterfly operation.
+            if start >= end_pos:
+                continue
+            print(f"butterfly: [{start:2} {start + stride:2}]")
             for i in range(start, start + stride):
                 # Compute the omega multiplier. Here j = i - start.
                 # zp = root ** ((i - start) << exp_f) % q
@@ -206,3 +213,12 @@ print()
 
 assert a_ntt_naive == a_ntt_ref == a_ntt == a_ntt_v
 assert a == a_intt_naive == a_intt_ref ==  a_intt_ct == a_intt_v == a_intt_gs
+
+
+
+end = n//2
+gs_partial = gs_ntt_iter(a, w, q, end_pos=end)
+ct_partial = ct_ntt_iter(a, w, q)
+print("a:   ", gs_partial)
+print("b:   ", ct_partial)
+assert gs_partial[:end] == ct_partial[:end]

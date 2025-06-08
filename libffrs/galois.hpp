@@ -111,6 +111,10 @@ public:
             res += 0x10001;
         return res;
     }
+
+    inline GFT neg(GFT const& a) const {
+        return 0x10001 - a;
+    }
 };
 
 
