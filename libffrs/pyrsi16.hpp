@@ -91,6 +91,7 @@ public:
             output[j] = rs.gf.mul(output[j], _ecc_mix_w[j]);
 
         for (size_t j = 1; j < block_size / rs.ecc_len; ++j)
+            // std::copy_n(&output[0], rs.ecc_len, &output[j * rs.ecc_len]);
             std::memcpy(&output[j * rs.ecc_len], output, rs.ecc_len * sizeof(GFT));
 
         gs_butterfly(rs.ecc_len, &_roots_i[0], output, block_size);
@@ -259,8 +260,11 @@ public:
         for (size_t block = 0; block < buf.size / input_block_size; ++block) {
             auto output_block = &output_data[block * output_block_size];
             std::copy_n(&buf[block * input_block_size], input_block_size, &output_block[0]);
+            // std::memcpy(&output_block[0], &buf[block * input_block_size], input_block_size * sizeof(uint16_t));
 
             std::fill_n(&temp[0], output_block_size, 0);
+            // std::memset(&temp[0], 0, output_block_size * sizeof(GFT));
+
             encode(&buf[block * input_block_size], input_block_size, &temp[0], output_block_size);
             std::copy_n(&temp[0], ecc_len, &output_block[input_block_size]);
         }

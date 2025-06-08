@@ -7,7 +7,7 @@ add_subdirectory(pybind11)
 if (MSVC)
     add_compile_options(/W3)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic -O2 -flto=auto)
+    add_compile_options(-Wall -Wextra -Wpedantic -O3 -flto=auto)
 endif()
 
 

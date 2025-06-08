@@ -20,6 +20,7 @@ ext_modules = [
         extra_compile_args=[
             "-Wextra",
             "-Wpedantic",
+            "-O3",
         ],
         # extra_link_args=[],
     ),
