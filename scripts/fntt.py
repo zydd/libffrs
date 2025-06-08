@@ -130,10 +130,8 @@ def gs_ntt_iter(a, root, q, end_pos=None):
     while stride > 0:
         # For each stride, iterate over all N//(stride*2) slices.
         print("-" * 10)
-        for start in range(0, size, stride * 2):
+        for start in range(0, end_pos, stride * 2):
             # For each pair of the CT butterfly operation.
-            if start >= end_pos:
-                continue
             print(f"butterfly: [{start:2} {start + stride:2}]")
             for i in range(start, start + stride):
                 # Compute the omega multiplier. Here j = i - start.

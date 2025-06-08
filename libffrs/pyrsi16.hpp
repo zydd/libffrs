@@ -93,7 +93,7 @@ public:
         for (size_t j = 1; j < block_size / rs.ecc_len; ++j)
             std::memcpy(&output[j * rs.ecc_len], output, rs.ecc_len * sizeof(GFT));
 
-        gs_butterfly(&_roots_i[0], output, block_size);
+        gs_butterfly(rs.ecc_len, &_roots_i[0], output, block_size);
     }
 
 protected:
@@ -125,11 +125,11 @@ protected:
         }
     }
 
-    inline void gs_butterfly(const GFT roots[], GFT output[], size_t block_size) const {
+    inline void gs_butterfly(size_t end, const GFT roots[], GFT output[], size_t block_size) const {
         auto& gf = RS::cast(this).gf;
 
         for (size_t stride = block_size / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
-            for (size_t start = 0; start < block_size; start += stride * 2) {
+            for (size_t start = 0; start < end; start += stride * 2) {
                 for (size_t i = start; i < start + stride; ++i) {
                     // Gentleman-Sande butterfly
                     GFT w = roots[(i - start) << exp_f];
