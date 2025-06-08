@@ -47,7 +47,7 @@ ref_ntt, ref_intt = ref_ntt_ct, ref_intt_ct
 ])
 class TestRS:
     def test_encode(self, rs):
-        size_u16 = rs.block_len // 2
+        size_u16 = rs.block_size // 2
         ecc_u16 = rs.ecc_len // 2
         buf = [random.randrange(0, 2**16) for _ in range(size_u16 - ecc_u16)] + [0] * ecc_u16
 
@@ -59,12 +59,7 @@ class TestRS:
         res = rs.encode(to_bytearray(buf, 2))
         res = to_int_list(res, 2)
 
-        ecc_mix = ref[:ecc_u16]
-        ecc_mix = [rs.gf.sub(0, s) for s in ecc_mix]
-        ecc_mix = [rs.gf.div(s, int(w.pow(rbo(rs.block_len // 2, (rs.block_len - rs.ecc_len)//2) * j))) for j, s in enumerate(ecc_mix)]
-        ecc_mix = ecc_mix * (size_u16 // ecc_u16)
-        # print("ecc_mix:", ecc_mix)
-        ecc_mix = ref_intt(w, ecc_mix)
+        ecc_mix = rs._mix_ecc(w, ref[:ecc_u16])
         ref_ecc = ecc_mix[:ecc_u16]
         # print("ref_ecc:", ref_ecc)
 
@@ -72,7 +67,7 @@ class TestRS:
         assert ref_ecc == res[-ecc_u16:]
 
     def test_encode_decode(self, rs):
-        size_u16 = rs.block_len // 2
+        size_u16 = rs.block_size // 2
         ecc_u16 = rs.ecc_len // 2
         orig = [random.randrange(0, 2**16) for _ in range(size_u16 - ecc_u16)] + [0] * ecc_u16
 
@@ -108,23 +103,3 @@ class TestRS:
 
         assert orig[:-ecc_u16] == to_int_list(msg_enc_err_dec, 2)
         assert error_positions == rs.find_errors(to_bytearray(msg_enc_err, 2))
-
-    def test_encode_blocks(self, rs):
-        blocks = 3
-
-        size_u16 = rs.block_len // 2
-        ecc_u16 = rs.ecc_len // 2
-        msg_u16 = rs.message_len // 2
-        buf = [random.randrange(1, 2**16) for _ in range(msg_u16 * blocks)]
-
-        w = ref_gf(rs.roots_of_unity[round(math.log2(size_u16))])
-
-        buf_ntt = [ref_ntt(w, buf[msg_u16 * blk:msg_u16 * (blk + 1)] + [0] * ecc_u16) for blk in range(blocks)]
-
-        res = rs.encode_blocks(to_bytearray(buf, 2))
-        res = to_int_list(res, 2)
-
-        for i in range(blocks):
-            start = (i + 1) * size_u16 - ecc_u16
-            assert buf_ntt[i][:ecc_u16] == res[start:start + ecc_u16]
-

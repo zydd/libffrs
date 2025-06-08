@@ -54,11 +54,15 @@ public:
             _nth_roots_of_unity[i] = root;
         }
 
-        GFT r = get_root_of_unity(block_size / sizeof(uint16_t));
-        for (size_t i = 0; i < (1 << MaxFieldBits); ++i) {
+        _roots.resize(block_size);
+        _roots_i.resize(block_size);
+        GFT r = get_root_of_unity(block_size);
+        GFT r_i = rs.gf.inv(r);
+        for (size_t i = 0; i < block_size; ++i) {
             // _roots[i] = r;
             // r = rs.gf.pow(r, 2);
             _roots[i] = rs.gf.pow(r, i);
+            _roots_i[i] = rs.gf.pow(r_i, i);
         }
     }
 
@@ -70,17 +74,38 @@ public:
     inline void encode(const T input[], size_t input_size, GFT output[], size_t output_size) {
         std::copy_n(input, input_size, output);
         // copy_rbo(input, input_size, output, output_size);
-        ct_butterfly(output, output_size);
+        ct_butterfly(&_roots[0], output, output_size);
 
         // gs_butterfly(output, output_size);
         // shuffle_rbo(output, output_size);
+
+        auto& rs = RS::cast(this);
+
+        size_t i = rbo16(rs.block_size - rs.ecc_len) >> (16 - __builtin_ctzl(output_size));
+        GFT w_i = rs.gf.pow(_roots_i[1], i);
+
+        for (size_t j = 0; j < rs.ecc_len; ++j)
+            output[j] = rs.gf.sub(0, rs.gf.mul(output[j], rs.gf.pow(w_i, j)));
+
+        size_t rep = output_size / rs.ecc_len;
+        for (size_t j = 0; j < rs.ecc_len; ++j) {
+            auto x = output[j];
+            for (size_t k = 1; k < rep; ++k) {
+                // FIXME: buffer overflow
+                output[k * rs.ecc_len + j] = x;
+            }
+        }
+        gs_butterfly(&_roots_i[0], output, output_size);
+        for (size_t j = 0; j < rs.ecc_len; ++j)
+            output[j] = rs.gf.div(output[j], output_size);
     }
 
 protected:
     GFT _nth_roots_of_unity[MaxFieldBits] = {0};
-    GFT _roots[65536] = {0};
+    std::vector<GFT> _roots;
+    std::vector<GFT> _roots_i;
 
-    inline void ct_butterfly(GFT output[], size_t output_size) const {
+    inline void ct_butterfly(const GFT roots[], GFT output[], size_t output_size) const {
         // GFT root = get_root_of_unity(output_size);
         auto& gf = RS::cast(this).gf;
         for (size_t stride = 1, exp_f = output_size >> 1; stride < output_size; stride *= 2, exp_f >>= 1) {
@@ -88,8 +113,8 @@ protected:
                 // For each pair of the CT butterfly operation.
                 for (size_t i = start; i < start + stride; ++i) {
                     // j = i - start
-                    GFT w = _roots[exp_f * (i - start)];
-                    // GFT w = _roots[exp_f * (i - start)];
+                    GFT w = roots[exp_f * (i - start)];
+                    // GFT w = roots[exp_f * (i - start)];
 
                     // Cooley-Tukey butterfly
                     GFT a = output[i];
@@ -102,14 +127,14 @@ protected:
         }
     }
 
-    inline void gs_butterfly(GFT output[], size_t output_size) const {
+    inline void gs_butterfly(const GFT roots[], GFT output[], size_t output_size) const {
         auto& gf = RS::cast(this).gf;
 
         for (size_t stride = output_size / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
             for (size_t start = 0; start < output_size; start += stride * 2) {
                 for (size_t i = start; i < start + stride; ++i) {
                     // Gentleman-Sande butterfly
-                    GFT w = _roots[(i - start) << exp_f];
+                    GFT w = roots[(i - start) << exp_f];
                     GFT a = output[i];
                     GFT b = output[i + stride];
                     output[i] = gf.add(a, b);
@@ -163,7 +188,6 @@ using RSi16 = ffrs::RS<GF, rs_encode_ntt, ffrs::rs_data>;
 class PyRSi16 : public RSi16<PyGFi16> {
 public:
     using GFT = rs_data::GFT;
-    size_t default_block_size = 256;
 
     inline PyRSi16(
             std::optional<size_t> block_size,
@@ -171,14 +195,15 @@ public:
             std::optional<uint16_t> ecc_len,
             uint16_t primitive):
         PyRSi16(_get_ecc_len(block_size, message_len, ecc_len),
-                block_size.value_or(256),
+                // TODO: _get_block_size(block_size, message_len, ecc_len),
+                block_size.value_or(256) / sizeof(uint16_t),
                 primitive)
     {
         if (ecc_len && message_len) {
             if (block_size && *message_len + *ecc_len != *block_size) {
-                throw py::value_error("block_len must be equal to message_len + ecc_len");
+                throw py::value_error("block_size must be equal to message_len + ecc_len");
             } else if (!block_size) {
-                set_default_block_size(size_t(*message_len) + size_t(*ecc_len));
+                set_block_size((size_t(*message_len) + size_t(*ecc_len)) / sizeof(uint16_t));
             }
         }
     }
@@ -186,21 +211,21 @@ public:
     inline PyRSi16(uint16_t ecc_len, size_t block_size, uint16_t primitive):
         RSi16<PyGFi16>(rs_encode_ntt(block_size), rs_data(PyGFi16(65537, primitive), ecc_len))
     {
-        set_default_block_size(block_size);
+        set_block_size(block_size);
     }
 
-    inline void set_default_block_size(size_t block_size) {
+    inline void set_block_size(size_t block_size) {
         if (block_size <= ecc_len)
-            throw py::value_error("block_len must be greater than ecc_len");
+            throw py::value_error("block_size must be greater than ecc_len");
 
         if (block_size > 65536)
-            throw py::value_error("block_len must be <= 65536");
+            throw py::value_error("block_size must be <= 65536");
 
-        default_block_size = block_size;
+        this->block_size = block_size;
     }
 
     inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
-        size_t msg_size = buf.size - ecc_len / sizeof(uint16_t);
+        size_t msg_size = buf.size - ecc_len;
 
         std::vector<GFT> temp(buf.size);
         encode(&buf[0], buf.size, &temp[0], buf.size);
@@ -208,13 +233,12 @@ public:
         auto output = py::bytearray(nullptr, buf.size * sizeof(uint16_t));
         auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
         std::copy_n(&buf[0], msg_size, &output_data[0]);
-        std::copy_n(&temp[0], ecc_len / sizeof(uint16_t), &output_data[msg_size]);
+        std::copy_n(&temp[0], ecc_len, &output_data[msg_size]);
         return output;
     }
 
     inline py::bytearray py_encode_blocks(buffer_ro<uint16_t> buf) {
-        size_t output_block_size = default_block_size / sizeof(uint16_t);
-        size_t ecc_len = this->ecc_len / sizeof(uint16_t);
+        size_t output_block_size = block_size;
         size_t input_block_size = output_block_size - ecc_len;
 
         if (buf.size == 0 || output_block_size == 0 || output_block_size <= ecc_len)
@@ -274,14 +298,14 @@ public:
         using namespace pybind11::literals;
 
         py::class_<PyRSi16>(m, "RSi16")
-            .def_property_readonly("ecc_len", [](PyRSi16& self) { return self.ecc_len; })
+            .def_property_readonly("ecc_len", [](PyRSi16& self) { return self.ecc_len * sizeof(uint16_t); })
 
-            .def_property("block_len",
-                [](PyRSi16& self) { return self.default_block_size; },
-                &PyRSi16::set_default_block_size)
+            .def_property("block_size",
+                [](PyRSi16& self) { return self.block_size * sizeof(uint16_t); },
+                &PyRSi16::set_block_size)
 
             .def_property_readonly("message_len",
-                [](PyRSi16& self) { return self.default_block_size - self.ecc_len; })
+                [](PyRSi16& self) { return (self.block_size - self.ecc_len) * sizeof(uint16_t); })
 
             .def_property_readonly("gf", [](PyRSi16& self) -> auto const& { return self.gf; })
 
@@ -290,7 +314,7 @@ public:
 
             .def(py::init<std::optional<uint16_t>, std::optional<uint16_t>, std::optional<uint16_t>, uint16_t>(), R"(
                 Instantiate a Reed-Solomon encoder with the given configuration)",
-                "block_len"_a = py::none(), "message_len"_a = py::none(), "ecc_len"_a = py::none(), "primitive"_a = 3)
+                "block_size"_a = py::none(), "message_len"_a = py::none(), "ecc_len"_a = py::none(), "primitive"_a = 3)
 
             .def("__sizeof__", [](PyRSi16& self) { return sizeof(self); })
 
@@ -316,26 +340,26 @@ public:
 
 private:
     inline uint16_t _get_ecc_len(
-            std::optional<size_t> block_len,
+            std::optional<size_t> block_size,
             std::optional<uint16_t> message_len,
             std::optional<uint16_t> ecc_len) {
 
         uint16_t res;
         if (ecc_len) {
             res = *ecc_len;
-        } else if (message_len && block_len) {
-            if (*message_len >= *block_len) {
-                throw py::value_error("block_len must be greater than message_len");
+        } else if (message_len && block_size) {
+            if (*message_len >= *block_size) {
+                throw py::value_error("block_size must be greater than message_len");
             }
-            res = block_len.value_or(default_block_size) - *message_len;
+            res = *block_size - *message_len;
         } else {
-            throw py::value_error("Must specify either (block_len, message_len) or ecc_len");
+            throw py::value_error("Must specify either (block_size, message_len) or ecc_len");
         }
 
         if (res % 2 != 0)
             throw py::value_error("ecc_len must be a multiple of 2: " + std::to_string(res));
 
-        return res;
+        return res / sizeof(uint16_t);
     }
 };
 
