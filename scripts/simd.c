@@ -24,17 +24,18 @@ int main() {
     // }
     printf("\n");
     {
-        typedef int32_t i4x4 __attribute__ ((vector_size(16)));
-        typedef int32_t i4x8 __attribute__ ((vector_size(32)));
-        typedef int32_t i4x16 __attribute__ ((vector_size(64)));
-        typedef int32_t i4x32 __attribute__ ((vector_size(128)));
+        typedef int32_t i32x4 __attribute__ ((vector_size(16)));
+        typedef int32_t i32x8 __attribute__ ((vector_size(32)));
+        typedef int32_t i32x16 __attribute__ ((vector_size(64)));
+        typedef int32_t i32x32 __attribute__ ((vector_size(128)));
         // union {
-        //     i4x4 v;
+        //     i32x4 v;
         //     int32_t i4[4];
         // } a;
-        i4x16 a = {1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1};
-        i4x16 b = {1,2,3,4, 5,6,7,8, 9,10,11,12, 13,14,15,16};
+        i32x16 a = {1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1};
+        i32x16 b = {1,2,3,4, 5,6,7,8, 9,10,11,12, 13,14,15,16};
         a <<= b;
+        a >>= 1;
         printf("a: %d %d %d %d  %d %d %d %d  %d %d %d %d  %d %d %d %d\n",
                a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7],
                a[8], a[9], a[10], a[11], a[12], a[13], a[14], a[15]);

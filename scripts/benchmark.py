@@ -108,12 +108,6 @@ def enc256_benchmark(method, ecc_len, block_size):
 
     return (f"rs.{method}(data)", dict(rs=RS256))
 
-def enci16_benchmark(block_size, ecc_len):
-    print(f"\nencode_blocks block_size: {block_size} ecc_len: {ecc_len}")
-    RSi16 = ffrs.RSi16(block_size, ecc_len=ecc_len)
-
-    return (f"rs.encode_blocks(data)", dict(rs=RSi16))
-
 
 def run_enc_benchmarks(config):
     table = []
@@ -193,6 +187,9 @@ def main():
     if len(sys.argv) < 2:
         return show_help()
 
+    block_size = 1024
+    ecc_len = block_size // 8
+
     fn = sys.argv[1]
 
     if fn == "enc":
@@ -205,9 +202,9 @@ def main():
     elif fn == "ntt":
         benchmark_throughput(ntt_benchmark(1024//2), input_size=1 * 2**20)
     elif fn == "enci16":
-        block_size = 1024
-        ecc_len = block_size // 8
-        benchmark_throughput(enci16_benchmark(block_size, ecc_len), input_size=10 * 2**20)
+        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16(block_size, ecc_len=ecc_len))), input_size=(block_size - ecc_len) * 2**10)
+    elif fn == "enci16v":
+        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_len=ecc_len))), input_size=(block_size - ecc_len) * 2**10)
     else:
         return show_help()
 

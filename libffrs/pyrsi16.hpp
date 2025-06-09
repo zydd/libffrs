@@ -72,6 +72,7 @@ public:
         _ecc_mix_w.resize(rs.ecc_len);
         for (size_t j = 0; j < rs.ecc_len; ++j) {
             auto w = _roots_i[_rbo[rs.block_size - rs.ecc_len]];
+            // w = - w ** (- rbo(i) * j) / block_size
             _ecc_mix_w[j] = rs.gf.neg(rs.gf.div(rs.gf.pow(w, j), rs.block_size));
         }
     }

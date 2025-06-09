@@ -43,10 +43,10 @@ class rs_data {
 public:
     using GFT = typename GF::GFT;
     const GF gf;
-    const GFT ecc_len;
+    const size_t ecc_len;
     // TODO: make const
     size_t block_size;
-    inline rs_data(GF&& gf, GFT ecc_len, size_t block_size = 256):
+    inline rs_data(GF&& gf, size_t ecc_len, size_t block_size = 256):
         gf(std::move(gf)), ecc_len(ecc_len), block_size(block_size)
     { }
 };

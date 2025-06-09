@@ -102,6 +102,7 @@ public:
         uint32_t res = lhs + rhs;
         if (res > 0x10001)
             res -= 0x10001;
+        // res -= (res > 0x10001) * 0x10001;
         return res;
     }
 
@@ -109,6 +110,7 @@ public:
         uint32_t res = lhs - rhs;
         if (int32_t(res) < 0)
             res += 0x10001;
+        // res += (res >= 0x10000000) * 0x10001;
         return res;
     }
 
@@ -123,8 +125,11 @@ class gf_mul_i16_shift {
 public:
     inline GFT mul(GFT const& lhs, GFT const& rhs) const {
         uint32_t res = lhs * rhs;
-        if (res == 0 && lhs && rhs)
+        if (res == 0 && lhs && rhs) [[unlikely]]
             return 1;
+
+        // uint32_t overflow = (res == 0 && lhs && rhs) * 0xffffffff;
+        // res = (res & ~overflow) + (1 & overflow);
 
         // uint32_t res;
         // if (__builtin_mul_overflow(lhs, rhs, &res))

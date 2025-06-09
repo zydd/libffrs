@@ -1,7 +1,6 @@
 import libffrs
 
-from libffrs import GF256, RS256
-from libffrs import GFi16, RSi16
+from libffrs import *
 
 import math
 
