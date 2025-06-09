@@ -306,14 +306,14 @@ public:
 
     inline void encode_block_v(const uint16_t src[], size_t msg_size, GFT temp[], uint16_t dst[]) {
         auto temp_u32 = reinterpret_cast<uint32_t *>(&temp[0]);
+        copy_blocks(&src[0], msg_size, &dst[0]);
+
         copy_msg_transposed(&src[0], msg_size, &temp_u32[0]);
         std::fill_n(&temp[msg_size], ecc_len, GFT{0});
         // std::memset(&temp[msg_size], 0, ecc_len * sizeof(GFT));
 
         encode(&temp[0], block_size);
-
         copy_blocks_transposed(&temp_u32[0], ecc_len, &dst[msg_size]);
-        copy_blocks(&src[0], msg_size, &dst[0]);
     }
 
     inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
