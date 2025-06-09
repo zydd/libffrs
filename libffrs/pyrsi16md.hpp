@@ -149,40 +149,40 @@ public:
         if (gf.pow1(root, block_size) != 1)
             throw std::runtime_error("Root of unity not found for block size");
 
-        _roots.resize(block_size);
-        _roots_i.resize(block_size);
+        _rootsv.resize(block_size);
+        _roots_iv.resize(block_size);
         uint32_t r = root;
         uint32_t r_i = gf.inv1(r);
         for (size_t i = 0; i < block_size; ++i) {
             // _roots[i] = r;
             // r = gf.pow(r, 2);
-            _roots[i] = gf.pow1(root, i);
-            _roots_i[i] = gf.pow1(r_i, i);
+            _rootsv[i] = GFT{0} + gf.pow1(root, i);
+            _roots_iv[i] = GFT{0} + gf.pow1(r_i, i);
         }
 
         _rbo.resize(block_size);
         for (size_t i = 0; i < block_size; ++i)
             _rbo[i] = rbo16(i)  >> (16 - nbits);
 
-        _ecc_mix_w.resize(ecc_len);
+        _ecc_mix_wv.resize(ecc_len);
         for (size_t j = 0; j < ecc_len; ++j) {
-            auto w = _roots_i[_rbo[block_size - ecc_len]];
+            auto w = _roots_iv[_rbo[block_size - ecc_len]][0];
             // w = - w ** (- rbo(i) * j) / block_size
-            _ecc_mix_w[j] = gf.neg(gf.div1(gf.pow1(w, j), block_size));
+            _ecc_mix_wv[j] = GFT{0} + gf.neg(gf.div1(gf.pow1(w, j), block_size));
         }
     }
 
     inline void encode(GFT block[], size_t block_size) {
-        ct_butterfly(&_roots[0], block, block_size);
+        ct_butterfly(&_rootsv[0], block, block_size);
 
         for (size_t j = 0; j < ecc_len; ++j)
-            block[j] = block[j] * _ecc_mix_w[j];
+            block[j] = block[j] * _ecc_mix_wv[j];
 
         for (size_t j = 1; j < block_size / ecc_len; ++j)
-            // std::copy_n(&block[0], ecc_len, &block[j * ecc_len]);
-            std::memcpy(&block[j * ecc_len], block, ecc_len * sizeof(GFT));
+            std::copy_n(&block[0], ecc_len, &block[j * ecc_len]);
+            // std::memcpy(&block[j * ecc_len], block, ecc_len * sizeof(GFT));
 
-        gs_butterfly(ecc_len, &_roots_i[0], block, block_size);
+        gs_butterfly(ecc_len, &_roots_iv[0], block, block_size);
     }
 
 protected:
@@ -190,19 +190,19 @@ protected:
     GF gf;
     size_t block_size;
     size_t ecc_len;
-    std::vector<uint32_t> _roots;
-    std::vector<uint32_t> _roots_i;
+    std::vector<GFT> _rootsv;
+    std::vector<GFT> _roots_iv;
     std::vector<uint16_t> _rbo;
-    std::vector<uint32_t> _ecc_mix_w;
+    std::vector<GFT> _ecc_mix_wv;
 
-    inline void ct_butterfly(const uint32_t roots[], GFT block[], size_t block_size) const {
+    inline void ct_butterfly(const GFT roots[], GFT block[], size_t block_size) const {
         for (size_t stride = 1, exp_f = block_size >> 1; stride < block_size; stride *= 2, exp_f >>= 1) {
             for (size_t start = 0; start < block_size /*input_size*/; start += stride * 2) {
                 // For each pair of the CT butterfly operation.
                 for (size_t i = start; i < start + stride; ++i) {
                     // j = i - start
                     // GFT w = roots[exp_f * (i - start)];
-                    GFT w = GFT{0} + roots[exp_f * (i - start)];
+                    GFT w = roots[exp_f * (i - start)];
 
                     // Cooley-Tukey butterfly
                     GFT a = block[i];
@@ -215,13 +215,13 @@ protected:
         }
     }
 
-    inline void gs_butterfly(size_t end, const uint32_t roots[], GFT block[], size_t block_size) const {
+    inline void gs_butterfly(size_t end, const GFT roots[], GFT block[], size_t block_size) const {
         for (size_t stride = block_size / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
             for (size_t start = 0; start < end; start += stride * 2) {
                 for (size_t i = start; i < start + stride; ++i) {
                     // Gentleman-Sande butterfly
                     // GFT w = roots[(i - start) << exp_f];
-                    GFT w = GFT{0} + roots[(i - start) << exp_f];
+                    GFT w = roots[(i - start) << exp_f];
 
                     GFT a = block[i];
                     GFT b = block[i + stride];
@@ -285,30 +285,30 @@ public:
 
     template<typename T, typename U>
     inline void copy_blocks(const T *src, size_t src_size, U *dst) const {
-        for (size_t i = 0; i < src_size; ++i)
-            for (size_t j = 0; j < vec_size; ++j)
+        for (size_t j = 0; j < vec_size; ++j)
+            for (size_t i = 0; i < src_size; ++i)
                 dst[i + j * block_size] = src[i + j * src_size];
     }
 
     template<typename T, typename U>
     inline void copy_blocks_transposed(const T *src, size_t src_size, U *dst) const {
-        for (size_t i = 0; i < src_size; ++i)
-            for (size_t j = 0; j < vec_size; ++j)
+        for (size_t j = 0; j < vec_size; ++j)
+            for (size_t i = 0; i < src_size; ++i)
                 dst[i + j * block_size] = src[i * vec_size + j];
     }
 
     template<typename T, typename U>
     inline void copy_msg_transposed(const T *src, size_t src_size, U *dst) const {
-        for (size_t i = 0; i < src_size; ++i)
-            for (size_t j = 0; j < vec_size; ++j)
+        for (size_t j = 0; j < vec_size; ++j)
+            for (size_t i = 0; i < src_size; ++i)
                 dst[i * vec_size + j] = src[i + j * src_size];
     }
 
     inline void encode_block_v(const uint16_t src[], size_t msg_size, GFT temp[], uint16_t dst[]) {
         auto temp_u32 = reinterpret_cast<uint32_t *>(&temp[0]);
         copy_msg_transposed(&src[0], msg_size, &temp_u32[0]);
-        // std::fill_n(&temp_u32[msg_size * vec_size], ecc_len * vec_size, 0);
-        std::memset(&temp[msg_size], 0, ecc_len * sizeof(GFT));
+        std::fill_n(&temp[msg_size], ecc_len, GFT{0});
+        // std::memset(&temp[msg_size], 0, ecc_len * sizeof(GFT));
 
         encode(&temp[0], block_size);
 
