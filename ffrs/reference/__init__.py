@@ -39,6 +39,16 @@ class F:
         assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
         return self.__mul__(rhs.inv())
 
+    def __pow__(self, rhs):
+        x = self.x
+
+        if rhs < 0:
+            x = self.inv().x
+            rhs = -rhs
+
+        v = (x ** rhs) % self.p
+        return F(self.p, v)
+
     def pow(self, rhs):
         v = (self.x ** rhs) % self.p
         return F(self.p, v)
@@ -313,6 +323,9 @@ class Fp:
             return Fp(self.GF, 0)
 
         return Fp(self.GF, self._exp(self.log() + rhs.log()))
+
+    def __pow__(self, power):
+        return Fp(self.GF, self._exp(self.log() * power))
 
     def _mul(self, rhs):
         return Fp(self.GF, self.x * rhs.x)
