@@ -110,11 +110,16 @@ protected:
         auto& gf = RS::cast(this).gf;
         for (size_t stride = 1, exp_f = block_size >> 1; stride < block_size; stride *= 2, exp_f >>= 1) {
             for (size_t start = 0; start < block_size /*input_size*/; start += stride * 2) {
-                // For each pair of the CT butterfly operation.
-                for (size_t i = start; i < start + stride; ++i) {
+                {
+                    // Cooley-Tukey butterfly
+                    GFT a = output[start];
+                    GFT b = output[start + stride];
+                    output[start] = gf.add(a, b);
+                    output[start + stride] = gf.sub(a, b);
+                }
+                for (size_t i = start + 1; i < start + stride; ++i) {
                     // j = i - start
                     GFT w = roots[exp_f * (i - start)];
-                    // GFT w = roots[exp_f * (i - start)];
 
                     // Cooley-Tukey butterfly
                     GFT a = output[i];
@@ -132,7 +137,14 @@ protected:
 
         for (size_t stride = block_size / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
             for (size_t start = 0; start < end; start += stride * 2) {
-                for (size_t i = start; i < start + stride; ++i) {
+                 {
+                    // Gentleman-Sande butterfly
+                    GFT a = output[start];
+                    GFT b = output[start + stride];
+                    output[start] = gf.add(a, b);
+                    output[start + stride] = gf.sub(a, b);
+                }
+                for (size_t i = start + 1; i < start + stride; ++i) {
                     // Gentleman-Sande butterfly
                     GFT w = roots[(i - start) << exp_f];
                     GFT a = output[i];
