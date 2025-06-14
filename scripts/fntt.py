@@ -137,7 +137,7 @@ def gs_ntt_iter(a, root, q, end_pos=None):
                 # Compute the omega multiplier. Here j = i - start.
                 # zp = root ** ((i - start) << exp_f) % q
                 zp = roots[(i - start) << exp_f]
-                
+
                 # Gentleman-Sande butterfly.
                 a = res[i]
                 b = res[i+stride]

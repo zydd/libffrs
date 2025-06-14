@@ -69,9 +69,9 @@ class TestRS:
         assert len(buf_enc) == len(buf_enc_blk) == rs.block_size * vec_size
         assert buf_enc == buf_enc_blk
 
-    def test_encode_blocks_multiple(self, rs):
+    @pytest.mark.parametrize('count', [3, 4, 5, 6, 7, 8, 9, 12, 16, 100])
+    def test_encode_blocks_multiple(self, rs, count):
         vec_size = 4
-        count = 3
         buf = randbytes(rs.message_len * vec_size * count)
 
         buf_enc = [rs.encode(buf[i * rs.message_len * vec_size:(i + 1) * rs.message_len * vec_size])
