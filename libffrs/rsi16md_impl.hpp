@@ -25,135 +25,6 @@
 
 #include "pygfi16.hpp"
 
-template<typename T, size_t N>
-struct vec {
-    std::array<T, N> v;
-
-#define _VEC_OP_BIN(op) \
-    inline vec operator op(const vec& other) const { \
-        vec res; \
-        for (size_t i = 0; i < N; ++i) \
-            res.v[i] = v[i] op other.v[i]; \
-        return res; \
-    } \
-    template<typename V> \
-    inline vec operator op(const V& other) const { \
-        vec res; \
-        for (size_t i = 0; i < N; ++i) \
-            res.v[i] = v[i] op other; \
-        return res; \
-    } \
-    template<typename V> \
-    friend vec operator op(const V& lhs, const vec& rhs) { \
-        vec res; \
-        for (size_t i = 0; i < N; ++i) \
-            res.v[i] = lhs op rhs.v[i]; \
-        return res; \
-    } \
-
-    inline vec operator-() const {
-        vec res;
-        for (size_t i = 0; i < N; ++i)
-            res.v[i] = -v[i];
-        return res;
-    }
-    inline vec operator!() const {
-        vec res;
-        for (size_t i = 0; i < N; ++i)
-            res.v[i] = !v[i];
-        return res;
-    }
-
-    #define _VEC_OP_ASSIGN(op) \
-        inline vec& operator op(const vec& other) { \
-            for (size_t i = 0; i < N; ++i) \
-                v[i] op other.v[i]; \
-            return *this; \
-        } \
-        template<typename V> \
-        inline vec& operator op(const V& other) { \
-            for (size_t i = 0; i < N; ++i) \
-                v[i] op other; \
-            return *this; \
-        } \
-
-    _VEC_OP_BIN(+)
-    _VEC_OP_BIN(-)
-    _VEC_OP_BIN(*)
-    _VEC_OP_BIN(/)
-    _VEC_OP_BIN(>>)
-    _VEC_OP_BIN(<<)
-    _VEC_OP_BIN(&)
-    _VEC_OP_BIN(|)
-    _VEC_OP_BIN(^)
-    _VEC_OP_BIN(&&)
-    _VEC_OP_BIN(||)
-    _VEC_OP_BIN(>)
-    _VEC_OP_BIN(>=)
-    _VEC_OP_BIN(<)
-    _VEC_OP_BIN(<=)
-    _VEC_OP_BIN(==)
-    _VEC_OP_BIN(!=)
-
-    _VEC_OP_ASSIGN(+=)
-    _VEC_OP_ASSIGN(-=)
-    _VEC_OP_ASSIGN(*=)
-    _VEC_OP_ASSIGN(/=)
-    _VEC_OP_ASSIGN(>>=)
-    _VEC_OP_ASSIGN(<<=)
-    _VEC_OP_ASSIGN(&=)
-    _VEC_OP_ASSIGN(|=)
-    _VEC_OP_ASSIGN(^=)
-
-    // inline uint32_t operator[](size_t idx) const {
-    //     return reinterpret_cast<const uint32_t *>(&v[0])[idx]; }
-};
-
-
-template<typename T>
-struct GFi16v {
-    T v;
-    GFi16v& operator=(const T& val) { v = val; return *this; }
-    inline GFi16v operator+(const GFi16v& other) const { return {add(v, other.v)}; }
-    inline GFi16v operator+(uint32_t other) const { return {add(v, other)}; }
-    inline GFi16v operator-(const GFi16v& other) const { return {sub(v, other.v)}; }
-    inline GFi16v operator*(const GFi16v& other) const { return {mul(v, other.v)}; }
-    inline GFi16v operator*(uint32_t other) const { return {mul(v, other)}; }
-    inline GFi16v operator/(const GFi16v& other) const { return {div(v, other.v)}; }
-    inline GFi16v operator-() const { return {neg(v)}; }
-    inline uint32_t operator[](size_t idx) const { return v[idx]; }
-    inline operator T const&() const { return v; }
-    inline operator T&() { return v; }
-
-    template<typename V>
-    static inline T mul(T const& lhs, V const& rhs) {
-        T res = lhs * rhs;
-        T overflow = (res == 0 && lhs && rhs);
-        res = (res & !overflow) + (1 & overflow);
-        res = (res & 0xffff) - (res >> 16);
-        res += (res >= 0x80000000) & 0x10001;
-        return res;
-    }
-
-    template<typename V>
-    static inline T add(T const& lhs, V const& rhs) {
-        T res = lhs + rhs;
-        res -= (res > 0x10001) & 0x10001;
-        return res;
-    }
-
-    static inline T sub(T const& lhs, T const& rhs) {
-        T res = lhs - rhs;
-        res += (res >= 0x80000000) & 0x10001;
-        return res;
-    }
-
-    template<typename V>
-    static inline V neg(V const& a) {
-        return 0x10001 - a;
-    }
-};
-
 
 template<typename GFT>
 class RSi16vImpl {
@@ -186,7 +57,7 @@ public:
 
         _rbo.resize(block_size);
         for (size_t i = 0; i < block_size; ++i)
-            _rbo[i] = rbo16(i)  >> (16 - nbits);
+            _rbo[i] = rbo16(i) >> (16 - nbits);
 
         _ecc_mix_wv.resize(ecc_len);
         for (size_t j = 0; j < ecc_len; ++j) {
@@ -200,7 +71,7 @@ public:
         ct_butterfly(&_rootsv[0], block, block_size);
 
         for (size_t j = 0; j < ecc_len; ++j)
-            block[j] = block[j] * _ecc_mix_wv[j];
+            block[j] = gf.mul(block[j], _ecc_mix_wv[j]);
 
         for (size_t j = 1; j < block_size / ecc_len; ++j)
             std::copy_n(&block[0], ecc_len, &block[j * ecc_len]);
@@ -225,20 +96,19 @@ protected:
                     // Cooley-Tukey butterfly
                     GFT a = block[start];
                     GFT b = block[start + stride];
-                    block[start] = a + b;
-                    block[start + stride] = a - b;
+                    block[start] = gf.add(a, b);
+                    block[start + stride] = gf.sub(a, b);
                 }
                 for (size_t i = start + 1; i < start + stride; ++i) {
                     // j = i - start
-                    // GFT w = roots[exp_f * (i - start)];
                     GFT w = roots[exp_f * (i - start)];
 
                     // Cooley-Tukey butterfly
                     GFT a = block[i];
                     GFT b = block[i + stride];
-                    GFT m = b * w;
-                    block[i] = a + m;
-                    block[i + stride] = a - m;
+                    GFT m = gf.mul(b, w);
+                    block[i] = gf.add(a, m);
+                    block[i + stride] = gf.sub(a, m);
                 }
             }
         }
@@ -251,18 +121,17 @@ protected:
                     // Gentleman-Sande butterfly
                     GFT a = block[start];
                     GFT b = block[start + stride];
-                    block[start] = a + b;
-                    block[start + stride] = a - b;
+                    block[start] = gf.add(a, b);
+                    block[start + stride] = gf.sub(a, b);
                 }
                 for (size_t i = start + 1; i < start + stride; ++i) {
                     // Gentleman-Sande butterfly
-                    // GFT w = roots[(i - start) << exp_f];
                     GFT w = roots[(i - start) << exp_f];
 
                     GFT a = block[i];
                     GFT b = block[i + stride];
-                    block[i] = a + b;
-                    block[i + stride] = (a - b) * w;
+                    block[i] = gf.add(a, b);
+                    block[i + stride] = gf.mul(gf.sub(a, b), w);
                 }
             }
         }

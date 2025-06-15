@@ -192,9 +192,9 @@ public:
                 )",
                 "prime"_a, "primitive"_a
             )
-            .def("mul", &PyGFi16::mul, R"(Multiplication: :math:`\text{lhs} \times \text{rhs}`)", "lhs"_a, "rhs"_a)
-            .def("add", &PyGFi16::add, R"(Addition: :math:`\text{lhs} + \text{rhs}`)", "lhs"_a, "rhs"_a)
-            .def("sub", &PyGFi16::sub, R"(Subtraction: :math:`\text{lhs} - \text{rhs}`)", "lhs"_a, "rhs"_a)
+            .def("mul", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::mul), R"(Multiplication: :math:`\text{lhs} \times \text{rhs}`)", "lhs"_a, "rhs"_a)
+            .def("add", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::add), R"(Addition: :math:`\text{lhs} + \text{rhs}`)", "lhs"_a, "rhs"_a)
+            .def("sub", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::sub), R"(Subtraction: :math:`\text{lhs} - \text{rhs}`)", "lhs"_a, "rhs"_a)
             .def("inv", &PyGFi16::inv, R"(Reciprocal: :math:`\frac{1}{\text{value}}`)", "value"_a)
             .def("div", &PyGFi16::div, R"(Division: :math:`\frac{\text{num}}{\text{den}}`)", "num"_a, "den"_a)
             .def("exp", &PyGFi16::exp, R"(Exponential function: :math:`a^{\text{value}}`)", "value"_a)
@@ -204,7 +204,7 @@ public:
             .def("ntt16", cast_args(&PyGFi16::py_ntt16), R"(Number-theoretic transform (NTT) on a buffer)", "buf"_a, "root"_a)
             .def("ntt_blocks16", cast_args(&PyGFi16::py_ntt_blocks16), R"(Number-theoretic transform (NTT) on 16-bit buffer blocks)", "buf"_a, "root"_a, "block_size"_a)
             .doc() = R"(
-                Finite-field operations for prime fields <= 65537
+            Finite-field operations for prime fields <= 65537
             )";
     }
 };

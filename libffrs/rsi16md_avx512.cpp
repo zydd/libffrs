@@ -26,7 +26,7 @@
 typedef uint32_t u32x16 __attribute__((vector_size(16 * sizeof(uint32_t))));
 
 template <size_t N>
-struct RSi16v<N>::data : RSi16vImpl<GFi16v<u32x16>> { using RSi16vImpl::RSi16vImpl; };
+struct RSi16v<N>::data : RSi16vImpl<u32x16> { using RSi16vImpl::RSi16vImpl; };
 
 
 template <size_t N>
@@ -37,7 +37,7 @@ RSi16v<N>::RSi16v(GFi16 const& gf, size_t block_size, size_t ecc_len) {
 
 template <size_t N>
 void RSi16v<N>::encode(uint32_t block[]) const {
-    d->encode(reinterpret_cast<GFi16v<u32x16> *>(block));
+    d->encode(reinterpret_cast<u32x16 *>(block));
 }
 
 

@@ -117,6 +117,20 @@ public:
     inline GFT neg(GFT const& a) const {
         return 0x10001 - a;
     }
+
+    template<typename T, typename U, typename = std::enable_if_t<!std::is_integral_v<T>>>
+    static inline T add(T const& lhs, U const& rhs) {
+        T res = lhs + rhs;
+        res -= (res > 0x10001) & 0x10001;
+        return res;
+    }
+
+    template<typename T, typename U, typename = std::enable_if_t<!std::is_integral_v<T>>>
+    static inline T sub(T const& lhs, U const& rhs) {
+        T res = lhs - rhs;
+        res += (res >= 0x80000000) & 0x10001;
+        return res;
+    }
 };
 
 
@@ -140,6 +154,16 @@ public:
         if (int32_t(res) < 0)
             res += 0x10001;
 
+        return res;
+    }
+
+    template<typename T, typename U, typename = std::enable_if_t<!std::is_integral_v<T>>>
+    static inline T mul(T const& lhs, U const& rhs) {
+        T res = lhs * rhs;
+        T overflow = (res == 0 && lhs && rhs);
+        res = (res & !overflow) + (1 & overflow);
+        res = (res & 0xffff) - (res >> 16);
+        res += (res >= 0x80000000) & 0x10001;
         return res;
     }
 };
