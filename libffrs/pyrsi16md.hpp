@@ -50,7 +50,14 @@ private:
     bool simd_x4;
     bool inline_ecc;
 
-    inline PyRSi16md(rs_data&& args, uint32_t primitive, bool inline_ecc):
+    inline PyRSi16md(
+        rs_data&& args,
+        uint32_t primitive,
+        bool inline_ecc,
+        std::optional<bool> simd_x16,
+        std::optional<bool> simd_x8,
+        std::optional<bool> simd_x4
+    ):
         gf(GFi16::gf_data(0x10001, 1, primitive, 0)),
         rs16(gf, args.block_size, args.ecc_len),
         rs16v4(gf, args.block_size, args.ecc_len),
@@ -59,9 +66,9 @@ private:
         block_size(args.block_size),
         msg_size(args.block_size - args.ecc_len),
         ecc_len(args.ecc_len),
-        simd_x16(__builtin_cpu_supports("avx512f")),
-        simd_x8(__builtin_cpu_supports("avx2")),
-        simd_x4(__builtin_cpu_supports("sse2")),
+        simd_x16(simd_x16.value_or(__builtin_cpu_supports("avx512f"))),
+        simd_x8(simd_x8.value_or(__builtin_cpu_supports("avx2"))),
+        simd_x4(simd_x4.value_or(__builtin_cpu_supports("sse2"))),
         inline_ecc(inline_ecc)
     { }
 
@@ -74,9 +81,19 @@ public:
             std::optional<uint16_t> message_len,
             std::optional<uint16_t> ecc_len,
             uint32_t primitive,
-            bool inline_ecc
+            bool inline_ecc,
+            std::optional<bool> simd_x16,
+            std::optional<bool> simd_x8,
+            std::optional<bool> simd_x4
     ):
-        PyRSi16md(_get_args(block_size, message_len, ecc_len), primitive, inline_ecc)
+        PyRSi16md(
+            _get_args(block_size, message_len, ecc_len),
+            primitive,
+            inline_ecc,
+            simd_x16,
+            simd_x8,
+            simd_x4
+        )
     { }
 
     inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
@@ -146,13 +163,24 @@ public:
             .def_property_readonly("message_len",
                 [](PyRSi16md& self) { return (self.block_size - self.ecc_len) * sizeof(uint16_t); })
 
-            .def(py::init<std::optional<uint16_t>, std::optional<uint16_t>, std::optional<uint16_t>, uint32_t, bool>(), R"(
-                Instantiate a Reed-Solomon encoder with the given configuration)",
+            .def(py::init<
+                    std::optional<uint16_t>,
+                    std::optional<uint16_t>,
+                    std::optional<uint16_t>,
+                    uint32_t,
+                    bool,
+                    std::optional<bool>,
+                    std::optional<bool>,
+                    std::optional<bool>>(),
+                R"(Instantiate a Reed-Solomon encoder with the given configuration)",
                 "block_size"_a = py::none(),
                 "message_len"_a = py::none(),
                 "ecc_len"_a = py::none(),
                 "primitive"_a = 3,
-                "inline"_a = false
+                "inline"_a = false,
+                "simd_x16"_a = py::none(),
+                "simd_x8"_a = py::none(),
+                "simd_x4"_a = py::none()
             )
 
             .def("__sizeof__", [](PyRSi16md& self) { return sizeof(self); })
