@@ -21,24 +21,16 @@
 #include <array>
 #include <vector>
 
+#include "pygfi16.hpp"
+
+
 template<size_t N>
 class RSi16v {
 public:
-    RSi16v(size_t block_size, size_t ecc_len, uint32_t primitive);
+    RSi16v(GFi16 const& gf, size_t block_size, size_t ecc_len);
     void encode(uint32_t block[]) const;
 
 protected:
     struct data;
     data *d;
 };
-
-
-// class RSi16v16 {
-// public:
-//     RSi16v16(size_t block_size, size_t ecc_len, uint32_t primitive);
-//     void encode(uint32_t block[]) const;
-
-// protected:
-//     struct data;
-//     data *d;
-// };

@@ -22,6 +22,7 @@
 #include "rsi16md_impl.hpp"
 #include "rsi16md.h"
 
+
 typedef uint32_t u32x16 __attribute__((vector_size(16 * sizeof(uint32_t))));
 
 template <size_t N>
@@ -29,14 +30,14 @@ struct RSi16v<N>::data : RSi16vImpl<GFi16v<u32x16>> { using RSi16vImpl::RSi16vIm
 
 
 template <size_t N>
-RSi16v<N>::RSi16v(size_t block_size, size_t ecc_len, uint32_t primitive) {
-    d = new data(block_size, ecc_len, primitive);
+RSi16v<N>::RSi16v(GFi16 const& gf, size_t block_size, size_t ecc_len) {
+    d = new data(gf, block_size, ecc_len);
 }
 
 
 template <size_t N>
 void RSi16v<N>::encode(uint32_t block[]) const {
-    d->encode(reinterpret_cast<typename data::GFT *>(block));
+    d->encode(reinterpret_cast<GFi16v<u32x16> *>(block));
 }
 
 

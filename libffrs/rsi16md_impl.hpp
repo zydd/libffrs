@@ -23,6 +23,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "pygfi16.hpp"
 
 template<typename T, size_t N>
 struct vec {
@@ -110,40 +111,19 @@ struct vec {
 
 
 template<typename T>
-class GFi16v {
-public:
-    struct GFT {
-        using GF = GFi16v;
-        T v;
-        GFT& operator=(const T& val) { v = val; return *this; }
-        inline GFT operator+(const GFT& other) const { return {GFi16v::add(v, other.v)}; }
-        inline GFT operator+(uint32_t other) const { return {GFi16v::add(v, other)}; }
-        inline GFT operator-(const GFT& other) const { return {GFi16v::sub(v, other.v)}; }
-        inline GFT operator*(const GFT& other) const { return {GFi16v::mul(v, other.v)}; }
-        inline GFT operator*(uint32_t other) const { return {GFi16v::mul(v, other)}; }
-        inline GFT operator/(const GFT& other) const { return {GFi16v::div(v, other.v)}; }
-        inline GFT operator-() const { return {GFi16v::neg(v)}; }
-        inline uint32_t operator[](size_t idx) const { return v[idx]; }
-        inline operator T const&() const { return v; }
-        inline operator T&() { return v; }
-    };
-    static_assert(sizeof(T) == sizeof(GFT));
-
-    inline GFi16v(uint32_t primitive) {
-        uint32_t x = 1;
-        for (uint32_t i = 0; i < 0x10001; ++i) {
-            _exp[i] = x;
-            _log[x] = i;
-            x = (x * primitive) % 0x10001;
-        }
-    }
-
-    template<typename... Args>
-    inline GFT operator()(Args... args) const {
-        static_assert(sizeof...(Args) * sizeof(uint32_t) == sizeof(T));
-        T v = {static_cast<uint32_t>(args)...};
-        return {v};
-    }
+struct GFi16v {
+    T v;
+    GFi16v& operator=(const T& val) { v = val; return *this; }
+    inline GFi16v operator+(const GFi16v& other) const { return {add(v, other.v)}; }
+    inline GFi16v operator+(uint32_t other) const { return {add(v, other)}; }
+    inline GFi16v operator-(const GFi16v& other) const { return {sub(v, other.v)}; }
+    inline GFi16v operator*(const GFi16v& other) const { return {mul(v, other.v)}; }
+    inline GFi16v operator*(uint32_t other) const { return {mul(v, other)}; }
+    inline GFi16v operator/(const GFi16v& other) const { return {div(v, other.v)}; }
+    inline GFi16v operator-() const { return {neg(v)}; }
+    inline uint32_t operator[](size_t idx) const { return v[idx]; }
+    inline operator T const&() const { return v; }
+    inline operator T&() { return v; }
 
     template<typename V>
     static inline T mul(T const& lhs, V const& rhs) {
@@ -172,69 +152,36 @@ public:
     static inline V neg(V const& a) {
         return 0x10001 - a;
     }
-
-    inline uint32_t inv1(uint32_t a) const {
-        return _exp[0x10000 - _log[a]];
-    }
-
-    inline uint32_t div1(uint32_t a, uint32_t b) const {
-        if (a == 0)
-            return 0;
-
-        size_t r = _log[a] + 0x10000 - _log[b];
-        if (r >= 0x10000)
-            r -= 0x10000;
-
-        return _exp[r];
-    }
-
-    inline uint32_t exp1(uint32_t a) const {
-        return _exp[a];
-    }
-
-    inline uint32_t log1(uint32_t a) const {
-        return _log[a];
-    }
-
-    inline uint32_t pow1(uint32_t a, uint32_t b) const {
-        return _exp[(_log[a] * b) % 0x10000];
-    }
-
-private:
-    std::array<uint32_t, 0x10001> _exp = {};
-    std::array<uint32_t, 0x10001> _log = {};
 };
 
 
-template<typename GF>
+template<typename GFT>
 class RSi16vImpl {
 public:
-    using GFT = typename GF::GFT;
-
-    inline RSi16vImpl(size_t block_size, size_t ecc_len, uint32_t primitive):
-        gf(primitive),
+    inline RSi16vImpl(GFi16 const& gf, size_t block_size, size_t ecc_len):
+        gf(gf),
         block_size(block_size),
         ecc_len(ecc_len)
     {
         size_t nbits = __builtin_ctzl(block_size);
 
-        uint32_t root = gf.exp1(gf.div1(gf.log1(1), block_size));
+        uint32_t root = gf.exp(gf.div(gf.log(1), block_size));
 
         if (root >= 0x8000)
             root = gf.neg(root);
 
-        if (gf.pow1(root, block_size) != 1)
+        if (gf.pow(root, block_size) != 1)
             throw std::runtime_error("Root of unity not found for block size");
 
         _rootsv.resize(block_size);
         _roots_iv.resize(block_size);
         uint32_t r = root;
-        uint32_t r_i = gf.inv1(r);
+        uint32_t r_i = gf.inv(r);
         for (size_t i = 0; i < block_size; ++i) {
             // _roots[i] = r;
             // r = gf.pow(r, 2);
-            _rootsv[i] = GFT{0} + gf.pow1(root, i);
-            _roots_iv[i] = GFT{0} + gf.pow1(r_i, i);
+            _rootsv[i] = GFT{0} + gf.pow(root, i);
+            _roots_iv[i] = GFT{0} + gf.pow(r_i, i);
         }
 
         _rbo.resize(block_size);
@@ -245,7 +192,7 @@ public:
         for (size_t j = 0; j < ecc_len; ++j) {
             auto w = _roots_iv[_rbo[block_size - ecc_len]][0];
             // w = - w ** (- rbo(i) * j) / block_size
-            _ecc_mix_wv[j] = GFT{0} + gf.neg(gf.div1(gf.pow1(w, j), block_size));
+            _ecc_mix_wv[j] = GFT{0} + gf.neg(gf.div(gf.pow(w, j), block_size));
         }
     }
 
@@ -263,8 +210,7 @@ public:
     }
 
 protected:
-    // GFT _nth_roots_of_unity[MaxFieldBits] = {0};
-    GF gf;
+    GFi16 const& gf;
     size_t block_size;
     size_t ecc_len;
     std::vector<GFT> _rootsv;

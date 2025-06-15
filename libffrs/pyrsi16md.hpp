@@ -24,7 +24,6 @@
 #include <pybind11/stl.h>
 
 #include "util.hpp"
-#include "rsi16md_impl.hpp"
 #include "rsi16md.h"
 
 namespace py = pybind11;
@@ -37,6 +36,7 @@ private:
         size_t ecc_len;
     };
 
+    GFi16 gf;
     RSi16v<4> rs16v4;
     RSi16v<8> rs16v8;
     RSi16v<16> rs16v16;
@@ -49,9 +49,10 @@ private:
     bool inline_ecc;
 
     inline PyRSi16md(rs_data&& args, uint32_t primitive, bool inline_ecc):
-        rs16v4(args.block_size, args.ecc_len, primitive),
-        rs16v8(args.block_size, args.ecc_len, primitive),
-        rs16v16(args.block_size, args.ecc_len, primitive),
+        gf(GFi16::gf_data(0x10001, 1, primitive, 0)),
+        rs16v4(gf, args.block_size, args.ecc_len),
+        rs16v8(gf, args.block_size, args.ecc_len),
+        rs16v16(gf, args.block_size, args.ecc_len),
         block_size(args.block_size),
         msg_size(args.block_size - args.ecc_len),
         ecc_len(args.ecc_len),
@@ -98,7 +99,6 @@ public:
             return {};
 
         size_t full_blocks = buf.size / msg_size;
-
         size_t output_size = full_blocks * (inline_ecc ? msg_size + ecc_len : ecc_len);
 
         // Last block will be smaller if input size is not divisible by msg_size
