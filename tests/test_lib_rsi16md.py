@@ -16,6 +16,7 @@
 #  limitations under the License.
 
 import pytest
+import random
 
 import ffrs
 import ffrs.reference
@@ -48,10 +49,55 @@ class TestRSInline:
 
         res = rs.encode(buf)
 
-        rs1 = ffrs.RSi16(rs.block_size, ecc_len=rs.ecc_len)
-        ref = rs1.encode(buf + bytearray(rs.ecc_len))
+        # Compare inline/external
+        rs2 = ffrs.RSi16md(rs.block_size, rs.message_len, inline=False)
+        res_ecc = rs2.encode(buf)
+        assert res[-rs.ecc_len:] == res_ecc
 
-        assert res == ref
+        w = ref_gf(rs.root)
+        buf_ntt = ref_ntt(w, to_int_list(buf + bytearray(rs.ecc_len), 2))
+
+        ecc_mix = rs._mix_ecc(w, buf_ntt[:rs.ecc_len//2])
+
+        assert to_bytearray(ecc_mix, 2) == res[-rs.ecc_len:]
+        assert res[:rs.message_len] == buf
+
+    def test_encode_decode(self, rs):
+        size_u16 = rs.block_size // 2
+        ecc_u16 = rs.ecc_len // 2
+        orig = [random.randrange(0, 2**16) for _ in range(size_u16 - ecc_u16)]
+
+        msg_enc = to_int_list(rs.encode(to_bytearray(orig, 2)), 2)
+
+        msg_enc_err = list(msg_enc)
+
+        assert rs.find_errors(to_bytearray(msg_enc, 2)) == {}
+
+        error_positions = dict()
+
+        # Always add one error to the codeword
+        if len(error_positions) < max(ecc_u16//2, 1):
+            i = random.randrange(size_u16 - ecc_u16, size_u16)
+            error_positions[i] = random.randrange(2**16)
+            msg_enc_err[i] = rs.gf.add(msg_enc_err[i], error_positions[i])
+
+        while len(error_positions) < ecc_u16//2:
+            i = random.randrange(size_u16)
+            if i in error_positions:
+                continue
+            error_positions[i] = random.randrange(2**16)
+            msg_enc_err[i] = rs.gf.add(msg_enc_err[i], error_positions[i])
+
+        w = ref_gf(rs.root)
+        print()
+        print("errs: ", error_positions)
+
+        assert msg_enc_err != msg_enc
+
+        msg_enc_err_dec = rs.decode(to_bytearray(msg_enc_err, 2))
+
+        assert msg_enc[:-ecc_u16] == to_int_list(msg_enc_err_dec, 2)
+        assert error_positions == rs.find_errors(to_bytearray(msg_enc_err, 2))
 
     def test_encode_blocks_single(self, rs):
         buf = randbytes(rs.message_len)
@@ -62,7 +108,7 @@ class TestRSInline:
         assert len(buf_enc) == len(buf_enc_blk) == rs.block_size
         assert buf_enc == buf_enc_blk
 
-    @pytest.mark.parametrize('count', [4, 8, 12, 16, 100])
+    @pytest.mark.parametrize('count', [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 16, 100])
     def test_encode_blocks_multiple(self, rs, count):
         buf = randbytes(rs.message_len * count)
 
@@ -91,10 +137,12 @@ class TestRSExternal:
 
         res = rs.encode(buf)
 
-        rs1 = ffrs.RSi16(rs.block_size, ecc_len=rs.ecc_len)
-        ref = rs1.encode(buf + bytearray(rs.ecc_len))
+        w = ref_gf(rs.root)
+        buf_ntt = ref_ntt(w, to_int_list(buf + bytearray(rs.ecc_len), 2))
 
-        assert res == ref[-rs.ecc_len:]
+        ecc_mix = rs._mix_ecc(w, buf_ntt[:rs.ecc_len//2])
+
+        assert to_bytearray(ecc_mix, 2) == res
 
     def test_encode_blocks_empty(self, rs):
         assert bytearray() == rs.encode_blocks(bytearray())
@@ -108,7 +156,7 @@ class TestRSExternal:
         assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len
         assert buf_enc == buf_enc_blk
 
-    @pytest.mark.parametrize('count', [4, 8, 12, 16, 100])
+    @pytest.mark.parametrize('count', [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 16, 100])
     def test_encode_blocks_multiple(self, rs, count):
         buf = randbytes(rs.message_len * count)
 

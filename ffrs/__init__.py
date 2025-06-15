@@ -2,8 +2,6 @@ import libffrs
 
 from libffrs import *
 
-import math
-
 import ffrs.reference as ref
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted
 
@@ -13,7 +11,7 @@ ntt = lambda w, x: to_int_list(ref.ntt.ntt(GF, w, rbo_sorted(x)))
 intt = lambda w, x: rbo_sorted(to_int_list(ref.ntt.intt(GF, w, x)))
 
 
-class RSi16(libffrs.RSi16):
+class RSi16md(libffrs.RSi16md):
     def _mix_ecc(self, w, ecc):
         ecc_mix = ecc
         i = rbo(self.block_size // 2, (self.block_size - self.ecc_len) // 2)
@@ -33,22 +31,15 @@ class RSi16(libffrs.RSi16):
     def find_errors(self, msg1: bytearray):
         size_u16 = self.block_size // 2
         ecc_u16 = self.ecc_len // 2
-        w = GF(self.roots_of_unity[round(math.log2(size_u16))])
-
-        # msg2 = self.encode(msg1[:-self.ecc_len] + bytearray(self.ecc_len))
+        w = GF(self.root)
 
         msg1_list = to_int_list(msg1, 2)
-        # msg2_list = to_int_list(msg2, 2)
-
-        # ecc1 = self._unmix_ecc(w, msg1_list[-ecc_u16:])
-        # ecc2 = self._unmix_ecc(w, msg2_list[-ecc_u16:])
-
-        # synds = [self.gf.sub(e1, e2) for e1, e2 in zip(ecc1, ecc2)]
-        # # print()
-        # print("synds:    ", synds)
         synds = ntt(w, msg1_list)[:ecc_u16]
+
         if all(s == 0 for s in synds):
             return {}
+
+        # print("synds:    ", synds)
         synds = GF(synds)
 
         for err_count in range(ecc_u16 // 2, 0, -1):

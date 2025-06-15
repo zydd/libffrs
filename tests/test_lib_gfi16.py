@@ -24,7 +24,7 @@ import ffrs.reference.ntt as ref_ntt
 from ffrs.reference.util import *
 
 
-GF = ffrs.GFi16(65537, 3)
+GF = ffrs.GFi16(3)
 GF_ref = ffrs.reference.GF(65537, 1, 3)
 random.seed(42)
 
@@ -82,46 +82,3 @@ def test_scalar_exp_pow():
     for a in sample_field(GF):
         assert GF.exp(a) == GF.pow(GF.primitive, a) != 0
 
-
-def test_ntt():
-    size = 16
-    w = next(i for i in range(2, GF.prime) if i**size % GF.prime == 1)
-    buf = [random.randrange(0, GF.prime) for _ in range(size)]
-
-    res_buf = GF.ntt(to_bytearray(buf, 4), w)
-    res = to_int_list(res_buf, 4)
-
-    ref = to_int_list(ref_ntt.ntt(GF_ref, GF_ref(w), buf))
-    res_i = to_int_list(ref_ntt.intt(GF_ref, GF_ref(w), ref))
-
-    print()
-    print("w:", w)
-    print("input:      ", buf)
-    print("reference:  ", ref)
-    print("result:     ", res)
-    print("invert:     ", res_i)
-
-    assert res_i == buf
-    assert ref == res
-
-
-def test_ntt16():
-    size = 16
-    w = next(i for i in range(2, GF.prime) if i**size % GF.prime == 1)
-    buf = [random.randrange(0, 2**16) for _ in range(size)]
-
-    res_buf = GF.ntt16(to_bytearray(buf, 2), w)
-    res = to_int_list(res_buf, 2)
-
-    ref = to_int_list(ref_ntt.ntt(GF_ref, GF_ref(w), buf))
-    res_i = to_int_list(ref_ntt.intt(GF_ref, GF_ref(w), ref))
-
-    print()
-    print("w:", w)
-    print("input:      ", buf)
-    print("reference:  ", ref)
-    print("result:     ", res)
-    print("invert:     ", res_i)
-
-    assert res_i == buf
-    assert ref == res

@@ -37,7 +37,7 @@ private:
         size_t ecc_len;
     };
 
-    GFi16 gf;
+    PyGFi16 gf;
     RSi16vImpl<uint32_t> rs16;
     RSi16v<4> rs16v4;
     RSi16v<8> rs16v8;
@@ -58,7 +58,7 @@ private:
         std::optional<bool> simd_x8,
         std::optional<bool> simd_x4
     ):
-        gf(GFi16::gf_data(0x10001, 1, primitive, 0)),
+        gf(primitive),
         rs16(gf, args.block_size, args.ecc_len),
         rs16v4(gf, args.block_size, args.ecc_len),
         rs16v8(gf, args.block_size, args.ecc_len),
@@ -162,6 +162,11 @@ public:
 
             .def_property_readonly("message_len",
                 [](PyRSi16md& self) { return (self.block_size - self.ecc_len) * sizeof(uint16_t); })
+
+            .def_property_readonly("root",
+                [](PyRSi16md& self) { return self.rs16.root; })
+
+            .def_property_readonly("gf", [](PyRSi16md& self) -> auto const& { return self.gf; })
 
             .def(py::init<
                     std::optional<uint16_t>,

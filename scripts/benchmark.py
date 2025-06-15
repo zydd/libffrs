@@ -202,7 +202,7 @@ def main():
     elif fn == "ntt":
         benchmark_throughput(ntt_benchmark(1024//2), input_size=1 * 2**20)
     elif fn == "enci16":
-        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16(block_size, ecc_len=ecc_len))), input_size=(block_size - ecc_len) * 2**10)
+        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_len=ecc_len, simd_x16=False, simd_x8=False, simd_x4=False))), input_size=(block_size - ecc_len) * 2**10)
     elif fn == "enci16v":
         benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_len=ecc_len))), input_size=(block_size - ecc_len) * 2**10)
     else:

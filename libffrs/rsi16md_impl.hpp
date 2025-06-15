@@ -29,6 +29,8 @@
 template<typename GFT>
 class RSi16vImpl {
 public:
+    uint32_t root;
+
     inline RSi16vImpl(GFi16 const& gf, size_t block_size, size_t ecc_len):
         gf(gf),
         block_size(block_size),
@@ -36,7 +38,7 @@ public:
     {
         size_t nbits = __builtin_ctzl(block_size);
 
-        uint32_t root = gf.exp(gf.div(gf.log(1), block_size));
+        root = gf.exp(gf.div(gf.log(1), block_size));
 
         if (root >= 0x8000)
             root = gf.neg(root);
