@@ -61,13 +61,13 @@ public:
 
         _ecc_mix_wv.resize(ecc_len);
         for (size_t j = 0; j < ecc_len; ++j) {
-            auto w = _roots_iv[_rbo[block_size - ecc_len]][0];
+            auto w = *reinterpret_cast<uint32_t *>(&_roots_iv[_rbo[block_size - ecc_len]]);
             // w = - w ** (- rbo(i) * j) / block_size
             _ecc_mix_wv[j] = GFT{0} + gf.neg(gf.div(gf.pow(w, j), block_size));
         }
     }
 
-    inline void encode(GFT block[]) {
+    inline void encode(GFT block[]) const {
         ct_butterfly(&_rootsv[0], block, block_size);
 
         for (size_t j = 0; j < ecc_len; ++j)

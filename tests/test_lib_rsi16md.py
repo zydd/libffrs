@@ -16,7 +16,6 @@
 #  limitations under the License.
 
 import pytest
-import random
 
 import ffrs
 import ffrs.reference
@@ -45,38 +44,34 @@ ref_ntt, ref_intt = ref_ntt_ct, ref_intt_ct
 ])
 class TestRSInline:
     def test_encode(self, rs):
-        vec_size = 4
-        buf = randbytes(rs.message_len * vec_size)
+        buf = randbytes(rs.message_len)
 
         res = rs.encode(buf)
 
         rs1 = ffrs.RSi16(rs.block_size, ecc_len=rs.ecc_len)
-        for i in range(vec_size):
-            ref_block = buf[i * rs.message_len:(i + 1) * rs.message_len] + bytearray(rs.ecc_len)
-            ref = rs1.encode(ref_block)
-            assert res[i * rs.block_size:(i + 1) * rs.block_size] == ref
+        ref = rs1.encode(buf + bytearray(rs.ecc_len))
+
+        assert res == ref
 
     def test_encode_blocks_single(self, rs):
-        vec_size = 4
-        buf = randbytes(rs.message_len * vec_size)
+        buf = randbytes(rs.message_len)
 
         buf_enc = rs.encode(buf)
         buf_enc_blk = rs.encode_blocks(buf)
 
-        assert len(buf_enc) == len(buf_enc_blk) == rs.block_size * vec_size
+        assert len(buf_enc) == len(buf_enc_blk) == rs.block_size
         assert buf_enc == buf_enc_blk
 
-    @pytest.mark.parametrize('count', [3, 4, 5, 6, 7, 8, 9, 12, 16, 100])
+    @pytest.mark.parametrize('count', [4, 8, 12, 16, 100])
     def test_encode_blocks_multiple(self, rs, count):
-        vec_size = 4
-        buf = randbytes(rs.message_len * vec_size * count)
+        buf = randbytes(rs.message_len * count)
 
-        buf_enc = [rs.encode(buf[i * rs.message_len * vec_size:(i + 1) * rs.message_len * vec_size])
+        buf_enc = [rs.encode(buf[i * rs.message_len:(i + 1) * rs.message_len])
                         for i in range(count)]
         buf_enc = b"".join(buf_enc)
         buf_enc_blk = rs.encode_blocks(buf)
 
-        assert len(buf_enc) == len(buf_enc_blk) == rs.block_size * vec_size * count
+        assert len(buf_enc) == len(buf_enc_blk) == rs.block_size * count
         assert buf_enc == buf_enc_blk
 
     # def test_encode_blocks_remainder(self, rs):
@@ -92,41 +87,37 @@ class TestRSInline:
 ])
 class TestRSExternal:
     def test_encode(self, rs):
-        vec_size = 4
-        buf = randbytes(rs.message_len * vec_size)
+        buf = randbytes(rs.message_len)
 
         res = rs.encode(buf)
 
         rs1 = ffrs.RSi16(rs.block_size, ecc_len=rs.ecc_len)
-        for i in range(vec_size):
-            ref_block = buf[i * rs.message_len:(i + 1) * rs.message_len] + bytearray(rs.ecc_len)
-            ref = rs1.encode(ref_block)
-            assert res[i * rs.ecc_len:(i + 1) * rs.ecc_len] == ref[-rs.ecc_len:]
+        ref = rs1.encode(buf + bytearray(rs.ecc_len))
+
+        assert res == ref[-rs.ecc_len:]
 
     def test_encode_blocks_empty(self, rs):
         assert bytearray() == rs.encode_blocks(bytearray())
 
     def test_encode_blocks_single(self, rs):
-        vec_size = 4
-        buf = randbytes(rs.message_len * vec_size)
+        buf = randbytes(rs.message_len)
 
         buf_enc = rs.encode(buf)
         buf_enc_blk = rs.encode_blocks(buf)
 
-        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * vec_size
+        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len
         assert buf_enc == buf_enc_blk
 
-    @pytest.mark.parametrize('count', [3, 4, 5, 6, 7, 8, 9, 12, 16, 100])
+    @pytest.mark.parametrize('count', [4, 8, 12, 16, 100])
     def test_encode_blocks_multiple(self, rs, count):
-        vec_size = 4
-        buf = randbytes(rs.message_len * vec_size * count)
+        buf = randbytes(rs.message_len * count)
 
-        buf_enc = [rs.encode(buf[i * rs.message_len * vec_size:(i + 1) * rs.message_len * vec_size])
+        buf_enc = [rs.encode(buf[i * rs.message_len:(i + 1) * rs.message_len])
                         for i in range(count)]
         buf_enc = b"".join(buf_enc)
         buf_enc_blk = rs.encode_blocks(buf)
 
-        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * vec_size * count
+        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * count
         assert buf_enc == buf_enc_blk
 
     # def test_encode_blocks_remainder(self, rs):

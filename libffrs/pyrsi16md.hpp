@@ -24,6 +24,7 @@
 #include <pybind11/stl.h>
 
 #include "util.hpp"
+#include "rsi16md_impl.hpp"
 #include "rsi16md.h"
 
 namespace py = pybind11;
@@ -37,6 +38,7 @@ private:
     };
 
     GFi16 gf;
+    RSi16vImpl<uint32_t> rs16;
     RSi16v<4> rs16v4;
     RSi16v<8> rs16v8;
     RSi16v<16> rs16v16;
@@ -50,6 +52,7 @@ private:
 
     inline PyRSi16md(rs_data&& args, uint32_t primitive, bool inline_ecc):
         gf(GFi16::gf_data(0x10001, 1, primitive, 0)),
+        rs16(gf, args.block_size, args.ecc_len),
         rs16v4(gf, args.block_size, args.ecc_len),
         rs16v8(gf, args.block_size, args.ecc_len),
         rs16v16(gf, args.block_size, args.ecc_len),
@@ -77,7 +80,7 @@ public:
     { }
 
     inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
-        size_t vec_size = 4;
+        constexpr size_t vec_size = 1;
         py_assert(buf.size == msg_size * vec_size);
 
         size_t output_size = (inline_ecc ? msg_size + ecc_len : ecc_len);
@@ -87,9 +90,9 @@ public:
         auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
 
         if (inline_ecc)
-            encode_block_inline<4>(rs16v4, &buf[0], &temp[0], &output_data[0]);
+            encode_block_inline<vec_size>(rs16, &buf[0], &temp[0], &output_data[0]);
         else
-            encode_block_external<4>(rs16v4, &buf[0], &temp[0], &output_data[0]);
+            encode_block_external<vec_size>(rs16, &buf[0], &temp[0], &output_data[0]);
 
         return output;
     }
@@ -269,7 +272,12 @@ private:
                 block += 4;
             }
         }
-        // TODO: last 3 blocks + remainder
+        // TODO: use SIMD for all iterations
+        while (block < full_blocks) {
+            encode_block_inline<1>(rs16, &src[block * msg_size], &temp[0], &dst[block * block_size]);
+            block += 1;
+        }
+        // TODO: remainder
 
         return block;
     }
@@ -295,7 +303,12 @@ private:
                 block += 4;
             }
         }
-        // TODO: last 3 blocks + remainder
+        // TODO: use SIMD for all iterations
+        while (block < full_blocks) {
+            encode_block_external<1>(rs16, &src[block * msg_size], &temp[0], &dst[block * ecc_len]);
+            block += 1;
+        }
+        // TODO: remainder
 
         return block;
     }
