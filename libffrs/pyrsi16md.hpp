@@ -41,20 +41,24 @@ private:
     RSi16v<8> rs16v8;
     RSi16v<16> rs16v16;
     const size_t block_size;
+    const size_t msg_size;
     const size_t ecc_len;
     bool simd_x16;
     bool simd_x8;
     bool simd_x4;
+    bool inline_ecc;
 
-    inline PyRSi16md(rs_data&& args, uint32_t primitive):
+    inline PyRSi16md(rs_data&& args, uint32_t primitive, bool inline_ecc):
         rs16v4(args.block_size, args.ecc_len, primitive),
         rs16v8(args.block_size, args.ecc_len, primitive),
         rs16v16(args.block_size, args.ecc_len, primitive),
         block_size(args.block_size),
+        msg_size(args.block_size - args.ecc_len),
         ecc_len(args.ecc_len),
         simd_x16(__builtin_cpu_supports("avx512f")),
         simd_x8(__builtin_cpu_supports("avx2")),
-        simd_x4(__builtin_cpu_supports("sse2"))
+        simd_x4(__builtin_cpu_supports("sse2")),
+        inline_ecc(inline_ecc)
     { }
 
 public:
@@ -65,62 +69,52 @@ public:
             std::optional<size_t> block_size,
             std::optional<uint16_t> message_len,
             std::optional<uint16_t> ecc_len,
-            uint32_t primitive):
-        PyRSi16md(_get_args(block_size, message_len, ecc_len), primitive)
+            uint32_t primitive,
+            bool inline_ecc
+    ):
+        PyRSi16md(_get_args(block_size, message_len, ecc_len), primitive, inline_ecc)
     { }
 
     inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
-        size_t msg_size = block_size - ecc_len;
         size_t vec_size = 4;
         py_assert(buf.size == msg_size * vec_size);
 
+        size_t output_size = (inline_ecc ? msg_size + ecc_len : ecc_len);
+
         auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_size * vec_size]);
-        auto output = py::bytearray(nullptr, block_size * vec_size * sizeof(uint16_t));
+        auto output = py::bytearray(nullptr, output_size * vec_size * sizeof(uint16_t));
         auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
 
-        encode_block_v<4>(rs16v4, &buf[0], msg_size, &temp[0], &output_data[0]);
+        if (inline_ecc)
+            encode_block_inline<4>(rs16v4, &buf[0], &temp[0], &output_data[0]);
+        else
+            encode_block_external<4>(rs16v4, &buf[0], &temp[0], &output_data[0]);
 
         return output;
     }
 
     inline py::bytearray py_encode_blocks(buffer_ro<uint16_t> buf) {
-        size_t msg_size = block_size - ecc_len;
-
         if (buf.size == 0 || block_size == 0 || block_size <= ecc_len)
             return {};
 
         size_t full_blocks = buf.size / msg_size;
 
-        size_t output_size = full_blocks * (msg_size + ecc_len);
+        size_t output_size = full_blocks * (inline_ecc ? msg_size + ecc_len : ecc_len);
 
         // Last block will be smaller if input size is not divisible by msg_size
         size_t input_remainder = buf.size - full_blocks * msg_size;
         if (input_remainder > 0)
-            output_size += input_remainder + ecc_len;
+            output_size += inline_ecc ? input_remainder + ecc_len : ecc_len;
 
         auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_size * max_vec_size]);
         auto output = py::bytearray(nullptr, output_size * sizeof(uint16_t));
         auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
 
-        size_t block = 0;
-        if (simd_x16) {
-            while (full_blocks - block >= 16) {
-                encode_block_v<16>(rs16v16, &buf[block * msg_size], msg_size, &temp[0], &output_data[block * block_size]);
-                block += 16;
-            }
-        }
-        if (simd_x8) {
-            while (full_blocks - block >= 8) {
-                encode_block_v<8>(rs16v8, &buf[block * msg_size], msg_size, &temp[0], &output_data[block * block_size]);
-                block += 8;
-            }
-        }
-        if (simd_x4) {
-            while (full_blocks - block >= 4) {
-                encode_block_v<4>(rs16v4, &buf[block * msg_size], msg_size, &temp[0], &output_data[block * block_size]);
-                block += 4;
-            }
-        }
+        size_t block;
+        if (inline_ecc)
+            block = encode_blocks_inline(&buf[0], full_blocks, &temp[0], &output_data[0]);
+        else
+            block = encode_blocks_external(&buf[0], full_blocks, &temp[0], &output_data[0]);
 
         if (block != full_blocks)
             throw std::runtime_error("Number of blocks is not divisible by vector size: " +  std::to_string(block) + "/" + std::to_string(full_blocks));
@@ -149,9 +143,14 @@ public:
             .def_property_readonly("message_len",
                 [](PyRSi16md& self) { return (self.block_size - self.ecc_len) * sizeof(uint16_t); })
 
-            .def(py::init<std::optional<uint16_t>, std::optional<uint16_t>, std::optional<uint16_t>, uint32_t>(), R"(
+            .def(py::init<std::optional<uint16_t>, std::optional<uint16_t>, std::optional<uint16_t>, uint32_t, bool>(), R"(
                 Instantiate a Reed-Solomon encoder with the given configuration)",
-                "block_size"_a = py::none(), "message_len"_a = py::none(), "ecc_len"_a = py::none(), "primitive"_a = 3)
+                "block_size"_a = py::none(),
+                "message_len"_a = py::none(),
+                "ecc_len"_a = py::none(),
+                "primitive"_a = 3,
+                "inline"_a = false
+            )
 
             .def("__sizeof__", [](PyRSi16md& self) { return sizeof(self); })
 
@@ -214,10 +213,10 @@ private:
     }
 
     template<size_t vec_size, typename T, typename U>
-    inline void copy_blocks_transposed(const T *src, size_t src_size, U *dst) const {
+    inline void copy_blocks_transposed(const T *src, size_t src_size, U *dst, size_t dst_block_size) const {
         for (size_t j = 0; j < vec_size; ++j)
             for (size_t i = 0; i < src_size; ++i)
-                dst[i + j * block_size] = src[i * vec_size + j];
+                dst[i + j * dst_block_size] = src[i * vec_size + j];
     }
 
     template<size_t vec_size, typename T, typename U>
@@ -228,7 +227,7 @@ private:
     }
 
     template<size_t vec_size, typename T>
-    inline void encode_block_v(T const& rs, const uint16_t src[], size_t msg_size, uint32_t temp[], uint16_t dst[]) {
+    inline void encode_block_inline(T const& rs, const uint16_t src[], uint32_t temp[], uint16_t dst[]) {
         copy_blocks<vec_size>(&src[0], msg_size, &dst[0]);
 
         copy_msg_transposed<vec_size>(&src[0], msg_size, &temp[0]);
@@ -236,6 +235,68 @@ private:
         // std::memset(&temp[msg_size * vec_size], 0, ecc_len * vec_size * sizeof(uint32_t));
 
         rs.encode(&temp[0]);
-        copy_blocks_transposed<vec_size>(&temp[0], ecc_len, &dst[msg_size]);
+        copy_blocks_transposed<vec_size>(&temp[0], ecc_len, &dst[msg_size], block_size);
+    }
+
+    template<size_t vec_size, typename T>
+    inline void encode_block_external(T const& rs, const uint16_t src[], uint32_t temp[], uint16_t dst[]) {
+        copy_msg_transposed<vec_size>(&src[0], msg_size, &temp[0]);
+        std::fill_n(&temp[msg_size * vec_size], ecc_len * vec_size, 0);
+        // std::memset(&temp[msg_size * vec_size], 0, ecc_len * vec_size * sizeof(uint32_t));
+
+        rs.encode(&temp[0]);
+        copy_blocks_transposed<vec_size>(&temp[0], ecc_len, &dst[0], ecc_len);
+    }
+
+    inline size_t encode_blocks_inline(const uint16_t src[], size_t full_blocks, uint32_t temp[], uint16_t dst[]) {
+        size_t block = 0;
+
+        if (simd_x16) {
+            while (full_blocks - block >= 16) {
+                encode_block_inline<16>(rs16v16, &src[block * msg_size], &temp[0], &dst[block * block_size]);
+                block += 16;
+            }
+        }
+        if (simd_x8) {
+            while (full_blocks - block >= 8) {
+                encode_block_inline<8>(rs16v8, &src[block * msg_size], &temp[0], &dst[block * block_size]);
+                block += 8;
+            }
+        }
+        if (simd_x4) {
+            while (full_blocks - block >= 4) {
+                encode_block_inline<4>(rs16v4, &src[block * msg_size], &temp[0], &dst[block * block_size]);
+                block += 4;
+            }
+        }
+        // TODO: last 3 blocks + remainder
+
+        return block;
+    }
+
+    inline size_t encode_blocks_external(const uint16_t src[], size_t full_blocks, uint32_t temp[], uint16_t dst[]) {
+        size_t block = 0;
+
+        if (simd_x16) {
+            while (full_blocks - block >= 16) {
+                encode_block_external<16>(rs16v16, &src[block * msg_size], &temp[0], &dst[block * ecc_len]);
+                block += 16;
+            }
+        }
+        if (simd_x8) {
+            while (full_blocks - block >= 8) {
+                encode_block_external<8>(rs16v8, &src[block * msg_size], &temp[0], &dst[block * ecc_len]);
+                block += 8;
+            }
+        }
+        if (simd_x4) {
+            while (full_blocks - block >= 4) {
+                encode_block_external<4>(rs16v4, &src[block * msg_size], &temp[0], &dst[block * ecc_len]);
+                block += 4;
+            }
+        }
+        // TODO: last 3 blocks + remainder
+
+        return block;
     }
 };

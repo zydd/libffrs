@@ -4,7 +4,10 @@ project(ffrs)
 add_subdirectory(pybind11)
 
 
-add_compile_options(-Wall -Wextra -Wpedantic -O3 -flto=auto)
+if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-O3 -flto=auto)
+endif()
+add_compile_options(-Wall -Wextra -Wpedantic)
 
 
 pybind11_add_module(pyffrs

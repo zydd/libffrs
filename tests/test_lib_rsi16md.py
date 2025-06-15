@@ -1,5 +1,5 @@
 
-#  test_lib_rsi16.py
+#  test_lib_rsi16md.py
 #
 #  Copyright 2025 Gabriel Machado
 #
@@ -37,13 +37,13 @@ ref_ntt, ref_intt = ref_ntt_ct, ref_intt_ct
 
 
 @pytest.mark.parametrize('rs', [
-    ffrs.RSi16md(4*2, ecc_len=2*2),
-    ffrs.RSi16md(16*2, ecc_len=4*2),
-    ffrs.RSi16md(128*2, ecc_len=2*2),
-    ffrs.RSi16md(256*2, ecc_len=128*2),
-    ffrs.RSi16md(1024, ecc_len=128),
+    ffrs.RSi16md(4*2, ecc_len=2*2, inline=True),
+    ffrs.RSi16md(16*2, ecc_len=4*2, inline=True),
+    ffrs.RSi16md(128*2, ecc_len=2*2, inline=True),
+    ffrs.RSi16md(256*2, ecc_len=128*2, inline=True),
+    ffrs.RSi16md(1024, ecc_len=128, inline=True),
 ])
-class TestRS:
+class TestRSInline:
     def test_encode(self, rs):
         vec_size = 4
         buf = randbytes(rs.message_len * vec_size)
@@ -55,9 +55,6 @@ class TestRS:
             ref_block = buf[i * rs.message_len:(i + 1) * rs.message_len] + bytearray(rs.ecc_len)
             ref = rs1.encode(ref_block)
             assert res[i * rs.block_size:(i + 1) * rs.block_size] == ref
-
-    def test_encode_blocks_empty(self, rs):
-        assert bytearray() == rs.encode_blocks(bytearray())
 
     def test_encode_blocks_single(self, rs):
         vec_size = 4
@@ -80,6 +77,56 @@ class TestRS:
         buf_enc_blk = rs.encode_blocks(buf)
 
         assert len(buf_enc) == len(buf_enc_blk) == rs.block_size * vec_size * count
+        assert buf_enc == buf_enc_blk
+
+    # def test_encode_blocks_remainder(self, rs):
+    #     TODO
+
+
+@pytest.mark.parametrize('rs', [
+    ffrs.RSi16md(4*2, ecc_len=2*2),
+    ffrs.RSi16md(16*2, ecc_len=4*2),
+    ffrs.RSi16md(128*2, ecc_len=2*2),
+    ffrs.RSi16md(256*2, ecc_len=128*2),
+    ffrs.RSi16md(1024, ecc_len=128),
+])
+class TestRSExternal:
+    def test_encode(self, rs):
+        vec_size = 4
+        buf = randbytes(rs.message_len * vec_size)
+
+        res = rs.encode(buf)
+
+        rs1 = ffrs.RSi16(rs.block_size, ecc_len=rs.ecc_len)
+        for i in range(vec_size):
+            ref_block = buf[i * rs.message_len:(i + 1) * rs.message_len] + bytearray(rs.ecc_len)
+            ref = rs1.encode(ref_block)
+            assert res[i * rs.ecc_len:(i + 1) * rs.ecc_len] == ref[-rs.ecc_len:]
+
+    def test_encode_blocks_empty(self, rs):
+        assert bytearray() == rs.encode_blocks(bytearray())
+
+    def test_encode_blocks_single(self, rs):
+        vec_size = 4
+        buf = randbytes(rs.message_len * vec_size)
+
+        buf_enc = rs.encode(buf)
+        buf_enc_blk = rs.encode_blocks(buf)
+
+        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * vec_size
+        assert buf_enc == buf_enc_blk
+
+    @pytest.mark.parametrize('count', [3, 4, 5, 6, 7, 8, 9, 12, 16, 100])
+    def test_encode_blocks_multiple(self, rs, count):
+        vec_size = 4
+        buf = randbytes(rs.message_len * vec_size * count)
+
+        buf_enc = [rs.encode(buf[i * rs.message_len * vec_size:(i + 1) * rs.message_len * vec_size])
+                        for i in range(count)]
+        buf_enc = b"".join(buf_enc)
+        buf_enc_blk = rs.encode_blocks(buf)
+
+        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * vec_size * count
         assert buf_enc == buf_enc_blk
 
     # def test_encode_blocks_remainder(self, rs):
