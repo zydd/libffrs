@@ -242,46 +242,46 @@ private:
     }
 
     template<size_t vec_size, typename T, typename U>
-    inline void copy_blocks(const T *src, size_t src_size, U *dst) const {
+    inline void copy_msg(const T *src, U *dst) const {
         for (size_t j = 0; j < vec_size; ++j)
-            for (size_t i = 0; i < src_size; ++i)
-                dst[i + j * block_size] = src[i + j * src_size];
+            for (size_t i = 0; i < msg_size; ++i)
+                dst[i + j * block_size] = src[i + j * msg_size];
     }
 
     template<size_t vec_size, typename T, typename U>
-    inline void copy_blocks_transposed(const T *src, size_t src_size, U *dst, size_t dst_block_size) const {
+    inline void copy_ecc_transposed(const T *src, U *dst, size_t dst_stride) const {
         for (size_t j = 0; j < vec_size; ++j)
-            for (size_t i = 0; i < src_size; ++i)
-                dst[i + j * dst_block_size] = src[i * vec_size + j];
+            for (size_t i = 0; i < ecc_len; ++i)
+                dst[i + j * dst_stride] = src[i * vec_size + j];
     }
 
     template<size_t vec_size, typename T, typename U>
-    inline void copy_msg_transposed(const T *src, size_t src_size, U *dst) const {
+    inline void copy_msg_transposed(const T *src, U *dst) const {
         for (size_t j = 0; j < vec_size; ++j)
-            for (size_t i = 0; i < src_size; ++i)
-                dst[i * vec_size + j] = src[i + j * src_size];
+            for (size_t i = 0; i < msg_size; ++i)
+                dst[i * vec_size + j] = src[i + j * msg_size];
     }
 
     template<size_t vec_size, typename T>
     inline void encode_block_inline(T const& rs, const uint16_t src[], uint32_t temp[], uint16_t dst[]) {
-        copy_blocks<vec_size>(&src[0], msg_size, &dst[0]);
+        copy_msg<vec_size>(&src[0], &dst[0]);
 
-        copy_msg_transposed<vec_size>(&src[0], msg_size, &temp[0]);
+        copy_msg_transposed<vec_size>(&src[0], &temp[0]);
         std::fill_n(&temp[msg_size * vec_size], ecc_len * vec_size, 0);
         // std::memset(&temp[msg_size * vec_size], 0, ecc_len * vec_size * sizeof(uint32_t));
 
         rs.encode(&temp[0]);
-        copy_blocks_transposed<vec_size>(&temp[0], ecc_len, &dst[msg_size], block_size);
+        copy_ecc_transposed<vec_size>(&temp[0], &dst[msg_size], block_size);
     }
 
     template<size_t vec_size, typename T>
     inline void encode_block_external(T const& rs, const uint16_t src[], uint32_t temp[], uint16_t dst[]) {
-        copy_msg_transposed<vec_size>(&src[0], msg_size, &temp[0]);
+        copy_msg_transposed<vec_size>(&src[0], &temp[0]);
         std::fill_n(&temp[msg_size * vec_size], ecc_len * vec_size, 0);
         // std::memset(&temp[msg_size * vec_size], 0, ecc_len * vec_size * sizeof(uint32_t));
 
         rs.encode(&temp[0]);
-        copy_blocks_transposed<vec_size>(&temp[0], ecc_len, &dst[0], ecc_len);
+        copy_ecc_transposed<vec_size>(&temp[0], &dst[0], ecc_len);
     }
 
     inline size_t encode_blocks_inline(const uint16_t src[], size_t full_blocks, uint32_t temp[], uint16_t dst[]) {
