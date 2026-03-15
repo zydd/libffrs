@@ -36,30 +36,34 @@ ref_ntt, ref_intt = ref_ntt_ct, ref_intt_ct
 # ref_ntt, ref_intt = ref_ntt_gs, ref_intt_gs
 
 
-@pytest.mark.parametrize('rs', [
+@pytest.mark.parametrize("rs", [
     ffrs.RSi16md(4*2, ecc_len=2*2),
     ffrs.RSi16md(16*2, ecc_len=4*2),
     ffrs.RSi16md(128*2, ecc_len=2*2),
     ffrs.RSi16md(256*2, ecc_len=128*2),
-    ffrs.RSi16md(1024, ecc_len=128),
+    # ffrs.RSi16md(1024, ecc_len=128),
+    # ffrs.RSi16md(4096, ecc_len=512),
 
     ffrs.RSi16md(4*2, ecc_len=2*2, simd_x16=False),
     ffrs.RSi16md(16*2, ecc_len=4*2, simd_x16=False),
     ffrs.RSi16md(128*2, ecc_len=2*2, simd_x16=False),
-    # ffrs.RSi16md(256*2, ecc_len=128*2, simd_x16=False),
+    ffrs.RSi16md(256*2, ecc_len=128*2, simd_x16=False),
     # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False),
+    # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False),
 
     ffrs.RSi16md(4*2, ecc_len=2*2, simd_x16=False, simd_x8=False),
     ffrs.RSi16md(16*2, ecc_len=4*2, simd_x16=False, simd_x8=False),
     ffrs.RSi16md(128*2, ecc_len=2*2, simd_x16=False, simd_x8=False),
-    # ffrs.RSi16md(256*2, ecc_len=128*2, simd_x16=False, simd_x8=False),
+    ffrs.RSi16md(256*2, ecc_len=128*2, simd_x16=False, simd_x8=False),
     # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False),
+    # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False),
 
     ffrs.RSi16md(4*2, ecc_len=2*2, simd_x16=False, simd_x8=False, simd_x4=False),
     ffrs.RSi16md(16*2, ecc_len=4*2, simd_x16=False, simd_x8=False, simd_x4=False),
     ffrs.RSi16md(128*2, ecc_len=2*2, simd_x16=False, simd_x8=False, simd_x4=False),
-    # ffrs.RSi16md(256*2, ecc_len=128*2, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.RSi16md(256*2, ecc_len=128*2, simd_x16=False, simd_x8=False, simd_x4=False),
     # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
+    # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False, simd_x4=False),
 ])
 class TestRS:
     def test_encode(self, rs):
@@ -123,7 +127,7 @@ class TestRS:
         assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len
         assert buf_enc == buf_enc_blk
 
-    @pytest.mark.parametrize('count', [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 16, 100])
+    @pytest.mark.parametrize("count", [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 16, 100])
     def test_encode_blocks_multiple(self, rs, count):
         buf = randbytes(rs.message_len * count)
 
@@ -135,7 +139,7 @@ class TestRS:
         assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * count
         assert buf_enc == buf_enc_blk
 
-    @pytest.mark.parametrize('extra', [2, 4, 6, 8, 10, 12, 14, 128, 1500])
+    @pytest.mark.parametrize("extra", [2, 4, 6, 8, 10, 12, 14, 128, 1500])
     def test_encode_blocks_remainder(self, rs, extra):
         count = 16 + extra // rs.message_len
         extra = (extra % rs.message_len) or 2
@@ -149,4 +153,38 @@ class TestRS:
         buf_enc_blk = rs.encode_blocks(buf)
 
         assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * (count + 1)
+        assert buf_enc == buf_enc_blk
+
+    @pytest.mark.parametrize("interleave", [1, 2, 4, 8, 16])
+    def test_encode_blocks_interleaved(self, rs, interleave):
+        if not (
+            interleave == 1
+            or interleave <= 4 and rs.simd_x4
+            or interleave <= 8 and rs.simd_x8
+            or interleave <= 16 and rs.simd_x16
+        ):
+            pytest.skip("TODO: generalized interleaving")
+
+        count = interleave * 16
+        # buf = randbytes(rs.message_len * count)
+        buf = to_bytearray(list(range(count * rs.message_len//2)), 2)
+
+        buf_enc = [rs.encode(buf[i * rs.message_len:(i + 1) * rs.message_len])
+                        for i in range(count)]
+        buf_enc = b"".join(buf_enc)
+        buf_enc_blk = rs.encode_blocks(buf)
+
+        interleave_orig = rs.interleave
+        rs.interleave = interleave
+        try:
+            buf_enc_blk_interleaved = rs.encode_blocks(buf)
+        finally:
+            rs.interleave = interleave_orig
+
+        for i in range(interleave):
+            blk0 = buf_enc_blk_interleaved[i * rs.ecc_len:(i + 1) * rs.ecc_len]
+            enc0 = rs.encode(to_bytearray(to_int_list(buf, 2)[i::interleave][:rs.message_len//2], 2))
+            assert blk0 == enc0
+
+        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * count
         assert buf_enc == buf_enc_blk

@@ -47,6 +47,10 @@ public:
     inline T& operator[](size_t idx) {
         return data[idx];
     }
+
+    inline T const& operator[](size_t idx) const {
+        return data[idx];
+    }
 };
 
 }

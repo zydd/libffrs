@@ -187,7 +187,7 @@ def main():
     if len(sys.argv) < 2:
         return show_help()
 
-    block_size = 1024
+    block_size = 4096
     ecc_len = block_size // 8
 
     fn = sys.argv[1]

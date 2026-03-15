@@ -44,8 +44,9 @@ def to_bytearray(v, sizeof, byteorder="little"):
         return bytearray(v, "utf-8")
 
     buf = bytearray(len(v) * sizeof)
+    mask = 2 ** (8 * sizeof) - 1
     for i, v in enumerate(v):
-        buf[i * sizeof:(i + 1) * sizeof] = int.to_bytes(v, sizeof, byteorder)
+        buf[i * sizeof:(i + 1) * sizeof] = int.to_bytes(v & mask, sizeof, byteorder)
     return buf
 
 
