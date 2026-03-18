@@ -188,3 +188,21 @@ class TestRS:
 
         assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * count
         assert buf_enc == buf_enc_blk
+
+    @pytest.mark.parametrize("interleave", list(range(32)) + [32, 48, 100, 256])
+    def test_encode_chunk(self, rs, interleave):
+        data = list(range(interleave * rs.message_len//2))
+        buf = to_bytearray(data, 2)
+
+        interleave_orig = rs.interleave
+        rs.interleave = interleave
+        try:
+            chunk_enc = rs.encode_chunk(buf)
+        finally:
+            rs.interleave = interleave_orig
+
+        rs.interleave = 1
+        for i in range(interleave):
+            buf_enc = rs.encode(to_bytearray(data[i::interleave], 2))
+            assert chunk_enc[i * rs.ecc_len:(i + 1) * rs.ecc_len] == buf_enc
+

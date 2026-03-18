@@ -205,6 +205,11 @@ def main():
         benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_len=ecc_len, simd_x16=False, simd_x8=False, simd_x4=False))), input_size=(block_size - ecc_len) * 2**10)
     elif fn == "enci16v":
         benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_len=ecc_len))), input_size=(block_size - ecc_len) * 2**10)
+    elif fn == "enci16v4096":
+        block_size = 4096
+        interleave = 4096
+        chunks = 1
+        benchmark_throughput((f"rs.encode_chunk(data)", dict(rs=ffrs.RSi16md(block_size, ecc_len=block_size//8, interleave=interleave))), input_size=(block_size - block_size//8) * interleave * chunks)
     else:
         return show_help()
 
