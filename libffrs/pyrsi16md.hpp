@@ -1,7 +1,7 @@
 /**************************************************************************
  * PyRSi16md.hpp
  *
- * Copyright 2025 Gabriel Machado
+ * Copyright 2026 Gabriel Machado
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,17 +46,17 @@ private:
     const size_t msg_size;
     const size_t ecc_len;
     const size_t interleave;
-    bool simd_x16;
-    bool simd_x8;
     bool simd_x4;
+    bool simd_x8;
+    bool simd_x16;
 
     inline PyRSi16md(
         rs_data&& args,
         uint32_t primitive,
         size_t interleave,
-        bool simd_x16,
+        bool simd_x4,
         bool simd_x8,
-        bool simd_x4
+        bool simd_x16
     ):
         gf(primitive),
         rs16(gf, args.block_size, args.ecc_len),
@@ -67,9 +67,9 @@ private:
         msg_size(args.block_size - args.ecc_len),
         ecc_len(args.ecc_len),
         interleave(interleave),
-        simd_x16(simd_x16),
+        simd_x4(simd_x4),
         simd_x8(simd_x8),
-        simd_x4(simd_x4)
+        simd_x16(simd_x16)
     { }
 
 public:
@@ -82,17 +82,17 @@ public:
             std::optional<uint16_t> ecc_len,
             uint32_t primitive,
             size_t interleave,
-            std::optional<bool> simd_x16,
+            std::optional<bool> simd_x4,
             std::optional<bool> simd_x8,
-            std::optional<bool> simd_x4
+            std::optional<bool> simd_x16
     ):
         PyRSi16md(
             _get_args(block_size, message_len, ecc_len),
             primitive,
             interleave,
-            simd_x16.value_or(__builtin_cpu_supports("avx512f")),
+            simd_x4.value_or(__builtin_cpu_supports("sse2")),
             simd_x8.value_or(__builtin_cpu_supports("avx2")),
-            simd_x4.value_or(__builtin_cpu_supports("sse2"))
+            simd_x16.value_or(__builtin_cpu_supports("avx512f"))
         )
     { }
 
@@ -219,20 +219,20 @@ public:
                 },
                 R"(Number of interleaved codewords for block encoding)"
             )
-            .def_property("simd_x16",
-                [](PyRSi16md& self) { return self.simd_x16; },
-                [](PyRSi16md& self, bool value) { self.simd_x16 = value; },
-                R"(Enable SIMD x16 encoding)"
+            .def_property("simd_x4",
+                [](PyRSi16md& self) { return self.simd_x4; },
+                [](PyRSi16md& self, bool value) { self.simd_x4 = value; },
+                R"(Enable SIMD x4 encoding)"
             )
             .def_property("simd_x8",
                 [](PyRSi16md& self) { return self.simd_x8; },
                 [](PyRSi16md& self, bool value) { self.simd_x8 = value; },
                 R"(Enable SIMD x8 encoding)"
             )
-            .def_property("simd_x4",
-                [](PyRSi16md& self) { return self.simd_x4; },
-                [](PyRSi16md& self, bool value) { self.simd_x4 = value; },
-                R"(Enable SIMD x4 encoding)"
+            .def_property("simd_x16",
+                [](PyRSi16md& self) { return self.simd_x16; },
+                [](PyRSi16md& self, bool value) { self.simd_x16 = value; },
+                R"(Enable SIMD x16 encoding)"
             )
 
             .def(py::init<
@@ -251,9 +251,9 @@ public:
                 "ecc_len"_a = py::none(),
                 "primitive"_a = 3,
                 "interleave"_a = 1,
-                "simd_x16"_a = py::none(),
+                "simd_x4"_a = py::none(),
                 "simd_x8"_a = py::none(),
-                "simd_x4"_a = py::none()
+                "simd_x16"_a = py::none()
             )
 
             .def("__sizeof__", [](PyRSi16md& self) { return sizeof(self); })
@@ -342,6 +342,34 @@ private:
     }
 
     template<size_t vec_size, typename T, typename U>
+    inline void copy_msg_transposed(const T *src, U *dst) const {
+        for (size_t j = 0; j < vec_size; ++j)
+            for (size_t i = 0; i < msg_size; ++i)
+                dst[i * vec_size + j] = src[i + j * msg_size];
+    }
+
+    template<size_t vec_size, typename T, typename U>
+    inline size_t copy_msg_transposed(const T *src, size_t src_size, U *dst) const {
+        size_t i, j;
+        for (j = 0; j < vec_size; ++j) {
+            for (i = 0; i < msg_size; ++i) {
+                auto pos = i + j * msg_size;
+                if (pos >= src_size) [[unlikely]] {
+                    if (i > 0) {
+                        // Empty remaining column
+                        for (; i < msg_size; ++i)
+                            dst[i * vec_size + j] = 0;
+                        return j + 1;
+                    }
+                    return j;
+                }
+                dst[i * vec_size + j] = src[pos];
+            }
+        }
+        return j;
+    }
+
+    template<size_t vec_size, typename T, typename U>
     inline void copy_ecc_transposed(const T *src, U *dst, size_t dst_stride) const {
         for (size_t j = 0; j < vec_size; ++j)
             for (size_t i = 0; i < ecc_len; ++i)
@@ -401,7 +429,8 @@ private:
 
     template<size_t vec_size, typename T>
     inline void encode_block(T const& rs, const uint16_t src[], uint32_t temp[], uint16_t dst[]) {
-        copy_interleaved(src, msg_size * vec_size, temp, msg_size, vec_size);
+        // copy_interleaved(src, msg_size * vec_size, temp, msg_size, vec_size);
+        copy_msg_transposed<vec_size>(&src[0], &temp[0]);
         std::fill_n(&temp[msg_size * vec_size], ecc_len * vec_size, 0);
         // std::memset(&temp[msg_size * vec_size], 0, ecc_len * vec_size * sizeof(uint32_t));
 
@@ -411,9 +440,10 @@ private:
 
     template<size_t vec_size, typename T>
     inline void encode_block(T const& rs, const uint16_t src[], size_t src_size, uint32_t temp[], uint16_t dst[]) {
-        auto cols = src_size / msg_size + !!(src_size % msg_size);
         std::fill_n(&temp[0], block_size * vec_size, 0);
-        copy_interleaved(src, src_size, temp, msg_size, vec_size);
+        // copy_interleaved(src, src_size, temp, msg_size, vec_size);
+        // auto cols = src_size / msg_size + !!(src_size % msg_size);
+        auto cols = copy_msg_transposed<vec_size>(&src[0], src_size, &temp[0]);
         std::fill_n(&temp[msg_size * vec_size], ecc_len * vec_size, 0);
         // std::memset(&temp[msg_size * vec_size], 0, ecc_len * vec_size * sizeof(uint32_t));
 

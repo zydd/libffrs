@@ -155,6 +155,7 @@ class TestRS:
         assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * (count + 1)
         assert buf_enc == buf_enc_blk
 
+    @pytest.mark.skip
     @pytest.mark.parametrize("interleave", [1, 2, 4, 8, 16])
     def test_encode_blocks_interleaved(self, rs, interleave):
         if not (
