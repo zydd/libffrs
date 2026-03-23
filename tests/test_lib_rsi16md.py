@@ -38,7 +38,7 @@ ref_ntt, ref_intt = ref_ntt_ct, ref_intt_ct
 
 @pytest.mark.parametrize("rs", [
     ffrs.RSi16md(4*2, ecc_len=2*2),
-    ffrs.RSi16md(16*2, ecc_len=4*2),
+    ffrs.RSi16md(16*2, ecc_len=8*2),
     ffrs.RSi16md(128*2, ecc_len=2*2),
     ffrs.RSi16md(256*2, ecc_len=128*2),
     # ffrs.RSi16md(1024, ecc_len=128),
@@ -74,7 +74,7 @@ class TestRS:
         w = ref_gf(rs.root)
         buf_ntt = ref_ntt(w, to_int_list(buf + bytearray(rs.ecc_len), 2))
 
-        ecc_mix = rs._mix_ecc(w, buf_ntt[:rs.ecc_len//2])
+        ecc_mix = rs._mix_ecc(buf_ntt[:rs.ecc_len//2])
 
         assert to_bytearray(ecc_mix, 2) == res
 

@@ -27,21 +27,17 @@ intt = lambda w, x: rbo_sorted(to_int_list(ref.ntt.intt(GF, w, x)))
 
 
 class RSi16md(libffrs.RSi16md):
-    def _mix_ecc(self, w, ecc):
+    def _mix_ecc(self, ecc):
         ecc_mix = ecc
         i = rbo(self.block_size // 2, (self.block_size - self.ecc_len) // 2)
-        w_i = self.gf.pow(self.gf.inv(w), i)
+        w_i = self.gf.pow(self.gf.inv(self.root), i)
 
-        ecc_mix = [self.gf.mul(s, self.gf.pow(w_i, j)) for j, s in enumerate(ecc_mix)]
+        ecc_mix = [self.gf.mul(s, self.gf.sub(0, self.gf.pow(w_i, j))) for j, s in enumerate(ecc_mix)]
 
-        # print("ecc_mul: ", ecc_mix)
-        ecc_mix_short = intt(w ** (self.block_size // self.ecc_len), ecc_mix)
-        # ecc_mix = ecc_mix * (self.block_size // self.ecc_len)
-        # ecc_mix = intt(w, ecc_mix)
-        # ecc_mix = ecc_mix[:self.ecc_len // 2]
-        # assert ecc_mix == ecc_mix_short
+        # ecc_root = GF(self.root) ** (self.block_size // self.ecc_len)
+        ecc_root = GF(self.gf.exp(self.gf.div(self.gf.log(1), self.ecc_len//2)))
+        ecc_mix = intt(ecc_root, ecc_mix)
 
-        ecc_mix = [self.gf.sub(0, s) for s in ecc_mix_short]
         return ecc_mix
 
     def find_errors(self, msg1: bytearray):

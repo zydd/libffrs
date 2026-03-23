@@ -39,7 +39,6 @@ public:
         size_t nbits = __builtin_ctzl(block_size);
 
         root = gf.exp(gf.div(gf.log(1), block_size));
-
         if (root >= 0x8000)
             root = gf.neg(root);
 
@@ -47,14 +46,8 @@ public:
             throw std::runtime_error("Root of unity not found for block size");
 
         _rootsv.resize(block_size);
-        _roots_iv.resize(block_size);
-        uint32_t r = root;
-        uint32_t r_i = gf.inv(r);
         for (size_t i = 0; i < block_size; ++i) {
-            // _roots[i] = r;
-            // r = gf.pow(r, 2);
             _rootsv[i] = GFT{0} + gf.pow(root, i);
-            _roots_iv[i] = GFT{0} + gf.pow(r_i, i);
         }
 
         _rbo.resize(block_size);
@@ -62,10 +55,16 @@ public:
             _rbo[i] = rbo16(i) >> (16 - nbits);
 
         _ecc_mix_wv.resize(ecc_len);
-        for (size_t j = 0; j < ecc_len; ++j) {
-            auto w = *reinterpret_cast<uint32_t *>(&_roots_iv[_rbo[block_size - ecc_len]]);
-            // w = - w ** (- rbo(i) * j) / block_size
-            _ecc_mix_wv[j] = GFT{0} + gf.neg(gf.div(gf.pow(w, j), block_size));
+        for (size_t i = 0; i < ecc_len; ++i) {
+            auto w_i = gf.inv(*reinterpret_cast<uint32_t *>(&_rootsv[_rbo[block_size - ecc_len]]));
+            _ecc_mix_wv[i] = GFT{0} + gf.neg(gf.div(gf.pow(w_i, i), ecc_len));
+        }
+
+        // uint32_t ecc_root = gf.inv(gf.pow(root, block_size / ecc_len));
+        uint32_t ecc_root = gf.inv(gf.exp(gf.div(gf.log(1), ecc_len)));
+        _roots_iv.resize(ecc_len);
+        for (size_t i = 0; i < ecc_len; ++i) {
+            _roots_iv[i] = GFT{0} + gf.pow(ecc_root, i);
         }
     }
 
@@ -75,11 +74,7 @@ public:
         for (size_t j = 0; j < ecc_len; ++j)
             block[j] = gf.mul(block[j], _ecc_mix_wv[j]);
 
-        for (size_t j = 1; j < block_size / ecc_len; ++j)
-            std::copy_n(&block[0], ecc_len, &block[j * ecc_len]);
-            // std::memcpy(&block[j * ecc_len], block, ecc_len * sizeof(GFT));
-
-        gs_butterfly(ecc_len, &_roots_iv[0], block, block_size);
+        gs_butterfly(ecc_len, &_roots_iv[0], block, ecc_len);
     }
 
 protected:
