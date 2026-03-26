@@ -67,7 +67,16 @@ def benchmark_throughput(
         cooldown -= 1
         time.sleep(1)
 
-    data = random.randbytes(input_size)
+    if input_size <= 500e6:
+        data = random.randbytes(input_size)
+    else:
+        data = bytearray(input_size)
+        chunk_size = 2 ** 20
+        for i in range(0, input_size, chunk_size):
+            data[i:i+chunk_size] = random.randbytes(min(chunk_size, input_size - i))
+        remaining = input_size % chunk_size
+        if remaining:
+            data[-remaining:] = random.randbytes(remaining)
 
     elapsed_time = 0
     while elapsed_time < duration:
@@ -151,15 +160,8 @@ def run_enc_benchmarks(config):
         writer.writerows(table)
 
 
-def ntt_benchmark(block_size):
-    print(f"\nntt block_size: {block_size * 2} bytes")
-    GF = ffrs.GFi16(65537, 3)
-    w = next(i for i in range(2, GF.prime) if i**block_size % GF.prime == 1)
-
-    return (f"gf.ntt_blocks16(data, {w}, {block_size})", dict(gf=GF))
-
 def show_help():
-    print("benchmark.py [enc|ntt]")
+    print("benchmark.py [enc]")
 
 
 def main():
@@ -199,26 +201,28 @@ def main():
                 benchmark_throughput(enc256_benchmark("encode_blocks", ecc_len, 255))
         else:
             run_enc_benchmarks(config)
-    elif fn == "ntt":
-        benchmark_throughput(ntt_benchmark(1024//2), input_size=1 * 2**20)
     elif fn == "enci16":
-        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_len=ecc_len, simd_x16=False, simd_x8=False, simd_x4=False))), input_size=(block_size - ecc_len) * 2**10)
+        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_size=ecc_len, simd_x16=False, simd_x8=False, simd_x4=False))), input_size=(block_size - ecc_len) * 2**10)
     elif fn == "enci16v":
-        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_len=ecc_len))), input_size=(block_size - ecc_len) * 2**10)
+        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_size=ecc_len))), input_size=(block_size - ecc_len) * 2**10)
     elif fn == "enci16v4":
         block_size = 4096
         ecc_len = 4
-        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_len=ecc_len))), input_size=(block_size - ecc_len) * 2**10)
+        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_size=ecc_len))), input_size=(block_size - ecc_len) * 2**10)
     elif fn == "enci16v4096":
         block_size = 4096
         ecc_len = block_size // 8
         interleave = 4096
         chunks = 1
-        benchmark_throughput((f"rs.encode_chunk(data)", dict(rs=ffrs.RSi16md(block_size, ecc_len=ecc_len, interleave=interleave))), input_size=(block_size - ecc_len) * interleave * chunks)
+        rs = ffrs.RSi16md(block_size, ecc_size=ecc_len, interleave=interleave)
+        benchmark_throughput((f"rs.encode_chunk(data)", dict(rs=rs)), input_size=rs.chunk_size * chunks)
     elif fn == "circ":
-        rs = ffrs.CIRC(4096, 4, 4096, 4096 // 16)
+        block_size = 4096
+        ecc_len = block_size // 16
+        rs = ffrs.CIRC(block_size // 2, 4, block_size, ecc_len)
+        print(rs.message_size, rs.ecc_size)
         chunks = 1
-        benchmark_throughput((f"rs.encode(data)", dict(rs=rs)), input_size=rs.message_len)
+        benchmark_throughput((f"rs.encode(data)", dict(rs=rs)), input_size=rs.message_size)
     else:
         return show_help()
 

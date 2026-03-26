@@ -37,51 +37,49 @@ ref_ntt, ref_intt = ref_ntt_ct, ref_intt_ct
 
 
 @pytest.mark.parametrize("rs", [
-    ffrs.RSi16md(4*2, ecc_len=2*2),
-    ffrs.RSi16md(16*2, ecc_len=8*2),
-    ffrs.RSi16md(128*2, ecc_len=2*2),
-    ffrs.RSi16md(256*2, ecc_len=128*2),
+    ffrs.RSi16md(4, ecc_len=2),
+    ffrs.RSi16md(16, ecc_len=8),
+    ffrs.RSi16md(128, ecc_len=2),
+    ffrs.RSi16md(256, ecc_len=128),
     # ffrs.RSi16md(1024, ecc_len=128),
     # ffrs.RSi16md(4096, ecc_len=512),
 
-    ffrs.RSi16md(4*2, ecc_len=2*2, simd_x16=False),
-    ffrs.RSi16md(16*2, ecc_len=4*2, simd_x16=False),
-    ffrs.RSi16md(128*2, ecc_len=2*2, simd_x16=False),
-    ffrs.RSi16md(256*2, ecc_len=128*2, simd_x16=False),
+    ffrs.RSi16md(4, ecc_len=2, simd_x16=False),
+    ffrs.RSi16md(16, ecc_len=4, simd_x16=False),
+    ffrs.RSi16md(128, ecc_len=2, simd_x16=False),
+    ffrs.RSi16md(256, ecc_len=128, simd_x16=False),
     # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False),
     # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False),
 
-    ffrs.RSi16md(4*2, ecc_len=2*2, simd_x16=False, simd_x8=False),
-    ffrs.RSi16md(16*2, ecc_len=4*2, simd_x16=False, simd_x8=False),
-    ffrs.RSi16md(128*2, ecc_len=2*2, simd_x16=False, simd_x8=False),
-    ffrs.RSi16md(256*2, ecc_len=128*2, simd_x16=False, simd_x8=False),
+    ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False),
+    ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False),
+    ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False),
+    ffrs.RSi16md(256, ecc_len=128, simd_x16=False, simd_x8=False),
     # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False),
     # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False),
 
-    ffrs.RSi16md(4*2, ecc_len=2*2, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.RSi16md(16*2, ecc_len=4*2, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.RSi16md(128*2, ecc_len=2*2, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.RSi16md(256*2, ecc_len=128*2, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.RSi16md(256, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
     # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
     # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False, simd_x4=False),
 ])
 class TestRS:
     def test_encode(self, rs):
-        buf = randbytes(rs.message_len)
+        buf = randbytes(rs.message_size)
 
         res = rs.encode(buf)
 
         w = ref_gf(rs.root)
-        buf_ntt = ref_ntt(w, to_int_list(buf + bytearray(rs.ecc_len), 2))
+        buf_ntt = ref_ntt(w, to_int_list(buf + bytearray(rs.ecc_size), 2))
 
-        ecc_mix = rs._mix_ecc(buf_ntt[:rs.ecc_len//2])
+        ecc_mix = rs._mix_ecc(buf_ntt[:rs.ecc_len])
 
         assert to_bytearray(ecc_mix, 2) == res
 
     def test_encode_decode(self, rs):
-        size_u16 = rs.block_size // 2
-        ecc_u16 = rs.ecc_len // 2
-        orig = [random.randrange(0, 2**16) for _ in range(size_u16 - ecc_u16)]
+        orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
 
         msg_enc = orig + to_int_list(rs.encode(to_bytearray(orig, 2)), 2)
 
@@ -92,13 +90,13 @@ class TestRS:
         error_positions = dict()
 
         # Always add one error to the codeword
-        if len(error_positions) < max(ecc_u16//2, 1):
-            i = random.randrange(size_u16 - ecc_u16, size_u16)
+        if len(error_positions) < max(rs.ecc_len//2, 1):
+            i = random.randrange(rs.block_len - rs.ecc_len, rs.block_len)
             error_positions[i] = random.randrange(2**16)
             msg_enc_err[i] = rs.gf.add(msg_enc_err[i], error_positions[i])
 
-        while len(error_positions) < ecc_u16//2:
-            i = random.randrange(size_u16)
+        while len(error_positions) < rs.ecc_len//2:
+            i = random.randrange(rs.block_len)
             if i in error_positions:
                 continue
             error_positions[i] = random.randrange(2**16)
@@ -112,47 +110,47 @@ class TestRS:
 
         msg_enc_err_dec = rs.decode(to_bytearray(msg_enc_err, 2))
 
-        assert msg_enc[:-ecc_u16] == to_int_list(msg_enc_err_dec, 2)
+        assert msg_enc[:-rs.ecc_len] == to_int_list(msg_enc_err_dec, 2)
         assert error_positions == rs.find_errors(to_bytearray(msg_enc_err, 2))
 
     def test_encode_blocks_empty(self, rs):
         assert bytearray() == rs.encode_blocks(bytearray())
 
     def test_encode_blocks_single(self, rs):
-        buf = randbytes(rs.message_len)
+        buf = randbytes(rs.message_size)
 
         buf_enc = rs.encode(buf)
         buf_enc_blk = rs.encode_blocks(buf)
 
-        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len
+        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_size
         assert buf_enc == buf_enc_blk
 
     @pytest.mark.parametrize("count", [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 16, 100])
     def test_encode_blocks_multiple(self, rs, count):
-        buf = randbytes(rs.message_len * count)
+        buf = randbytes(rs.message_size * count)
 
-        buf_enc = [rs.encode(buf[i * rs.message_len:(i + 1) * rs.message_len])
+        buf_enc = [rs.encode(buf[i * rs.message_size:(i + 1) * rs.message_size])
                         for i in range(count)]
         buf_enc = b"".join(buf_enc)
         buf_enc_blk = rs.encode_blocks(buf)
 
-        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * count
+        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_size * count
         assert buf_enc == buf_enc_blk
 
     @pytest.mark.parametrize("extra", [2, 4, 6, 8, 10, 12, 14, 128, 1500])
     def test_encode_blocks_remainder(self, rs, extra):
-        count = 16 + extra // rs.message_len
-        extra = (extra % rs.message_len) or 2
-        buf = randbytes(rs.message_len * count + extra)
+        count = 16 + extra // rs.message_size
+        extra = (extra % rs.message_size) or 2
+        buf = randbytes(rs.message_size * count + extra)
 
-        buf_enc = [rs.encode(buf[i * rs.message_len:(i + 1) * rs.message_len])
+        buf_enc = [rs.encode(buf[i * rs.message_size:(i + 1) * rs.message_size])
                         for i in range(count)]
 
-        buf_enc += [rs.encode(buf[-extra:] + bytearray(rs.message_len - extra))]
+        buf_enc += [rs.encode(buf[-extra:] + bytearray(rs.message_size - extra))]
         buf_enc = b"".join(buf_enc)
         buf_enc_blk = rs.encode_blocks(buf)
 
-        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * (count + 1)
+        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_size * (count + 1)
         assert buf_enc == buf_enc_blk
 
     @pytest.mark.skip
@@ -167,10 +165,10 @@ class TestRS:
             pytest.skip("TODO: generalized interleaving")
 
         count = interleave * 16
-        # buf = randbytes(rs.message_len * count)
-        buf = to_bytearray(list(range(count * rs.message_len//2)), 2)
+        # buf = randbytes(rs.message_size * count)
+        buf = to_bytearray(list(range(count * rs.message_len)), 2)
 
-        buf_enc = [rs.encode(buf[i * rs.message_len:(i + 1) * rs.message_len])
+        buf_enc = [rs.encode(buf[i * rs.message_size:(i + 1) * rs.message_size])
                         for i in range(count)]
         buf_enc = b"".join(buf_enc)
         buf_enc_blk = rs.encode_blocks(buf)
@@ -183,16 +181,16 @@ class TestRS:
             rs.interleave = interleave_orig
 
         for i in range(interleave):
-            blk0 = buf_enc_blk_interleaved[i * rs.ecc_len:(i + 1) * rs.ecc_len]
-            enc0 = rs.encode(to_bytearray(to_int_list(buf, 2)[i::interleave][:rs.message_len//2], 2))
+            blk0 = buf_enc_blk_interleaved[i * rs.ecc_size:(i + 1) * rs.ecc_size]
+            enc0 = rs.encode(to_bytearray(to_int_list(buf, 2)[i::interleave][:rs.message_len], 2))
             assert blk0 == enc0
 
-        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_len * count
+        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_size * count
         assert buf_enc == buf_enc_blk
 
     @pytest.mark.parametrize("interleave", list(range(32)) + [32, 48, 100, 256])
     def test_encode_chunk(self, rs, interleave):
-        data = list(range(interleave * rs.message_len//2))
+        data = list(range(interleave * rs.message_len))
         buf = to_bytearray(data, 2)
 
         interleave_orig = rs.interleave
@@ -205,5 +203,5 @@ class TestRS:
         rs.interleave = 1
         for i in range(interleave):
             buf_enc = rs.encode(to_bytearray(data[i::interleave], 2))
-            assert chunk_enc[i * rs.ecc_len:(i + 1) * rs.ecc_len] == buf_enc
+            assert chunk_enc[i * rs.ecc_size:(i + 1) * rs.ecc_size] == buf_enc
 

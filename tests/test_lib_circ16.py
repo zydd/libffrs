@@ -23,9 +23,10 @@ from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, rand
 
 
 @pytest.mark.parametrize("rs", [
-    ffrs.CIRC(4096, 4, 4096, 4096 // 16),
+    ffrs.CIRC(4096 // 2, 4, 4096, 4096 // 16),
 ])
 class TestCIRC:
     def test_circ_encode(self, rs):
-        buf = randbytes(rs.message_len)
+        buf = randbytes(rs.message_size)
         res = rs.encode(buf)
+        assert len(res) == rs.ecc_size
