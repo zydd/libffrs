@@ -61,12 +61,6 @@ def benchmark_throughput(
 
     best_time = float("inf")
 
-    # some cool down time seems to make the test results more repeatable
-    while cooldown > 0:
-        print(f"Cooldown {cooldown:2}", end="\r")
-        cooldown -= 1
-        time.sleep(1)
-
     if input_size <= 500e6:
         data = random.randbytes(input_size)
     else:
@@ -77,6 +71,12 @@ def benchmark_throughput(
         remaining = input_size % chunk_size
         if remaining:
             data[-remaining:] = random.randbytes(remaining)
+
+    # some cool down time seems to make the test results more repeatable
+    while cooldown > 0:
+        print(f"Cooldown {cooldown:2}", end="\r")
+        cooldown -= 1
+        time.sleep(1)
 
     elapsed_time = 0
     while elapsed_time < duration:
@@ -210,17 +210,16 @@ def main():
         ecc_len = 4
         benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_size=ecc_len))), input_size=(block_size - ecc_len) * 2**10)
     elif fn == "enci16v4096":
-        block_size = 4096
-        ecc_len = block_size // 8
-        interleave = 4096
+        block_len = 4096
+        ecc_len = block_len // 16
+        interleave = 2**16 * 4
         chunks = 1
-        rs = ffrs.RSi16md(block_size, ecc_size=ecc_len, interleave=interleave)
+        rs = ffrs.RSi16md(block_len, ecc_len=ecc_len, interleave=interleave)
+        print(rs.chunk_size/1e6, rs.ecc_size*rs.interleave/1e6, rs.ecc_size * rs.interleave / rs.chunk_size)
         benchmark_throughput((f"rs.encode_chunk(data)", dict(rs=rs)), input_size=rs.chunk_size * chunks)
     elif fn == "circ":
-        block_size = 4096
-        ecc_len = block_size // 16
-        rs = ffrs.CIRC(block_size // 2, 4, block_size, ecc_len)
-        print(rs.message_size, rs.ecc_size)
+        rs = ffrs.CIRC(4096, 4, 4096, 256, 64)
+        print(rs.message_size/1e6, rs.ecc_size/1e6, rs.ecc_size / rs.message_size)
         chunks = 1
         benchmark_throughput((f"rs.encode(data)", dict(rs=rs)), input_size=rs.message_size)
     else:
