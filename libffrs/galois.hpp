@@ -98,30 +98,35 @@ public:
 template<typename GFT, typename GF>
 class gf_add_i16_shift {
 public:
+    template<typename = std::enable_if_t<std::is_integral_v<GFT>>>
     inline GFT add(GFT const& lhs, GFT const& rhs) const {
         uint32_t res = lhs + rhs;
-        if (res > 0x10001)
+        if (res >= 0x10001)
             res -= 0x10001;
-        // res -= (res > 0x10001) * 0x10001;
+        // res -= (res >= 0x10001) * 0x10001;
         return res;
     }
 
+    template<typename = std::enable_if_t<std::is_integral_v<GFT>>>
     inline GFT sub(GFT const& lhs, GFT const& rhs) const {
         uint32_t res = lhs - rhs;
         if (int32_t(res) < 0)
             res += 0x10001;
-        // res += (res >= 0x10000000) * 0x10001;
+        // res += (res >= 0x80000000) * 0x10001;
         return res;
     }
 
+    template<typename = std::enable_if_t<std::is_integral_v<GFT>>>
     inline GFT neg(GFT const& a) const {
+        if (a == 0)
+            return a;
         return 0x10001 - a;
     }
 
     template<typename T, typename U, typename = std::enable_if_t<!std::is_integral_v<T>>>
     static inline T add(T const& lhs, U const& rhs) {
         T res = lhs + rhs;
-        res -= (res > 0x10001) & 0x10001;
+        res -= (res >= 0x10001) & 0x10001;
         return res;
     }
 

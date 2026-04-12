@@ -82,3 +82,14 @@ def test_scalar_exp_pow():
     for a in sample_field(GF):
         assert GF.exp(a) == GF.pow(GF.primitive, a) != 0
 
+
+def test_add_overflow():
+    assert GF.add(65536, 1) == 0
+
+
+def test_sub_overflow():
+    assert GF.sub(0, 1) == 65536
+
+
+def test_mul_overflow():
+    assert GF.mul(65537, 2) == 0
