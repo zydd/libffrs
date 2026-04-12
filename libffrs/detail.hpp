@@ -148,5 +148,14 @@ constexpr size_t align_size(size_t size, size_t alignment) {
     return size + (alignment - (size % alignment)) % alignment;
 }
 
+
+constexpr uint16_t rbo16(uint16_t b) {
+    b = ((b >> 1) & 0x5555) | ((b & 0x5555) << 1);
+    b = ((b >> 2) & 0x3333) | ((b & 0x3333) << 2);
+    b = ((b >> 4) & 0x0f0f) | ((b & 0x0f0f) << 4);
+    b = ((b >> 8)         ) | ((b         ) << 8);
+    return b;
+}
+
 }
 }

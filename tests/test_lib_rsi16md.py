@@ -27,13 +27,8 @@ from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, rand
 
 ref_gf = ffrs.reference.GF(65537, 1, 3)
 
-ref_ntt_ct = lambda w, buf: to_int_list(ffrs.reference.ntt.ntt(ref_gf, ref_gf(w), rbo_sorted(buf)))
-ref_intt_ct = lambda w, buf: rbo_sorted(to_int_list(ffrs.reference.ntt.intt(ref_gf, ref_gf(w), buf)))
-ref_ntt_gs = lambda w, buf: rbo_sorted(to_int_list(ffrs.reference.ntt.ntt(ref_gf, ref_gf(w), buf)))
-ref_intt_gs = lambda w, buf: to_int_list(ffrs.reference.ntt.intt(ref_gf, ref_gf(w), rbo_sorted(buf)))
-
-ref_ntt, ref_intt = ref_ntt_ct, ref_intt_ct
-# ref_ntt, ref_intt = ref_ntt_gs, ref_intt_gs
+ref_ntt = lambda w, buf: to_int_list(ffrs.reference.ntt.ntt(ref_gf, ref_gf(w), rbo_sorted(buf)))
+ref_intt = lambda w, buf: rbo_sorted(to_int_list(ffrs.reference.ntt.intt(ref_gf, ref_gf(w), buf)))
 
 
 @pytest.mark.parametrize("rs", [
@@ -78,6 +73,44 @@ class TestRS:
 
         assert to_bytearray(ecc_mix, 2) == res
 
+    def test_repair(self, rs):
+        orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
+
+        block_enc = orig + to_int_list(rs.encode(to_bytearray(orig, 2)), 2)
+
+        block_enc_err = list(block_enc)
+
+        assert rs.find_errors(to_bytearray(block_enc, 2)) == []
+
+        error_positions = dict()
+
+        # Always add one error to the codeword
+        if len(error_positions) < max(rs.ecc_len//2, 1):
+            i = random.randrange(rs.block_len - rs.ecc_len, rs.block_len)
+            error_positions[i] = random.randrange(2**16)
+            block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
+
+        while len(error_positions) < rs.ecc_len//2:
+            i = random.randrange(rs.block_len)
+            if i in error_positions:
+                continue
+            error_positions[i] = random.randrange(2**16)
+            block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
+
+        w = ref_gf(rs.root)
+        print()
+        print("errs: ", error_positions)
+
+        block_enc_err = to_bytearray(block_enc_err, 2)
+        msg_err = block_enc_err[:rs.message_size]
+        ecc_err = block_enc_err[rs.message_size:]
+
+        assert block_enc != to_int_list(msg_err + ecc_err, 2)
+
+        rs.repair(msg_err, ecc_err, list(error_positions.keys()))
+
+        assert block_enc == to_int_list(msg_err + ecc_err, 2)
+
     def test_encode_decode(self, rs):
         orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
 
@@ -85,7 +118,7 @@ class TestRS:
 
         msg_enc_err = list(msg_enc)
 
-        assert rs.find_errors(to_bytearray(msg_enc, 2)) == {}
+        assert rs.find_errors(to_bytearray(msg_enc, 2)) == []
 
         error_positions = dict()
 
@@ -111,7 +144,7 @@ class TestRS:
         msg_enc_err_dec = rs.decode(to_bytearray(msg_enc_err, 2))
 
         assert msg_enc[:-rs.ecc_len] == to_int_list(msg_enc_err_dec, 2)
-        assert error_positions == rs.find_errors(to_bytearray(msg_enc_err, 2))
+        assert set(error_positions.keys()) == set(rs.find_errors(to_bytearray(msg_enc_err, 2)))
 
     def test_encode_blocks_empty(self, rs):
         assert bytearray() == rs.encode_blocks(bytearray())

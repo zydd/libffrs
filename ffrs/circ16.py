@@ -32,7 +32,7 @@ class CIRC(libffrs.CIRCi16):
         inner_ok = self.rsi.check_blocks(data, ecc[:inner_ecc_size], synd[:inner_ecc_size])
         outer_ok = self.rso.check_chunk(data, ecc[inner_ecc_size:], synd[inner_ecc_size:])
         return inner_ok and outer_ok, synd
-    
+
     def repair(self, data, ecc, synd=None):
         if not synd:
             synd = bytearray(self.ecc_size)

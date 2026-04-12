@@ -46,7 +46,7 @@ class RSi16md(libffrs.RSi16md):
         synds = ntt(w, msg1_list)[:self.ecc_len]
 
         if all(s == 0 for s in synds):
-            return {}
+            return []
 
         # print("synds:    ", synds)
         synds = GF(synds)
@@ -63,21 +63,14 @@ class RSi16md(libffrs.RSi16md):
         else:
             raise RuntimeError("Decoding failed")
 
-        err_ws = [[w.pow(err_pos_rbo[i] * j) for i in range(err_count)] for j in range(err_count)]
-        err_pos = [rbo(self.block_len, i) for i in err_pos_rbo]
+        return [rbo(self.block_len, pos) for pos in err_pos_rbo]
 
-        err_mag = ref.linalg.gaussian_elim(err_ws, GF(synds[:err_count]))
-        errors = dict(zip(err_pos, map(int, err_mag)))
-        print("errors:", errors)
-        return errors
+    def decode(self, block: bytearray):
+        error_pos = self.find_errors(block)
 
-    def decode(self, msg1: bytearray):
-        errors = self.find_errors(msg1)
-        msg1_list = to_int_list(msg1, 2)
+        msg = block[:self.message_size]
+        ecc = block[self.message_size:]
 
-        for pos, mag in errors.items():
-            msg1_list[pos] = self.gf.sub(msg1_list[pos], mag)
+        self.repair(msg, ecc, error_pos)
 
-        msg1[:] = to_bytearray(msg1_list, 2)
-
-        return msg1[:self.message_size]
+        return msg

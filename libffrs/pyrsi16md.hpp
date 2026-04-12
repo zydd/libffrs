@@ -99,18 +99,39 @@ public:
     { }
 
     inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
-        constexpr size_t vec_size = 1;
-        py_assert(buf.size == message_len * vec_size, std::to_string(buf.size));
+        py_assert(buf.size == message_len, std::to_string(buf.size));
 
-        size_t output_size = ecc_len;
-
-        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * vec_size]);
-        auto output = py::bytearray(nullptr, output_size * vec_size * sizeof(uint16_t));
+        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
+        auto output = py::bytearray(nullptr, ecc_len * sizeof(uint16_t));
         auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
 
-        encode_block<vec_size>(rs16, &buf[0], &temp[0], &output_data[0]);
+        encode_block<1>(rs16, &buf[0], &temp[0], &output_data[0]);
 
         return output;
+    }
+
+    inline void py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, std::vector<size_t> const& error_pos) {
+        py_assert(message.size == message_len, std::to_string(message.size));
+        py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
+        py_assert(error_pos.size() <= ecc_len);
+
+        if (error_pos.empty())
+            return;
+
+        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
+        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
+
+        std::copy_n(&message[0], message_len, &buf[0]);
+        std::copy_n(&ecc[0], ecc_len, &buf[message_len]);
+
+        auto error_pos_rbo = std::vector<size_t>(error_pos.size());
+        for (size_t i = 0; i < error_pos.size(); ++i)
+            error_pos_rbo[i] = rs16.rbo(error_pos[i]);
+
+        rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp[0]);
+
+        std::copy_n(&buf[0], message_len, &message[0]);
+        std::copy_n(&buf[message_len], ecc_len, &ecc[0]);
     }
 
     inline void encode_full_blocks(const uint16_t src[], size_t blocks, uint16_t dst[]) {
@@ -294,6 +315,12 @@ public:
             .def("encode_chunk", cast_args(&PyRSi16md::py_encode_chunk),
                 R"(Encode a chunk of interleaved codewords)",
                 "buffer"_a)
+
+            .def("repair", cast_args(&PyRSi16md::py_repair),
+                R"(Repair a block with the given error locations)",
+                "message"_a,
+                "ecc"_a,
+                "error_pos"_a)
 
             // .def("decode", cast_args(&PyRSi16md::py_decode),
             //     R"(Systematic decode)",

@@ -31,64 +31,104 @@ class RSi16vImpl {
 public:
     uint32_t root;
 
-    inline RSi16vImpl(GFi16 const& gf, size_t block_size, size_t ecc_len):
+    inline RSi16vImpl(GFi16 const& gf, size_t block_len, size_t ecc_len):
         gf(gf),
-        block_size(block_size),
+        block_len(block_len),
         ecc_len(ecc_len)
     {
-        size_t nbits = __builtin_ctzl(block_size);
+        _rbo_shift = 16 - __builtin_ctzl(block_len);
 
-        root = gf.exp(gf.div(gf.log(1), block_size));
+        root = gf.exp(gf.div(gf.log(1), block_len));
         if (root >= 0x8000)
             root = gf.neg(root);
 
-        if (gf.pow(root, block_size) != 1)
+        if (gf.pow(root, block_len) != 1)
             throw std::runtime_error("Root of unity not found for block size");
 
-        _rootsv.resize(block_size);
-        for (size_t i = 0; i < block_size; ++i) {
-            _rootsv[i] = GFT{0} + gf.pow(root, i);
+        uint32_t root_i = gf.inv(root);
+        _roots_v_block.resize(block_len);
+        _roots_iv_block.resize(block_len);
+        for (size_t i = 0; i < block_len; ++i) {
+            _roots_v_block[i] = GFT{0} + gf.pow(root, i);
+            _roots_iv_block[i] = GFT{0} + gf.pow(root_i, i);
         }
 
-        _rbo.resize(block_size);
-        for (size_t i = 0; i < block_size; ++i)
-            _rbo[i] = rbo16(i) >> (16 - nbits);
-
-        _ecc_mix_wv.resize(ecc_len);
+        _ecc_mix_v.resize(ecc_len);
         for (size_t i = 0; i < ecc_len; ++i) {
-            auto w_i = gf.inv(*reinterpret_cast<uint32_t *>(&_rootsv[_rbo[block_size - ecc_len]]));
-            _ecc_mix_wv[i] = GFT{0} + gf.neg(gf.div(gf.pow(w_i, i), ecc_len));
+            auto w_i = gf.inv(*reinterpret_cast<uint32_t *>(&_roots_v_block[rbo(block_len - ecc_len)]));
+            _ecc_mix_v[i] = GFT{0} + gf.neg(gf.div(gf.pow(w_i, i), ecc_len));
         }
 
-        // uint32_t ecc_root = gf.inv(gf.pow(root, block_size / ecc_len));
+        // uint32_t ecc_root = gf.inv(gf.pow(root, block_len / ecc_len));
         uint32_t ecc_root = gf.inv(gf.exp(gf.div(gf.log(1), ecc_len)));
-        _roots_iv.resize(ecc_len);
+        _roots_iv_ecc.resize(ecc_len);
         for (size_t i = 0; i < ecc_len; ++i) {
-            _roots_iv[i] = GFT{0} + gf.pow(ecc_root, i);
+            _roots_iv_ecc[i] = GFT{0} + gf.pow(ecc_root, i);
         }
     }
 
     inline void encode(GFT block[]) const {
-        ct_butterfly(&_rootsv[0], block, block_size);
+        ct_butterfly(&_roots_v_block[0], &block[0], block_len);
 
         for (size_t j = 0; j < ecc_len; ++j)
-            block[j] = gf.mul(block[j], _ecc_mix_wv[j]);
+            block[j] = gf.mul(block[j], _ecc_mix_v[j]);
 
-        gs_butterfly(ecc_len, &_roots_iv[0], block, ecc_len);
+        gs_butterfly(&_roots_iv_ecc[0], &block[0], ecc_len, ecc_len);
+    }
+
+    inline void repair(GFT block[], const size_t error_pos_rbo[], size_t error_count, GFT temp[]) const {
+        ct_butterfly(&_roots_v_block[0], &block[0], block_len);
+
+        // copy synds
+        std::copy_n(&block[0], ecc_len, &temp[0]);
+
+        // re-use start of block to store error locator polynomial (omiting 1)
+        // deg(locator_poly) == error_count <= ecc_len
+        auto locator_poly = block;
+        std::fill_n(&locator_poly[0], ecc_len, GFT{0});
+
+        size_t last_error = error_count - 1;
+
+        for (size_t j = 0; j < error_count; ++j) {
+            GFT x = GFT{0} + gf.neg(gf.pow(root, error_pos_rbo[j]));
+            for (size_t i = last_error - j; i < last_error; ++i) {
+                locator_poly[i] = gf.add(locator_poly[i], gf.mul(locator_poly[i + 1], x));
+            }
+            locator_poly[last_error] = gf.add(locator_poly[last_error], x);
+        }
+
+        for (size_t j = ecc_len; j < block_len; ++j) {
+            GFT sum = GFT{0};
+            for (size_t i = 0; i < error_count; ++i)
+                sum = gf.sub(sum, gf.mul(locator_poly[i], temp[j - error_count + i]));
+
+            temp[j] = sum;
+            block[j] = gf.sub(block[j], sum);
+        }
+
+        std::fill_n(&block[0], ecc_len, GFT{0});
+        gs_butterfly(&_roots_iv_block[0], &block[0], block_len, block_len);
+        for (size_t j = 0; j < block_len; ++j)
+            block[j] = gf.div(block[j], block_len);
+    }
+
+    uint16_t rbo(uint16_t b) const {
+        return ffrs::detail::rbo16(b) >> _rbo_shift;
     }
 
 protected:
     GFi16 const& gf;
-    size_t block_size;
+    uint16_t _rbo_shift;
+    size_t block_len;
     size_t ecc_len;
-    std::vector<GFT> _rootsv;
-    std::vector<GFT> _roots_iv;
-    std::vector<uint16_t> _rbo;
-    std::vector<GFT> _ecc_mix_wv;
+    std::vector<GFT> _roots_v_block;
+    std::vector<GFT> _roots_iv_block;
+    std::vector<GFT> _roots_iv_ecc;
+    std::vector<GFT> _ecc_mix_v;
 
-    inline void ct_butterfly(const GFT roots[], GFT block[], size_t block_size) const {
-        for (size_t stride = 1, exp_f = block_size >> 1; stride < block_size; stride *= 2, exp_f >>= 1) {
-            for (size_t start = 0; start < block_size /*input_size*/; start += stride * 2) {
+    inline void ct_butterfly(const GFT roots[], GFT block[], size_t block_len) const {
+        for (size_t stride = 1, exp_f = block_len >> 1; stride < block_len; stride *= 2, exp_f >>= 1) {
+            for (size_t start = 0; start < block_len /*input_size*/; start += stride * 2) {
                 {
                     // Cooley-Tukey butterfly
                     GFT a = block[start];
@@ -111,8 +151,8 @@ protected:
         }
     }
 
-    inline void gs_butterfly(size_t end, const GFT roots[], GFT block[], size_t block_size) const {
-        for (size_t stride = block_size / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
+    inline void gs_butterfly(const GFT roots[], GFT block[], size_t block_len, size_t end) const {
+        for (size_t stride = block_len / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
             for (size_t start = 0; start < end; start += stride * 2) {
                 {
                     // Gentleman-Sande butterfly
@@ -132,13 +172,5 @@ protected:
                 }
             }
         }
-    }
-
-    uint16_t rbo16(uint16_t b) const {
-        b = ((b >> 1) & 0x5555) | ((b & 0x5555) << 1);
-        b = ((b >> 2) & 0x3333) | ((b & 0x3333) << 2);
-        b = ((b >> 4) & 0x0f0f) | ((b & 0x0f0f) << 4);
-        b = ((b >> 8)         ) | ((b         ) << 8);
-        return b;
     }
 };
