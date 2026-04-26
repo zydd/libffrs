@@ -76,6 +76,10 @@ public:
         gs_butterfly(&_roots_iv_ecc[0], &block[0], ecc_len, ecc_len);
     }
 
+    inline void ntt(GFT block[]) const {
+        ct_butterfly(&_roots_v_block[0], &block[0], block_len);
+    }
+
     inline void repair(GFT block[], const size_t error_pos_rbo[], size_t error_count, GFT temp[]) const {
         ct_butterfly(&_roots_v_block[0], &block[0], block_len);
 
@@ -110,6 +114,12 @@ public:
         gs_butterfly(&_roots_iv_block[0], &block[0], block_len, block_len);
         for (size_t j = 0; j < block_len; ++j)
             block[j] = gf.div(block[j], block_len);
+
+        // TODO limit to error positions only
+        // for (size_t j = 0; j < error_count; ++j) {
+        //     size_t i = error_pos_rbo[j];
+        //     block[i] = gf.div(block[i], block_len);
+        // }
     }
 
     uint16_t rbo(uint16_t b) const {

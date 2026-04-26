@@ -33,22 +33,22 @@ class CIRC(libffrs.CIRCi16):
         outer_ok = self.rso.check_chunk(data, ecc[inner_ecc_size:], synd[inner_ecc_size:])
         return inner_ok and outer_ok, synd
 
-    def repair(self, data, ecc, synd=None):
-        if not synd:
-            synd = bytearray(self.ecc_size)
-            integrity_ok, synd = self.check(data, ecc, synd)
-            if integrity_ok:
-                return data
+    # def repair(self, data, ecc, synd=None):
+    #     if not synd:
+    #         synd = bytearray(self.ecc_size)
+    #         integrity_ok, synd = self.check(data, ecc, synd)
+    #         if integrity_ok:
+    #             return data
 
-        inner_ecc_size = self.rsi.ecc_size * self.rso.message_size
+    #     inner_ecc_size = self.rsi.ecc_size * self.rso.message_size
 
-        nok_rows = self._nok_rows(synd)
-        if len(nok_rows) <= self.rso.ecc_size:
-            self.rso.repair_chunk_error_locations(data, nok_rows)
-            return data
-        else:
-            self.rsi.repair_blocks(data, synd[:inner_ecc_size])
-            # TODO: find corrupted block start if len(nok_rows) == self.rso.ecc_size + 1
-            # TODO: retry outer repair after
+    #     nok_rows = self._nok_rows(synd)
+    #     if len(nok_rows) <= self.rso.ecc_size:
+    #         self.rso.repair_chunk_error_locations(data, nok_rows)
+    #         return data
+    #     else:
+    #         self.rsi.repair_blocks(data, synd[:inner_ecc_size])
+    #         # TODO: find corrupted block start if len(nok_rows) == self.rso.ecc_size + 1
+    #         # TODO: retry outer repair after
 
-        raise NotImplementedError
+    #     raise NotImplementedError

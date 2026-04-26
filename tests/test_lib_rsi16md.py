@@ -111,6 +111,19 @@ class TestRS:
 
         assert block_enc == to_int_list(msg_err + ecc_err, 2)
 
+    def test_repair_no_errors(self, rs):
+        orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
+        msg = to_bytearray(orig, 2)
+        ecc = rs.encode(msg)
+        msg_err = bytearray(msg)
+        ecc_err = bytearray(ecc)
+
+        assert rs.find_errors(msg + ecc) == []
+        rs.repair(msg_err, ecc_err, [])
+
+        assert msg_err == msg
+        assert ecc_err == ecc
+
     def test_encode_decode(self, rs):
         orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
 

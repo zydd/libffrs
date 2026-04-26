@@ -218,7 +218,7 @@ def main():
         print(rs.chunk_size/1e6, rs.ecc_size*rs.interleave/1e6, rs.ecc_size * rs.interleave / rs.chunk_size)
         benchmark_throughput((f"rs.encode_chunk(data)", dict(rs=rs)), input_size=rs.chunk_size * chunks)
     elif fn == "circ":
-        rs = ffrs.CIRC(4096, 4, 4096, 256, 64)
+        rs = ffrs.CIRC(4096, 4, 4096, 256, 32)
         print(rs.message_size/1e6, rs.ecc_size/1e6, rs.ecc_size / rs.message_size)
         chunks = 1
         benchmark_throughput((f"rs.encode(data)", dict(rs=rs)), input_size=rs.message_size)

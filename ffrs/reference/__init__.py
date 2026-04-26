@@ -141,6 +141,16 @@ class P:
 
         return self.new(v)
 
+    def __pow__(self, exp):
+        assert type(exp) == int, f'incompatible types: {type(self)} and {type(exp)}'
+        if exp < 0:
+            return self.inv() ** (-exp)
+
+        v = self.new([1])
+        for _ in range(exp):
+            v *= self
+        return v
+
     def __divmod__(self, rhs):
         assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
         q, r = self._ex_synth_div(self.x, rhs.x)
