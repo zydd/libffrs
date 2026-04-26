@@ -199,41 +199,6 @@ class TestRS:
         assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_size * (count + 1)
         assert buf_enc == buf_enc_blk
 
-    @pytest.mark.skip
-    @pytest.mark.parametrize("interleave", [1, 2, 4, 8, 16])
-    def test_encode_blocks_interleaved(self, rs, interleave):
-        if not (
-            interleave == 1
-            or interleave <= 4 and rs.simd_x4
-            or interleave <= 8 and rs.simd_x8
-            or interleave <= 16 and rs.simd_x16
-        ):
-            pytest.skip("TODO: generalized interleaving")
-
-        count = interleave * 16
-        # buf = randbytes(rs.message_size * count)
-        buf = to_bytearray(list(range(count * rs.message_len)), 2)
-
-        buf_enc = [rs.encode(buf[i * rs.message_size:(i + 1) * rs.message_size])
-                        for i in range(count)]
-        buf_enc = b"".join(buf_enc)
-        buf_enc_blk = rs.encode_blocks(buf)
-
-        interleave_orig = rs.interleave
-        rs.interleave = interleave
-        try:
-            buf_enc_blk_interleaved = rs.encode_blocks(buf)
-        finally:
-            rs.interleave = interleave_orig
-
-        for i in range(interleave):
-            blk0 = buf_enc_blk_interleaved[i * rs.ecc_size:(i + 1) * rs.ecc_size]
-            enc0 = rs.encode(to_bytearray(to_int_list(buf, 2)[i::interleave][:rs.message_len], 2))
-            assert blk0 == enc0
-
-        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_size * count
-        assert buf_enc == buf_enc_blk
-
     @pytest.mark.parametrize("interleave", list(range(32)) + [32, 48, 100, 256])
     def test_encode_chunk(self, rs, interleave):
         data = list(range(interleave * rs.message_len))

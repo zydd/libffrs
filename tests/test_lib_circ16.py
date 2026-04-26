@@ -35,7 +35,7 @@ class TestCIRC:
         buf = randbytes(rs.message_size)
         res = rs.encode(buf)
         assert len(res) == rs.ecc_size
-        assert len(res)
+        assert len(res) // 2 == rs.rsi.block_len * rs.rso.block_len - rs.message_len
 
         res_i = rs.rsi.encode_blocks(buf)
         assert len(res_i) == rs.rso.message_len * rs.rsi.ecc_size
