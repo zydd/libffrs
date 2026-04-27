@@ -37,6 +37,7 @@ public:
         ecc_len(ecc_len)
     {
         _rbo_shift = 16 - __builtin_ctzl(block_len);
+        block_len_iv = GFT{0} + gf.inv(block_len);
 
         root = gf.exp(gf.div(gf.log(1), block_len));
         if (root >= 0x8000)
@@ -113,7 +114,7 @@ public:
         std::fill_n(&block[0], ecc_len, GFT{0});
         gs_butterfly(&_roots_iv_block[0], &block[0], block_len, block_len);
         for (size_t j = 0; j < block_len; ++j)
-            block[j] = gf.div(block[j], block_len);
+            block[j] = gf.mul(block[j], block_len_iv);
 
         // TODO limit to error positions only
         // for (size_t j = 0; j < error_count; ++j) {
@@ -131,6 +132,7 @@ protected:
     uint16_t _rbo_shift;
     size_t block_len;
     size_t ecc_len;
+    GFT block_len_iv;
     std::vector<GFT> _roots_v_block;
     std::vector<GFT> _roots_iv_block;
     std::vector<GFT> _roots_iv_ecc;

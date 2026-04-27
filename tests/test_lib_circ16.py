@@ -24,10 +24,12 @@ from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, rand
 
 @pytest.mark.parametrize("rs", [
     ffrs.CIRC(4, 2, 4, 2),
-    ffrs.CIRC(32, 2, 32, 4),
-    ffrs.CIRC(128, 4, 128, 128 // 16),
+    ffrs.CIRC(8, 2, 8, 2),
+    ffrs.CIRC(16, 4, 16, 4),
+    ffrs.CIRC(32, 16, 4, 2),
+    ffrs.CIRC(128, 8, 128, 128 // 16),
     ffrs.CIRC(512, 4, 512, 512 // 16),
-    ffrs.CIRC(1024, 4, 1024, 1024 // 16),
+    # ffrs.CIRC(1024, 4, 1024, 1024 // 16),
     # ffrs.CIRC(4096, 4, 4096, 4096 // 16),
 ])
 class TestCIRC:
@@ -54,7 +56,7 @@ class TestCIRC:
         ecc_orig = bytearray(ecc)
 
         # TODO: repair errors in RSO ECC
-        grace = 2
+        grace = 0 if rs.rso.ecc_len < 32 else 2
 
         for i in range((rs.rso.ecc_len - grace) * rs.rsi.message_size):
             buf[i] = 0

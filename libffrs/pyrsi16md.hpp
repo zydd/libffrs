@@ -115,7 +115,14 @@ public:
         for (size_t i = 0; i < error_pos.size(); ++i)
             error_pos_rbo[i] = rs16.rbo(error_pos[i]);
 
-        _repair_chunk<1>(rs16, message, ecc, error_pos_rbo);
+        if (simd_x16)
+            _repair_chunk<16>(rs16v16, &message[0], &ecc[0], error_pos_rbo);
+        else if (simd_x8)
+            _repair_chunk<8>(rs16v8, &message[0], &ecc[0], error_pos_rbo);
+        else if (simd_x4)
+            _repair_chunk<4>(rs16v4, &message[0], &ecc[0], error_pos_rbo);
+        else
+            _repair_chunk<1>(rs16, &message[0], &ecc[0], error_pos_rbo);
     }
 
     template<size_t vec_size, typename T>
@@ -126,11 +133,11 @@ public:
         // chunk_size = block_len * interleave
         // temp_size = block_len * vec_size
 
-        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * max_vec_size]);
-        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * max_vec_size]);
+        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * vec_size]);
+        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * vec_size]);
 
-        size_t cols = interleave / vec_size;
-        for (size_t i = 0; i < cols; ++i) {
+        size_t vec_cols = interleave / vec_size;
+        for (size_t i = 0; i < vec_cols; ++i) {
             copy_stride(&message[i * vec_size], interleave, &buf[0], vec_size, vec_size, message_len);
             copy_transposed(&ecc[i * vec_size * ecc_len], ecc_len, &buf[message_len * vec_size], vec_size);
 
@@ -138,6 +145,18 @@ public:
 
             copy_stride(&buf[0], vec_size, &message[i * vec_size], interleave, vec_size, message_len);
             copy_transposed(&buf[message_len * vec_size], vec_size, &ecc[i * vec_size * ecc_len], ecc_len);
+        }
+
+        size_t encoded_cols = vec_cols * vec_size;
+        if (encoded_cols < interleave) {
+            size_t remaining_cols = interleave - encoded_cols;
+            copy_stride(&message[encoded_cols], interleave, &buf[0], vec_size, remaining_cols, message_len);
+            copy_transposed(&ecc[encoded_cols * ecc_len], ecc_len, ecc_len, &buf[message_len * vec_size], vec_size, remaining_cols);
+
+            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp[0]);
+
+            copy_stride(&buf[0], vec_size, &message[encoded_cols], interleave, remaining_cols, message_len);
+            copy_transposed(&buf[message_len * vec_size], vec_size, remaining_cols, &ecc[encoded_cols * ecc_len], ecc_len, ecc_len);
         }
     }
 
