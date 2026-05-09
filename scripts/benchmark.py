@@ -1,4 +1,3 @@
-
 #  benchmark.py
 #
 #  Copyright 2025 Gabriel Machado
@@ -15,8 +14,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import argparse
+import collections
 import csv
 import platform
+import pprint
 import random
 import re
 import subprocess
@@ -26,7 +28,7 @@ import timeit
 
 import ffrs
 
-random.seed(42)
+import matplotlib.pyplot as plt
 
 
 def get_system_info():
@@ -50,11 +52,13 @@ def get_system_info():
 
 
 def benchmark_throughput(
-        benchmark_config,
-        input_size=100 * 2**20,  # 100 MB
-        cpu_cache_flush_size=50 * 2**20,  # 50 MB
-        duration=5, update_interval=1, cooldown=5
-    ):
+    benchmark_config,
+    input_size=100 * 2**20,  # 100 MB
+    cpu_cache_flush_size=50 * 2**20,  # 50 MB
+    duration=5,
+    update_interval=1,
+    cooldown=5,
+):
 
     number = 1
     repeat = 5
@@ -65,9 +69,9 @@ def benchmark_throughput(
         data = random.randbytes(input_size)
     else:
         data = bytearray(input_size)
-        chunk_size = 2 ** 20
+        chunk_size = 2**20
         for i in range(0, input_size, chunk_size):
-            data[i:i+chunk_size] = random.randbytes(min(chunk_size, input_size - i))
+            data[i : i + chunk_size] = random.randbytes(min(chunk_size, input_size - i))
         remaining = input_size % chunk_size
         if remaining:
             data[-remaining:] = random.randbytes(remaining)
@@ -83,10 +87,12 @@ def benchmark_throughput(
         code, env = benchmark_config
         start_time = time.time()
 
-        env.update(dict(
-            data=data,
-            random=random,
-        ))
+        env.update(
+            dict(
+                data=data,
+                random=random,
+            )
+        )
 
         times = timeit.repeat(
             code,
@@ -109,6 +115,50 @@ def benchmark_throughput(
     peak_throughput = input_size / best_time
     print(f"Peak: {peak_throughput * 1e-6:.3f} MB/s")
     return peak_throughput
+
+
+def benchmark_ber(rs, tries=100):
+    if rs.message_size <= 500e6:
+        data = random.randbytes(rs.message_size)
+    else:
+        data = bytearray(rs.message_size)
+        chunk_size = 2**20
+        for i in range(0, rs.message_size, chunk_size):
+            data[i : i + chunk_size] = random.randbytes(min(chunk_size, rs.message_size - i))
+        remaining = rs.message_size % chunk_size
+        if remaining:
+            data[-remaining:] = random.randbytes(remaining)
+
+    ecc = rs.encode(data)
+    decode_result = []
+
+    for error_count in [1, 2, 4, 8, 16, 32, 64, 128]:
+        successes = 0
+        for j in range(tries):
+            error_positions = random.sample(range(rs.block_size), error_count)
+            # print(f"\rerror_rate: {error_rate} ({error_count}/{rs.block_size}) attempt: {j:3}/{tries}", end="")
+
+            data_t = bytearray(data)
+            ecc_t = bytearray(ecc)
+
+            for i in error_positions:
+                if i < rs.message_size:
+                    data_t[i] ^= random.randint(1, 255)
+                else:
+                    ecc_t[i - rs.message_size] ^= random.randint(1, 255)
+
+            rs.repair(data_t, ecc_t)
+
+            successes += int(data == data_t and ecc == ecc_t)
+        decode_result.append((error_count, successes, tries))
+
+    print("\r\033[2K", end="")
+    for error_count, successes, tries in decode_result:
+        success_rate = successes / tries
+        print(f"Error rate: {error_count / rs.block_size:.1} {round(error_count)}, Success rate: {success_rate:.1%}")
+    print()
+
+    return decode_result
 
 
 def enc256_benchmark(method, ecc_len, block_size):
@@ -154,76 +204,143 @@ def run_enc_benchmarks(config):
             assert row[:3] == list(map(str, cfg))
             row.append(thr)
 
-
     with open("benchmark.csv", mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerows(table)
 
 
-def show_help():
-    print("benchmark.py [enc]")
+def parse_size(size_str: str) -> int:
+    size_str = size_str.strip().lower()
+
+    multipliers = {
+        "k": 1024,
+        "m": 1024**2,
+        "g": 1024**3,
+        "t": 1024**4,
+    }
+
+    if size_str[-1] in multipliers:
+        number = float(size_str[:-1]) if "." in size_str[:-1] else int(size_str[:-1])
+        return int(number * multipliers[size_str[-1]])
+    else:
+        return int(size_str)
+
+
+def parse_ratio(ratio_str: str) -> tuple[float, float]:
+    ratio_str = ratio_str.strip().lower()
+
+    if "/" in ratio_str:
+        parts = ratio_str.split("/")
+    elif ":" in ratio_str:
+        parts = ratio_str.split(":")
+    else:
+        raise ValueError(f"Invalid ratio format: {ratio_str}")
+
+    if len(parts) != 2:
+        raise ValueError(f"Invalid ratio format: {ratio_str}")
+
+    numerator = parse_size(parts[0])
+    denominator = parse_size(parts[1])
+
+    return numerator, denominator
+
+
+def circ(args):
+    block_size = parse_size(args.block_size)
+
+    ecc_ratio_num, ecc_ratio_den = parse_ratio(args.ecc_ratio)
+    assert ecc_ratio_num == 1
+    assert ecc_ratio_den > 0 and (ecc_ratio_den & (ecc_ratio_den - 1)) == 0
+
+    hash_ratio_num, hash_ratio_den = parse_ratio(args.hash_ratio)
+
+    block_size_mul = block_size
+    block_size_power = 0
+    while block_size_mul > 0 and block_size_mul & 1 == 0:
+        block_size_mul >>= 1
+        block_size_power += 1
+
+    print(
+        f"block_size: {block_size_mul} * 2**{block_size_power} ecc_ratio: 1/{ecc_ratio_den} hash_ratio: {hash_ratio_num}/{hash_ratio_den}"
+    )
+
+    ecc_ratio_num *= 2
+    ecc_ratio_den *= 2
+
+    results = []
+
+    # TODO: validate RSi16md with 64k block
+    while block_size % (hash_ratio_den * ecc_ratio_den) == 0 and ecc_ratio_den <= 32768:
+        outer_interleave = block_size // (hash_ratio_den * ecc_ratio_den)
+        rs = ffrs.CIRC(hash_ratio_den // 2, hash_ratio_num // 2, ecc_ratio_den, ecc_ratio_num, outer_interleave)
+        print(rs)
+        assert rs.block_size == block_size, rs.block_size
+
+        # benchmark_throughput((f"rs.encode(data)", dict(rs=rs)), input_size=rs.message_size)
+        res = benchmark_ber(rs)
+        results.append((ecc_ratio_den, outer_interleave, res))
+
+        ecc_ratio_num *= 2
+        ecc_ratio_den *= 2
+
+    cmap = plt.cm.Blues
+    for i, (rso_block_len, outer_interleave, res) in enumerate(results):
+        success_rates = [successes / tries for _, successes, tries in res]
+        error_counts = [error_count for error_count, _, _ in res]
+        color = cmap((i + 1) / (len(results) + 1))
+        plt.plot(
+            error_counts,
+            success_rates,
+            color=color,
+            label=f"rso_block_size: {rso_block_len * 2} outer_interleave: {outer_interleave}",
+        )
+
+    plt.ylabel("repair success rate")
+    plt.xlabel("errors")
+    plt.xscale("log", base=2)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+re_algo = re.compile(r"(RSi16md|CIRC)\((\w+=)?\d+(,\s*(\w+=)?\d+)*\)")
+
+
+def parse_algo(algo):
+    assert re_algo.match(algo), f"Invalid format: {algo}"
+    return eval("ffrs." + algo)
+
+
+def cmd_throughput(args):
+    rs = parse_algo(args.algo)
+    print(get_system_info())
+    print(rs.message_size / 2**20, rs.ecc_size / 2**20, rs.ecc_size / rs.message_size)
+    benchmark_throughput((f"rs.encode(data)", dict(rs=rs)), input_size=rs.message_size)
 
 
 def main():
-    print(get_system_info())
+    parser = argparse.ArgumentParser(description="Benchmark")
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
-    config = [
-        # ("method", ecc_len, block_size)
+    # Throughput
+    parser_add = subparsers.add_parser("throughput", help="Add an item")
+    parser_add.add_argument("algo")
+    parser_add.set_defaults(func=cmd_throughput)
 
-        # Max block size
-        ("encode_blocks", 2, 255),
-        ("encode_blocks", 4, 255),
-        ("encode_blocks", 6, 255),
-        ("encode_blocks", 8, 255),
-        ("encode_blocks", 10, 255),
-        ("encode_blocks", 12, 255),
-        ("encode_blocks", 14, 255),
-        ("encode_blocks", 16, 255),
-        ("encode_blocks", 20, 255),
-        ("encode_blocks", 24, 255),
-        ("encode_blocks", 32, 255),
-        ("encode_blocks", 64, 255),
-        ("encode_blocks", 128, 255),
-    ]
+    # # BER
+    # parser_remove = subparsers.add_parser("ber", help="Remove an item")
+    # parser_remove.add_argument("algo")
+    # parser_remove.set_defaults(func=cmd_ber)
 
-    if len(sys.argv) < 2:
-        return show_help()
+    # CIRC
+    parser_remove = subparsers.add_parser("circ", help="Remove an item")
+    parser_remove.add_argument("block_size")
+    parser_remove.add_argument("ecc_ratio")
+    parser_remove.add_argument("hash_ratio")
+    parser_remove.set_defaults(func=circ)
 
-    block_size = 4096
-    ecc_len = block_size // 8
-
-    fn = sys.argv[1]
-
-    if fn == "enc":
-        if len(sys.argv) > 2:
-            for arg in sys.argv[2:]:
-                ecc_len = int(arg)
-                benchmark_throughput(enc256_benchmark("encode_blocks", ecc_len, 255))
-        else:
-            run_enc_benchmarks(config)
-    elif fn == "enci16":
-        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_size=ecc_len, simd_x16=False, simd_x8=False, simd_x4=False))), input_size=(block_size - ecc_len) * 2**10)
-    elif fn == "enci16v":
-        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_size=ecc_len))), input_size=(block_size - ecc_len) * 2**10)
-    elif fn == "enci16v4":
-        block_size = 4096
-        ecc_len = 4
-        benchmark_throughput((f"rs.encode_blocks(data)", dict(rs=ffrs.RSi16md(block_size, ecc_size=ecc_len))), input_size=(block_size - ecc_len) * 2**10)
-    elif fn == "enci16v4096":
-        block_len = 4096
-        ecc_len = block_len // 16
-        interleave = 2**16 * 4
-        chunks = 1
-        rs = ffrs.RSi16md(block_len, ecc_len=ecc_len, interleave=interleave)
-        print(rs.chunk_size/1e6, rs.ecc_size*rs.interleave/1e6, rs.ecc_size * rs.interleave / rs.chunk_size)
-        benchmark_throughput((f"rs.encode_chunk(data)", dict(rs=rs)), input_size=rs.chunk_size * chunks)
-    elif fn == "circ":
-        rs = ffrs.CIRC(4096, 4, 4096, 256, 32)
-        print(rs.message_size/2**20, rs.ecc_size/2**20, rs.ecc_size / rs.message_size)
-        chunks = 1
-        benchmark_throughput((f"rs.encode(data)", dict(rs=rs)), input_size=rs.message_size)
-    else:
-        return show_help()
+    args = parser.parse_args()
+    args.func(args)
 
 
 if __name__ == "__main__":

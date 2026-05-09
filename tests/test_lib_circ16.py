@@ -70,6 +70,14 @@ from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, rand
     ffrs.CIRC(128, 8, 128, 128 // 16, 4, simd_x16=False, simd_x8=False, simd_x4=False),
 ])
 class TestCIRC:
+    @staticmethod
+    def _rsi_ecc_size(rs):
+        return rs.rso.message_len * rs.rsi.ecc_size * rs.outer_interleave
+    
+    @staticmethod
+    def _rso_ecc_size(rs):
+        return rs.rsi.message_len * rs.rso.ecc_size * rs.outer_interleave
+
     def test_properties(self, rs):
         assert rs.ecc_len == rs.rsi.block_len * rs.rso.block_len * rs.outer_interleave - rs.message_len
         assert rs.block_len == rs.message_len + rs.ecc_len
@@ -80,11 +88,11 @@ class TestCIRC:
         assert len(res) == rs.ecc_size
 
         res_i = rs.rsi.encode_blocks(buf)
-        assert len(res_i) == rs.rso.message_len * rs.rsi.ecc_size * rs.outer_interleave
+        assert len(res_i) == self._rsi_ecc_size(rs)
         assert res[:len(res_i)] == res_i
 
         res_o = rs.rso.encode_chunk(buf)
-        assert len(res_o) == rs.rsi.message_len * rs.rso.ecc_size * rs.outer_interleave
+        assert len(res_o) == self._rso_ecc_size(rs)
         assert res[len(res_i):][:len(res_o)] == res_o
 
         res_io = rs.rsi.encode_blocks(res_o)
@@ -103,13 +111,23 @@ class TestCIRC:
         msg_orig = bytearray(buf)
         ecc_orig = bytearray(ecc)
 
+        # Corrupt message
         for i in range((rs.rso.ecc_len - 1) * rs.rsi.message_size):
             buf[i] = 0
 
-        # for i in range(rs.rsi.message_size):
-        #     ecc[i] = 0
+        # Corrupt rsi corresponding to message
+        for i in range(rs.rsi.ecc_size * (rs.rso.ecc_len - 1)):
+            # FIXME: repair fails if set `ecc[i] = 0`
+            ecc[i] ^= 0xff
 
-        # buf[rs.rsi.message_size * 10] ^= 0xff
+        # Corrupt rso
+        for i in range(self._rsi_ecc_size(rs), self._rsi_ecc_size(rs) + rs.rsi.ecc_size):
+            ecc[i] ^= 0xff
+
+        # Corrupt rsio corresponding to rso
+        rsio_size = self._rsi_ecc_size(rs) + self._rso_ecc_size(rs)
+        for i in range(rsio_size, rsio_size + rs.rsi.ecc_size):
+            ecc[i] ^= 0xff
 
         rs.repair(buf, ecc)
 

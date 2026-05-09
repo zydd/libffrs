@@ -74,3 +74,6 @@ class RSi16md(libffrs.RSi16md):
         self.repair(msg, ecc, error_pos)
 
         return msg
+
+    def __repr__(self):
+        return f"RSi16md({self.block_len}, ecc_len={self.ecc_len})"

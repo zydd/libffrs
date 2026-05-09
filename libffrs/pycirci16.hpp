@@ -91,7 +91,6 @@ public:
         py_assert(message.size == message_len, std::to_string(message.size));
         py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
 
-        // TODO: handle outer_interleave
         size_t inner_blocks = message.size / rsi.message_len;
         py_assert(inner_blocks == rso.message_len * outer_interleave);
 
@@ -127,7 +126,7 @@ public:
                         inner_zero_locations.push_back(rsi.message_len + j);
                     }
                 }
-                if (inner_zero_locations.empty()) {
+                if (inner_zero_locations.empty() || inner_zero_locations.size() >= rsi.ecc_len) {
                     continue;
                 }
 
@@ -138,13 +137,12 @@ public:
                 rsi.repair_block(&buf_rsi[0], inner_zero_locations, &temp_rsi[0]);
                 std::copy_n(&buf_rsi[0], rsi.message_len, &ecc_rso[offset]);
 
-                for (size_t zero_pos : inner_zero_locations) {
-                    if (zero_pos < rsi.message_len)
-                        py_assert((ecc_rso[offset + zero_pos] & 0xffff) == 0, std::to_string(ecc_rso[offset + zero_pos]));
+                if (std::all_of(inner_zero_locations.begin(), inner_zero_locations.end(),
+                    [&](size_t zero_pos) { return (ecc_rso[offset + zero_pos] & 0xffff) == 0; }))
+                {
+                    size_t synd_offset = (k + (rso.message_len + i) * outer_interleave) * rsi.ecc_len;
+                    std::fill_n(&synds_rsi[synd_offset], rsi.ecc_len, 0);
                 }
-
-                size_t synd_offset = (k + (rso.message_len + i) * outer_interleave) * rsi.ecc_len;
-                std::fill_n(&synds_rsi[synd_offset], rsi.ecc_len, 0);
             }
         }
 
@@ -171,7 +169,7 @@ public:
             if (outer_error_locations.empty())
                 continue;
 
-            py::print("err locations:", k, outer_error_locations, "/", rso.block_len);
+            // py::print("err locations:", k, outer_error_locations, "/", rso.block_len);
             // for (size_t i : outer_error_locations) {
             //     size_t synd_offset = (k + i * outer_interleave) * rsi.ecc_len;
             //     size_t msg_offset = (k + i * outer_interleave) * rsi.message_len;
@@ -183,6 +181,11 @@ public:
 
             outer_error_locations.clear();
         }
+
+        // TODO: sanity check on updated ecc
+        std::copy_n(&ecc_rso[0], rso.chunk_ecc_len, &ecc[rsi_chunk_ecc_len]);
+        rsi.encode_full_blocks(&message[0], rso.message_len * outer_interleave, 0, &ecc[0]);
+        rsi.encode_full_blocks(&ecc_rso[0], rso.ecc_len * outer_interleave, 0, &ecc[rsi_chunk_ecc_len + rso.chunk_ecc_len]);
 
         return false;
     }
