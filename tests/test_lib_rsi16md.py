@@ -214,5 +214,10 @@ class TestRS:
         rs.interleave = 1
         for i in range(interleave):
             buf_enc = rs.encode(to_bytearray(data[i::interleave], 2))
-            assert chunk_enc[i * rs.ecc_size:(i + 1) * rs.ecc_size] == buf_enc
+
+            # Sequential ecc
+            # assert chunk_enc[i * rs.ecc_size:(i + 1) * rs.ecc_size] == buf_enc
+
+            # Interleaved ecc
+            assert to_bytearray(to_int_list(chunk_enc, 2)[i::interleave], 2) == buf_enc
 

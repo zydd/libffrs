@@ -114,7 +114,7 @@ public:
         return output;
     }
 
-    inline void repair_chunk(uint16_t message[], uint16_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) {
+    inline void repair_chunk(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)
             error_pos_rbo[i] = rs16.rbo(error_pos[i]);
@@ -130,7 +130,7 @@ public:
     }
 
     template<size_t vec_size, typename T>
-    inline void _repair_chunk(T const& rs, uint16_t message[], uint16_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos_rbo) {
+    inline void _repair_chunk(T const& rs, uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos_rbo) {
         // src_size = message_len * interleave
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
@@ -141,30 +141,63 @@ public:
         auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * vec_size]);
 
         message += col_start;
-        ecc += col_start * ecc_len;
+
+        // Sequential ecc
+        // ecc += col_start * ecc_len;
+
+        // Interleaved ecc
+        ecc += col_start;
 
         size_t vec_cols = col_count / vec_size;
         for (size_t i = 0; i < vec_cols; ++i) {
             copy_stride(&message[i * vec_size], interleave, &buf[0], vec_size, vec_size, message_len);
-            copy_transposed(&ecc[i * vec_size * ecc_len], ecc_len, &buf[message_len * vec_size], vec_size);
+
+            // Sequential ecc
+            // copy_transposed(&ecc[i * vec_size * ecc_len], ecc_len, &buf[message_len * vec_size], vec_size);
+
+            // Interleaved ecc
+            copy_stride(&ecc[i * vec_size], interleave, &buf[message_len * vec_size], vec_size, vec_size, ecc_len);
 
             rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp[0]);
 
             copy_stride(&buf[0], vec_size, &message[i * vec_size], interleave, vec_size, message_len);
-            copy_transposed(&buf[message_len * vec_size], vec_size, &ecc[i * vec_size * ecc_len], ecc_len);
+
+            // Sequential ecc
+            // copy_transposed(&buf[message_len * vec_size], vec_size, &ecc[i * vec_size * ecc_len], ecc_len);
+
+            // Interleaved ecc
+            copy_stride(&buf[message_len * vec_size], vec_size, &ecc[i * vec_size], interleave, vec_size, ecc_len);
         }
 
         size_t encoded_cols = vec_cols * vec_size;
         if (encoded_cols < col_count) {
             size_t remaining_cols = col_count - encoded_cols;
             copy_stride(&message[encoded_cols], interleave, &buf[0], vec_size, remaining_cols, message_len);
-            copy_transposed(&ecc[encoded_cols * ecc_len], ecc_len, ecc_len, &buf[message_len * vec_size], vec_size, remaining_cols);
+
+            // Sequential ecc
+            // copy_transposed(&ecc[encoded_cols * ecc_len], ecc_len, ecc_len, &buf[message_len * vec_size], vec_size, remaining_cols);
+
+            // Interleaved ecc
+            copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * vec_size], vec_size, remaining_cols, ecc_len);
 
             rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp[0]);
 
             copy_stride(&buf[0], vec_size, &message[encoded_cols], interleave, remaining_cols, message_len);
-            copy_transposed(&buf[message_len * vec_size], vec_size, remaining_cols, &ecc[encoded_cols * ecc_len], ecc_len, ecc_len);
+
+            // Sequential ecc
+            // copy_transposed(&buf[message_len * vec_size], vec_size, remaining_cols, &ecc[encoded_cols * ecc_len], ecc_len, ecc_len);
+
+            // Interleaved ecc
+            copy_stride(&buf[message_len * vec_size], vec_size, &ecc[encoded_cols], interleave, remaining_cols, ecc_len);
         }
+    }
+
+    inline void repair_block(uint32_t block[], std::vector<size_t> const& error_pos, uint32_t temp[]) const {
+        auto error_pos_rbo = std::vector<size_t>(error_pos.size());
+        for (size_t i = 0; i < error_pos.size(); ++i)
+            error_pos_rbo[i] = rs16.rbo(error_pos[i]);
+
+        rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp[0]);
     }
 
     inline void py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, std::vector<size_t> const& error_pos) {
@@ -191,7 +224,8 @@ public:
         std::copy_n(&buf[message_len], ecc_len, &ecc[0]);
     }
 
-    inline void encode_full_blocks(const uint16_t src[], size_t full_blocks, size_t remainder, uint16_t dst[]) {
+    template<typename Src, typename Dst>
+    inline void encode_full_blocks(const Src src[], size_t full_blocks, size_t remainder, Dst dst[]) {
         auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * max_vec_size]);
 
         size_t block = 0;
@@ -253,7 +287,8 @@ public:
         return output;
     }
 
-    inline void synd_blocks(const uint16_t msg[], const uint16_t ecc[], size_t count, uint32_t temp[], uint32_t synds[]) {
+    template<typename Src>
+    inline void synd_blocks(const Src msg[], const uint16_t ecc[], size_t count, uint32_t temp[], uint32_t synds[]) {
         // len(temp) == block_len
         // len(synds) == count * ecc_len
         for (size_t i = 0; i < count; ++i) {
@@ -262,6 +297,14 @@ public:
             rs16.ntt(&temp[0]);
             std::copy_n(&temp[0], ecc_len, &synds[i * ecc_len]);
         }
+    }
+
+    inline void ntt(uint32_t block[]) {
+        rs16.ntt(&block[0]);
+    }
+
+    inline void ecc_mix(uint32_t ecc[]) {
+        rs16.ecc_mix(&ecc[0]);
     }
 
     inline void synd_chunk(const uint16_t msg[], const uint16_t ecc[], uint32_t temp[], uint32_t synds[]) {
@@ -472,8 +515,12 @@ private:
 
             rs.encode(&temp[0]);
             // std::copy_n(&temp[0], ecc_len * vec_size, &dst[i * vec_size * ecc_len]);
-            copy_transposed(&temp[0], vec_size, &dst[i * ecc_len * vec_size], ecc_len);
-            // copy_stride(&temp[0], vec_size, &dst[i * vec_size], interleave, vec_size, ecc_len);
+
+            // Sequential ecc
+            // copy_transposed(&temp[0], vec_size, &dst[i * ecc_len * vec_size], ecc_len);
+
+            // Interleaved ecc
+            copy_stride(&temp[0], vec_size, &dst[i * vec_size], interleave, vec_size, ecc_len);
         }
         size_t encoded_cols = vec_cols * vec_size;
         if (encoded_cols < interleave) {
@@ -484,13 +531,17 @@ private:
 
             rs.encode(&temp[0]);
             // copy_stride(&temp[0], vec_size, &dst[encoded_cols], remaining_cols, remaining_cols, ecc_len);
-            copy_transposed(&temp[0], vec_size, remaining_cols, &dst[encoded_cols * ecc_len], ecc_len, ecc_len);
-            // copy_stride(&temp[0], vec_size, &dst[encoded_cols], interleave, remaining_cols, ecc_len);
+
+            // Sequential ecc
+            // copy_transposed(&temp[0], vec_size, remaining_cols, &dst[encoded_cols * ecc_len], ecc_len, ecc_len);
+
+            // Interleaved ecc
+            copy_stride(&temp[0], vec_size, &dst[encoded_cols], interleave, remaining_cols, ecc_len);
         }
     }
 
-    template<size_t vec_size, typename T>
-    inline void encode_block(T const& rs, const uint16_t src[], uint32_t temp[], uint16_t dst[]) {
+    template<size_t vec_size, typename T, typename Src, typename Dst>
+    inline void encode_block(T const& rs, const Src src[], uint32_t temp[], Dst dst[]) {
         copy_transposed(&src[0], message_len, &temp[0], vec_size);
         std::fill_n(&temp[message_len * vec_size], ecc_len * vec_size, 0);
         // std::memset(&temp[message_len * vec_size], 0, ecc_len * vec_size * sizeof(uint32_t));
@@ -499,8 +550,8 @@ private:
         copy_transposed(&temp[0], vec_size, &dst[0], ecc_len);
     }
 
-    template<size_t vec_size, typename T>
-    inline void encode_block(T const& rs, const uint16_t src[], size_t src_size, uint32_t temp[], uint16_t dst[]) {
+    template<size_t vec_size, typename T, typename Src, typename Dst>
+    inline void encode_block(T const& rs, const Src src[], size_t src_size, uint32_t temp[], Dst dst[]) {
         std::fill_n(&temp[0], block_len * vec_size, 0);
 
         auto cols = src_size / message_len;

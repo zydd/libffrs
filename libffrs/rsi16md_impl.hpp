@@ -55,16 +55,22 @@ public:
         }
 
         _ecc_mix_v.resize(ecc_len);
+        _ecc_mix_iv.resize(ecc_len);
+        auto ecc_mix_w = *reinterpret_cast<uint32_t *>(&_roots_v_block[rbo(block_len - ecc_len)]);
+        auto ecc_mix_w_i = gf.inv(ecc_mix_w);
         for (size_t i = 0; i < ecc_len; ++i) {
-            auto w_i = gf.inv(*reinterpret_cast<uint32_t *>(&_roots_v_block[rbo(block_len - ecc_len)]));
-            _ecc_mix_v[i] = GFT{0} + gf.neg(gf.div(gf.pow(w_i, i), ecc_len));
+            _ecc_mix_v[i] = GFT{0} + gf.neg(gf.div(gf.pow(ecc_mix_w_i, i), ecc_len));
+            _ecc_mix_iv[i] = GFT{0} + gf.neg(gf.pow(ecc_mix_w, i));
         }
 
-        // uint32_t ecc_root = gf.inv(gf.pow(root, block_len / ecc_len));
-        uint32_t ecc_root = gf.inv(gf.exp(gf.div(gf.log(1), ecc_len)));
+        // uint32_t ecc_root = gf.pow(root, block_len / ecc_len);
+        uint32_t ecc_root = gf.exp(gf.div(gf.log(1), ecc_len));
+        uint32_t ecc_root_i = gf.inv(ecc_root);
+        _roots_v_ecc.resize(ecc_len);
         _roots_iv_ecc.resize(ecc_len);
         for (size_t i = 0; i < ecc_len; ++i) {
-            _roots_iv_ecc[i] = GFT{0} + gf.pow(ecc_root, i);
+            _roots_v_ecc[i] = GFT{0} + gf.pow(ecc_root, i);
+            _roots_iv_ecc[i] = GFT{0} + gf.pow(ecc_root_i, i);
         }
     }
 
@@ -75,6 +81,20 @@ public:
             block[j] = gf.mul(block[j], _ecc_mix_v[j]);
 
         gs_butterfly(&_roots_iv_ecc[0], &block[0], ecc_len, ecc_len);
+    }
+
+    inline void ecc_mix(GFT ecc[]) const {
+        for (size_t j = 0; j < ecc_len; ++j)
+            ecc[j] = gf.mul(ecc[j], _ecc_mix_v[j]);
+
+        gs_butterfly(&_roots_iv_ecc[0], &ecc[0], ecc_len, ecc_len);
+    }
+
+    inline void ecc_unmix(GFT ecc[]) const {
+        ct_butterfly(&_roots_v_ecc[0], &ecc[0], ecc_len);
+
+        for (size_t j = 0; j < ecc_len; ++j)
+            ecc[j] = gf.mul(ecc[j], _ecc_mix_iv[j]);
     }
 
     inline void ntt(GFT block[]) const {
@@ -135,8 +155,10 @@ protected:
     GFT block_len_iv;
     std::vector<GFT> _roots_v_block;
     std::vector<GFT> _roots_iv_block;
+    std::vector<GFT> _roots_v_ecc;
     std::vector<GFT> _roots_iv_ecc;
     std::vector<GFT> _ecc_mix_v;
+    std::vector<GFT> _ecc_mix_iv;
 
     inline void ct_butterfly(const GFT roots[], GFT block[], size_t block_len) const {
         for (size_t stride = 1, exp_f = block_len >> 1; stride < block_len; stride *= 2, exp_f >>= 1) {
