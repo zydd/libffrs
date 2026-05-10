@@ -23,7 +23,6 @@ import ffrs.reference
 import ffrs.reference.ntt
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, randbytes
 
-# random.seed(42)
 
 ref_gf = ffrs.reference.GF(65537, 1, 3)
 

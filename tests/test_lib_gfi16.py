@@ -26,7 +26,6 @@ from ffrs.reference.util import *
 
 GF = ffrs.GFi16(3)
 GF_ref = ffrs.reference.GF(65537, 1, 3)
-random.seed(42)
 
 
 @pytest.mark.parametrize('fn, id', [

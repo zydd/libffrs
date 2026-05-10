@@ -21,8 +21,6 @@ import random
 import ffrs
 
 
-random.seed(42)
-
 def randbytes(n):
     return bytearray(random.randrange(256) for _ in range(n))
 

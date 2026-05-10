@@ -26,8 +26,6 @@ from ffrs.reference.util import randbytes
 GF256 = ffrs.GF256()
 GF256_ref = ffrs.reference.GF(2, 8, GF256.primitive, GF256.poly1 | 0x100)
 
-random.seed(42)
-
 
 @pytest.mark.parametrize('fn, id', [
     (GF256.add, 0),
