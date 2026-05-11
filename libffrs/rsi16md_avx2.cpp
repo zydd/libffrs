@@ -41,8 +41,13 @@ void RSi16v<N>::encode(uint32_t block[]) const {
 }
 
 template <size_t N>
-void RSi16v<N>::repair(uint32_t block[], const size_t error_pos_rbo[], size_t error_count, uint32_t temp[]) const {
-    d->repair(reinterpret_cast<u32x8 *>(block), error_pos_rbo, error_count, reinterpret_cast<u32x8 *>(temp));
+void RSi16v<N>::repair(uint32_t block[], const size_t error_pos_rbo[], size_t error_count, uint32_t temp2[]) const {
+    d->repair(
+        reinterpret_cast<u32x8 *>(block),
+        error_pos_rbo,
+        error_count,
+        reinterpret_cast<u32x8 *>(temp2)
+    );
 }
 
 

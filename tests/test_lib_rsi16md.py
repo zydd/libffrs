@@ -72,7 +72,7 @@ class TestRS:
 
         assert to_bytearray(ecc_mix, 2) == res
 
-    def test_repair(self, rs):
+    def test_repair_unknown_locations(self, rs):
         orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
 
         block_enc = orig + to_int_list(rs.encode(to_bytearray(orig, 2)), 2)
@@ -90,6 +90,40 @@ class TestRS:
             block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
 
         while len(error_positions) < rs.ecc_len//2:
+            i = random.randrange(rs.block_len)
+            if i in error_positions:
+                continue
+            error_positions[i] = random.randrange(2**16)
+            block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
+
+        block_enc_err = to_bytearray(block_enc_err, 2)
+        msg_err = block_enc_err[:rs.message_size]
+        ecc_err = block_enc_err[rs.message_size:]
+
+        assert block_enc != to_int_list(msg_err + ecc_err, 2)
+
+        rs.repair(msg_err, ecc_err)
+
+        assert block_enc == to_int_list(msg_err + ecc_err, 2)
+
+    def test_repair(self, rs):
+        orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
+
+        block_enc = orig + to_int_list(rs.encode(to_bytearray(orig, 2)), 2)
+
+        block_enc_err = list(block_enc)
+
+        assert rs.find_errors(to_bytearray(block_enc, 2)) == []
+
+        error_positions = dict()
+
+        # Always add one error to the codeword
+        if len(error_positions) < max(rs.ecc_len, 1):
+            i = random.randrange(rs.block_len - rs.ecc_len, rs.block_len)
+            error_positions[i] = random.randrange(2**16)
+            block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
+
+        while len(error_positions) < rs.ecc_len:
             i = random.randrange(rs.block_len)
             if i in error_positions:
                 continue

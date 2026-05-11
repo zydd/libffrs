@@ -29,7 +29,7 @@ class RSi16v {
 public:
     RSi16v(GFi16 const& gf, size_t block_size, size_t ecc_len);
     void encode(uint32_t block[]) const;
-    void repair(uint32_t block[], const size_t error_pos_rbo[], size_t error_count, uint32_t temp[]) const;
+    void repair(uint32_t block[], const size_t error_pos_rbo[], size_t error_count, uint32_t temp2[]) const;
 
 protected:
     struct data;

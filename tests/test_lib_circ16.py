@@ -73,7 +73,7 @@ class TestCIRC:
     @staticmethod
     def _rsi_ecc_size(rs):
         return rs.rso.message_len * rs.rsi.ecc_size * rs.outer_interleave
-    
+
     @staticmethod
     def _rso_ecc_size(rs):
         return rs.rsi.message_len * rs.rso.ecc_size * rs.outer_interleave

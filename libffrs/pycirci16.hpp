@@ -95,18 +95,18 @@ public:
         py_assert(inner_blocks == rso.message_len * outer_interleave);
 
         auto buf_rsi = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rsi.block_len]);
-        auto temp_rsi = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rsi.block_len]);
+        auto temp2_rsi = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rsi.block_len * 2]);
         auto synds_rsi = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rso.block_len * rsi.ecc_len * outer_interleave]);
 
-        rsi.synd_blocks(&message[0], &ecc[0], rso.message_len * outer_interleave, &temp_rsi[0], &synds_rsi[0]);
+        rsi.synd_blocks(&message[0], &ecc[0], rso.message_len * outer_interleave, &temp2_rsi[0], &synds_rsi[0]);
 
         // py_assert(rsi.ecc_len == rsoc.ecc_len);
-        // rsoc.synd_chunk(&ecc[rsi_chunk_ecc_len], &ecc[rsi_chunk_ecc_len + rso.chunk_ecc_len], &temp_rsi[0], &synds_rsi[rso.message_len * outer_interleave * rsi.ecc_len]);
+        // rsoc.synd_chunk(&ecc[rsi_chunk_ecc_len], &ecc[rsi_chunk_ecc_len + rso.chunk_ecc_len], &temp2_rsi[0], &synds_rsi[rso.message_len * outer_interleave * rsi.ecc_len]);
 
         auto ecc_rso = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rso.chunk_ecc_len]);
 
         std::copy_n(&ecc[rsi_chunk_ecc_len], rso.chunk_ecc_len, &ecc_rso[0]);
-        rsi.synd_blocks(&ecc_rso[0], &ecc[rsi_chunk_ecc_len + rso.chunk_ecc_len], rso.ecc_len * outer_interleave, &temp_rsi[0], &synds_rsi[rso.message_len * outer_interleave * rsi.ecc_len]);
+        rsi.synd_blocks(&ecc_rso[0], &ecc[rsi_chunk_ecc_len + rso.chunk_ecc_len], rso.ecc_len * outer_interleave, &temp2_rsi[0], &synds_rsi[rso.message_len * outer_interleave * rsi.ecc_len]);
 
         // Repair zeroes in rso ecc
         for (size_t k = 0; k < outer_interleave; ++k) {
@@ -134,7 +134,7 @@ public:
 
                 std::copy_n(&ecc_rso[offset], rsi.message_len, &buf_rsi[0]);
                 std::copy_n(&ecc[ecc_offset], rsi.ecc_len, &buf_rsi[rsi.message_len]);
-                rsi.repair_block(&buf_rsi[0], inner_zero_locations, &temp_rsi[0]);
+                rsi.repair_block(&buf_rsi[0], inner_zero_locations, &temp2_rsi[0]);
                 std::copy_n(&buf_rsi[0], rsi.message_len, &ecc_rso[offset]);
 
                 if (std::all_of(inner_zero_locations.begin(), inner_zero_locations.end(),
@@ -154,10 +154,10 @@ public:
                 if (std::any_of(&synds_rsi[synd_offset], &synds_rsi[synd_offset + rsi.ecc_len], [](auto v) { return v != 0; })) {
                     // Repair zeroes in rsi ecc
                     if (std::any_of(&ecc[synd_offset], &ecc[synd_offset + rsi.ecc_len], [](auto v) { return v == 0; })) {
-                        std::copy_n(&synds_rsi[synd_offset], rsi.ecc_len, &temp_rsi[0]);
-                        rsi.ecc_mix(&temp_rsi[0]);
+                        std::copy_n(&synds_rsi[synd_offset], rsi.ecc_len, &temp2_rsi[0]);
+                        rsi.ecc_mix(&temp2_rsi[0]);
 
-                        if (std::all_of(&temp_rsi[0], &temp_rsi[rsi.ecc_len], [](auto v) { return (v & 0xffff) == 0; })) {
+                        if (std::all_of(&temp2_rsi[0], &temp2_rsi[rsi.ecc_len], [](auto v) { return (v & 0xffff) == 0; })) {
                             continue;
                         }
                     }

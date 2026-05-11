@@ -16,10 +16,37 @@ roots_of_unity = [1, 1, 256, 4096, 64, 8, 8224, 13987, 282, 15028, 19139, 3668, 
 
 
 size = 16
-ecc = 4
+ecc = 8
 ecc_decimation = size // ecc
 w = GF(roots_of_unity[round(math.log2(size))])
 assert w**size == 1
+
+
+x = ref.P(GF, [0, 1])
+
+
+def sugiyama(synds):
+    R2 = x ** len(synds)
+    R1 = ref.P(GF, (synds))
+    A2 = ref.P(GF, [0])
+    A1 = ref.P(GF, [1])
+    for _ in range(len(synds) // 2):
+        Q = R2 // R1
+        print("Q = R2 // R1")
+        print("R1:", R1.x)
+        print("R2:", R2.x)
+        print("Q:", Q.x)
+
+        t = A2 - Q * A1
+        A2 = A1
+        A1 = t if R1.deg() >= len(synds) // 2 else A1
+
+        t = R2 - Q * R1
+        R2 = R1
+        R1 = t if R1.deg() >= len(synds) // 2 else R1
+
+    locator = ref.P(GF, [a // GF(A1.x[0]) for a in A1.x])
+    return locator
 
 
 def test():
@@ -51,7 +78,7 @@ def test():
     print()
 
     e = [GF(0) for i in range(size)]
-    err_pos = [random.randint(0, size-1) for _ in range(ecc)]
+    err_pos = [random.randint(0, size-1) for _ in range(ecc//2-1)]
     for pos in err_pos:
         e[pos] += GF(random.randint(0, 0x10000))
     print("e:", to_int_list(e))
@@ -70,6 +97,8 @@ def test():
 
     L = ref.P(GF, [1])
     L = ref_rs.locator(GF, w, [rbo(size, pos) for pos in err_pos])
+
+    assert L == sugiyama(E[:ecc])
 
     print("L:", L)
     # print("L(err_pos):", [int(L.eval(w**-rbo(size, pos))) for pos in err_pos])

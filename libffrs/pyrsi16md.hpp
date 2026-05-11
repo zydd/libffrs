@@ -135,9 +135,9 @@ public:
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
         // chunk_size = block_len * interleave
-        // temp_size = block_len * vec_size
+        // temp2_size = block_len * vec_size * 2
 
-        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * vec_size]);
+        auto temp2 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * vec_size * 2]);
         auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * vec_size]);
 
         message += col_start;
@@ -158,7 +158,7 @@ public:
             // Interleaved ecc
             copy_stride(&ecc[i * vec_size], interleave, &buf[message_len * vec_size], vec_size, vec_size, ecc_len);
 
-            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp[0]);
+            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
 
             copy_stride(&buf[0], vec_size, &message[i * vec_size], interleave, vec_size, message_len);
 
@@ -180,7 +180,7 @@ public:
             // Interleaved ecc
             copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * vec_size], vec_size, remaining_cols, ecc_len);
 
-            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp[0]);
+            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
 
             copy_stride(&buf[0], vec_size, &message[encoded_cols], interleave, remaining_cols, message_len);
 
@@ -192,33 +192,39 @@ public:
         }
     }
 
-    inline void repair_block(uint32_t block[], std::vector<size_t> const& error_pos, uint32_t temp[]) const {
+    inline void repair_block(uint32_t block[], std::vector<size_t> const& error_pos, uint32_t temp2[]) const {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)
             error_pos_rbo[i] = rs16.rbo(error_pos[i]);
 
-        rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp[0]);
+        rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
     }
 
-    inline void py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, std::vector<size_t> const& error_pos) {
+    inline void py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, std::optional<std::vector<size_t>> const& error_pos) {
         py_assert(message.size == message_len, std::to_string(message.size));
         py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
-        py_assert(error_pos.size() <= ecc_len);
 
-        if (error_pos.empty())
+        if (error_pos && error_pos->empty())
             return;
 
-        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
+        auto temp6 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * 6]);
         auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
 
         std::copy_n(&message[0], message_len, &buf[0]);
         std::copy_n(&ecc[0], ecc_len, &buf[message_len]);
 
-        auto error_pos_rbo = std::vector<size_t>(error_pos.size());
-        for (size_t i = 0; i < error_pos.size(); ++i)
-            error_pos_rbo[i] = rs16.rbo(error_pos[i]);
+        if (error_pos) {
+            py_assert(error_pos->size() <= ecc_len);
 
-        rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp[0]);
+            auto error_pos_rbo = std::vector<size_t>(error_pos->size());
+            for (size_t i = 0; i < error_pos->size(); ++i)
+                error_pos_rbo[i] = rs16.rbo((*error_pos)[i]);
+
+            rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp6[0]);
+
+        } else {
+            rs16.repair(&buf[0], &temp6[0]);
+        }
 
         std::copy_n(&buf[0], message_len, &message[0]);
         std::copy_n(&buf[message_len], ecc_len, &ecc[0]);
@@ -425,7 +431,7 @@ public:
                 R"(Repair a block with the given error locations)",
                 "message"_a,
                 "ecc"_a,
-                "error_pos"_a)
+                "error_pos"_a = py::none())
 
             // .def("decode", cast_args(&PyRSi16md::py_decode),
             //     R"(Systematic decode)",
