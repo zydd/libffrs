@@ -32,6 +32,7 @@ ref_intt = lambda w, buf: rbo_sorted(to_int_list(ffrs.reference.ntt.intt(ref_gf,
 
 @pytest.mark.parametrize("rs", [
     ffrs.RSi16md(4, ecc_len=2),
+    ffrs.RSi16md(16, ecc_len=4),
     ffrs.RSi16md(16, ecc_len=8),
     ffrs.RSi16md(128, ecc_len=2),
     ffrs.RSi16md(256, ecc_len=128),
@@ -72,7 +73,8 @@ class TestRS:
 
         assert to_bytearray(ecc_mix, 2) == res
 
-    def test_repair_unknown_locations(self, rs):
+    @pytest.mark.parametrize("grace", [0, 1])
+    def test_repair_unknown_locations(self, rs, grace):
         orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
 
         block_enc = orig + to_int_list(rs.encode(to_bytearray(orig, 2)), 2)
@@ -89,7 +91,7 @@ class TestRS:
             error_positions[i] = random.randrange(2**16)
             block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
 
-        while len(error_positions) < rs.ecc_len//2:
+        while len(error_positions) < rs.ecc_len//2 - grace:
             i = random.randrange(rs.block_len)
             if i in error_positions:
                 continue

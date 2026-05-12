@@ -132,7 +132,8 @@ def benchmark_ber(rs, tries=100):
     ecc = rs.encode(data)
     decode_result = []
 
-    for error_count in [1, 2, 4, 8, 16, 32, 64, 128]:
+    for error_rate in range(50, 200, 25):
+        error_count = round(error_rate / 10000 * rs.block_size)
         successes = 0
         for j in range(tries):
             error_positions = random.sample(range(rs.block_size), error_count)
@@ -155,7 +156,7 @@ def benchmark_ber(rs, tries=100):
     print("\r\033[2K", end="")
     for error_count, successes, tries in decode_result:
         success_rate = successes / tries
-        print(f"Error rate: {error_count / rs.block_size:.1} {round(error_count)}, Success rate: {success_rate:.1%}")
+        print(f"Error rate: {error_count / rs.block_size:.2} {round(error_count)}, Success rate: {success_rate:.1%}")
     print()
 
     return decode_result
