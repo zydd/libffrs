@@ -34,7 +34,8 @@ public:
     inline RSi16vImpl(GFi16 const& gf, size_t block_len, size_t ecc_len):
         gf(gf),
         block_len(block_len),
-        ecc_len(ecc_len)
+        ecc_len(ecc_len),
+        pntt_blocks(block_len / ecc_len)
     {
         _rbo_shift = 16 - __builtin_ctzl(block_len);
         block_len_iv = GFT{0} + gf.inv(block_len);
@@ -64,8 +65,8 @@ public:
             _ecc_mix_iv[i] = GFT{0} + gf.neg(gf.pow(ecc_mix_w, i));
         }
 
-        // uint32_t ecc_root = gf.pow(root, block_len / ecc_len);
-        uint32_t ecc_root = gf.exp(gf.div(gf.log(1), ecc_len));
+        uint32_t ecc_root = gf.pow(root, block_len / ecc_len);
+        // uint32_t ecc_root = gf.exp(gf.div(gf.log(1), ecc_len));
         uint32_t ecc_root_i = gf.inv(ecc_root);
         _roots_v_ecc.resize(ecc_len);
         _roots_iv_ecc.resize(ecc_len);
@@ -73,15 +74,18 @@ public:
             _roots_v_ecc[i] = GFT{0} + gf.pow(ecc_root, i);
             _roots_iv_ecc[i] = GFT{0} + gf.pow(ecc_root_i, i);
         }
+
+        _pntt_shift.resize(block_len);
+        for (size_t i = 0; i < block_len; ++i) {
+            auto blk = (i / ecc_len) * ecc_len;
+            auto j = i - blk;
+            _pntt_shift[i] = GFT{0} + gf.pow(root, j * rbo(blk));
+        }
     }
 
     inline void encode(GFT block[]) const {
-        ntt(block);
-
-        for (size_t j = 0; j < ecc_len; ++j)
-            block[j] = gf.mul(block[j], _ecc_mix_v[j]);
-
-        gs_butterfly(&_roots_iv_ecc[0], &block[0], ecc_len, ecc_len);
+        pntt(&block[0]);
+        ecc_mix(&block[0]);
     }
 
     inline void ecc_mix(GFT ecc[]) const {
@@ -159,6 +163,7 @@ protected:
     uint16_t _rbo_shift;
     size_t block_len;
     size_t ecc_len;
+    size_t pntt_blocks;
     GFT block_len_iv;
     GFT ecc_len_iv;
     std::vector<GFT> _roots_v_block;
@@ -167,6 +172,7 @@ protected:
     std::vector<GFT> _roots_iv_ecc;
     std::vector<GFT> _ecc_mix_v;
     std::vector<GFT> _ecc_mix_iv;
+    std::vector<GFT> _pntt_shift;
 
     inline void ct_butterfly(const GFT roots[], GFT block[], size_t block_len) const {
         for (size_t stride = 1, exp_f = block_len >> 1; stride < block_len; stride *= 2, exp_f >>= 1) {
@@ -462,6 +468,26 @@ protected:
         ct_butterfly(&_roots_iv_ecc[0], &block[0], ecc_len);
         for (size_t j = 0; j < ecc_len; ++j)
             block[j] = gf.mul(block[j], ecc_len_iv);
+    }
+
+    inline void pntt(GFT block[]) const {
+        {
+            ct_butterfly(&_roots_v_ecc[0], &block[0], ecc_len);
+
+            for (size_t j = 0; j < ecc_len; ++j)
+                block[j] = gf.mul(block[j], _pntt_shift[j]);
+        }
+
+        for (size_t i = 1; i < pntt_blocks; ++i) {
+            auto p = &block[i * ecc_len];
+            ct_butterfly(&_roots_v_ecc[0], &p[0], ecc_len);
+
+            for (size_t j = 0; j < ecc_len; ++j)
+                p[j] = gf.mul(p[j], _pntt_shift[i * ecc_len + j]);
+
+            for (size_t j = 0; j < ecc_len; ++j)
+                block[j] = gf.add(block[j], block[i * ecc_len + j]);
+        }
     }
 };
 

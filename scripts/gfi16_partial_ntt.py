@@ -23,17 +23,30 @@ assert w**size == 1
 assert (w**ecc_decimation) ** ecc == 1
 
 
+pntt_shift = []
+for i in range(size):
+    blk =  (i // ecc) * ecc
+    j = i - blk
+    pntt_shift.append(w ** (j * rbo(size, blk)))
+
+
+def partial_ntt(buf):
+    for i in range(ecc_decimation):
+        buf[i*ecc:(i+1)*ecc] = ntt(w ** ecc_decimation, buf[i*ecc:(i+1)*ecc])
+
+    for i in range(size):
+        buf[i] *= pntt_shift[i]
+
+    for i in range(1, ecc_decimation):
+        buf[:ecc] = [a + b for a, b in zip(buf[0:ecc], buf[i*ecc:(i+1)*ecc])]
+
+    return buf[:ecc]
+
+
 def partial_ntt_block(ecc, shift):
     ecc = ntt(w ** ecc_decimation, ecc)
     ecc = [e * w ** (shift * i) for i, e in enumerate(ecc)]
     return ecc
-
-def partial_ntt(buf):
-    blocks = [
-        partial_ntt_block(buf[i*ecc:(i+1)*ecc], shift=rbo(size, i*ecc))
-        for i in range(ecc_decimation)
-    ]
-    return [sum((e[i] for e in blocks), GF(0)) for i in range(ecc)]
 
 
 def test():
