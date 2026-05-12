@@ -52,12 +52,7 @@ def to_bytearray(v, sizeof, byteorder="little"):
 
 def to_int_list(v, sizeof=None, byteorder="little"):
     if type(v) is list:
-        if len(v) == 0: return []
-
-        if type(v[0]) in [ffrs.reference.F, ffrs.reference.Fp]:
-            return list(map(int, v))
-        else:
-            raise TypeError
+        return list(map(int, v))
     else:
         assert sizeof, "Must specify sizeof for byte objects"
         return [int.from_bytes(v[i:i+sizeof], byteorder) for i in range(0, len(v), sizeof)]
