@@ -114,6 +114,73 @@ public:
         return output;
     }
 
+    inline void repair_chunk(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
+        _repair_chunk<1>(rs16, &message[0], &ecc[0], col_start, col_count);
+    }
+
+    template<size_t vec_size, typename T>
+    inline void _repair_chunk(T const& rs, uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
+        // src_size = message_len * interleave
+        // dst_size = ecc_len * interleave
+        // block_len = message_len + ecc_len
+        // chunk_size = block_len * interleave
+        // temp6_size = block_len * vec_size * 2
+
+        auto temp6 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * vec_size * 6]);
+        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * vec_size]);
+
+        message += col_start;
+
+        // Sequential ecc
+        // ecc += col_start * ecc_len;
+
+        // Interleaved ecc
+        ecc += col_start;
+
+        size_t vec_cols = col_count / vec_size;
+        for (size_t i = 0; i < vec_cols; ++i) {
+            copy_stride(&message[i * vec_size], interleave, &buf[0], vec_size, vec_size, message_len);
+
+            // Sequential ecc
+            // copy_transposed(&ecc[i * vec_size * ecc_len], ecc_len, &buf[message_len * vec_size], vec_size);
+
+            // Interleaved ecc
+            copy_stride(&ecc[i * vec_size], interleave, &buf[message_len * vec_size], vec_size, vec_size, ecc_len);
+
+            rs.repair(&buf[0], &temp6[0]);
+
+            copy_stride(&buf[0], vec_size, &message[i * vec_size], interleave, vec_size, message_len);
+
+            // Sequential ecc
+            // copy_transposed(&buf[message_len * vec_size], vec_size, &ecc[i * vec_size * ecc_len], ecc_len);
+
+            // Interleaved ecc
+            copy_stride(&buf[message_len * vec_size], vec_size, &ecc[i * vec_size], interleave, vec_size, ecc_len);
+        }
+
+        size_t encoded_cols = vec_cols * vec_size;
+        if (encoded_cols < col_count) {
+            size_t remaining_cols = col_count - encoded_cols;
+            copy_stride(&message[encoded_cols], interleave, &buf[0], vec_size, remaining_cols, message_len);
+
+            // Sequential ecc
+            // copy_transposed(&ecc[encoded_cols * ecc_len], ecc_len, ecc_len, &buf[message_len * vec_size], vec_size, remaining_cols);
+
+            // Interleaved ecc
+            copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * vec_size], vec_size, remaining_cols, ecc_len);
+
+            rs.repair(&buf[0], &temp6[0]);
+
+            copy_stride(&buf[0], vec_size, &message[encoded_cols], interleave, remaining_cols, message_len);
+
+            // Sequential ecc
+            // copy_transposed(&buf[message_len * vec_size], vec_size, remaining_cols, &ecc[encoded_cols * ecc_len], ecc_len, ecc_len);
+
+            // Interleaved ecc
+            copy_stride(&buf[message_len * vec_size], vec_size, &ecc[encoded_cols], interleave, remaining_cols, ecc_len);
+        }
+    }
+
     inline void repair_chunk(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)

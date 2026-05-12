@@ -177,7 +177,10 @@ public:
             //     py::print("ecc:", k, i, std::vector(&ecc[synd_offset], &ecc[synd_offset + rsi.ecc_len]));
             //     py::print("synds:", k, i, std::vector(&synds_rsi[synd_offset], &synds_rsi[synd_offset + rsi.ecc_len]));
             // }
-            rso.repair_chunk(&message[0], &ecc_rso[0], k * rsi.message_len, rsi.message_len, outer_error_locations);
+            if (outer_error_locations.size() <= rso.ecc_len)
+                rso.repair_chunk(&message[0], &ecc_rso[0], k * rsi.message_len, rsi.message_len, outer_error_locations);
+            else
+                rso.repair_chunk(&message[0], &ecc_rso[0], k * rsi.message_len, rsi.message_len);
 
             outer_error_locations.clear();
         }
