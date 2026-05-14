@@ -384,16 +384,11 @@ protected:
         return r_len;
     }
 
-    inline size_t _vec_inv_mod_xn(GFT h[], size_t /*h_len*/, size_t n, GFT a[]) const {
+    inline size_t _vec_inv_mod_xn(GFT h[], GFT h0, size_t n, GFT a[]) const {
         size_t l = 1;
 
         // a = P([h.x[0].inv()])
-        std::fill_n(&a[0], ecc_len, GFT{0});
-        inttr(h);
-        GFT h_0 = h[0];
-        nttr(h);
-        a[0] = gf.inv(h_0);
-        nttr(a);
+        std::fill_n(&a[0], ecc_len, gf.inv(h0));
 
         while (l < n) {
             // A = [a * (GF(2) - a * h) for a, h in zip(A, H)]
@@ -433,10 +428,11 @@ protected:
 
         inttr(g);
         std::reverse(&g[0], &g[g_len]);
+        auto g0 = g[0];
         nttr(g);
 
         // rev_g_i = inverse_modulo(rev_g, mod.deg())
-        _vec_inv_mod_xn(g, g_len, q_len, q);
+        _vec_inv_mod_xn(g, g0, q_len, q);
 
         // rev_q = rev_f * rev_g_i % mod
         _vec_mul(f, f_len, q, q_len, q);
@@ -444,9 +440,6 @@ protected:
         std::fill_n(&q[q_len], ecc_len - q_len, GFT{0});
         std::reverse(&q[0], &q[q_len]);
         nttr(q);
-
-        // q = P(rev_q.x[::-1]) * x ** (mod.deg() - rev_q.deg() - 1)
-        // std::rotate(&q[0], &q[q_len - 1], &q[q_len]);
 
         inttr(f);
         f[f_len - 1] = f_n;
