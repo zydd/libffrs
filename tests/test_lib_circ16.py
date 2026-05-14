@@ -118,16 +118,34 @@ class TestCIRC:
         # Corrupt rsi corresponding to message
         for i in range(rs.rsi.ecc_size * (rs.rso.ecc_len - 1)):
             # FIXME: repair fails if set `ecc[i] = 0`
-            ecc[i] ^= 0xff
+            ecc[i] = 1
 
         # Corrupt rso
         for i in range(self._rsi_ecc_size(rs), self._rsi_ecc_size(rs) + rs.rsi.ecc_size):
-            ecc[i] ^= 0xff
+            ecc[i] = 0
 
         # Corrupt rsio corresponding to rso
         rsio_size = self._rsi_ecc_size(rs) + self._rso_ecc_size(rs)
         for i in range(rsio_size, rsio_size + rs.rsi.ecc_size):
-            ecc[i] ^= 0xff
+            # FIXME: repair fails if set `ecc[i] = 0`
+            ecc[i] = 1
+
+        rs.repair(buf, ecc)
+
+        assert buf == msg_orig
+        assert ecc == ecc_orig
+
+    def test_repair_fallback(self, rs):
+        buf = randbytes(rs.message_size)
+        ecc = rs.encode(buf)
+        assert len(ecc) == rs.ecc_size
+
+        msg_orig = bytearray(buf)
+        ecc_orig = bytearray(ecc)
+
+        # Corrupt all rsi ecc
+        for i in range(rs.rsi.ecc_size * rs.rso.message_len):
+            ecc[i] = 0
 
         rs.repair(buf, ecc)
 

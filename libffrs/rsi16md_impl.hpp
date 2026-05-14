@@ -1,7 +1,7 @@
 /**************************************************************************
  * rsi16md_impl.hpp
  *
- * Copyright 2025 Gabriel Machado
+ * Copyright 2026 Gabriel Machado
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,20 @@
 #include <vector>
 
 #include "pygfi16.hpp"
+
+
+
+#define print_vec(v) \
+    py::print(#v ":", v##_len, std::vector(&(v)[0], &(v)[v##_len]));
+#define print_Vec(v) \
+    do { inttr(v); print_vec(v); nttr(v); } while(0)
+
+#define vec_add(a, b, r) r##_len = _vec_add(a, a##_len, b, b##_len, r)
+#define vec_sub(a, b, r) r##_len = _vec_sub(a, a##_len, b, b##_len, r)
+#define vec_mul(a, b, r) r##_len = _vec_mul(a, a##_len, b, b##_len, r)
+#define vec_div(a, b, r) r##_len = _vec_div(a, a##_len, b, b##_len, r)
+#define vec_copy(a, b) \
+    do { std::copy_n(a, ecc_len, b); b##_len = a##_len; } while(0)
 
 
 template<typename GFT>
@@ -113,13 +127,27 @@ public:
     }
 
     inline void repair(GFT block[], GFT temp6[]) const {
-        ntt(block);
-
         auto locator_poly = &temp6[0];
-        auto locator_poly_len = sugiyama(block, locator_poly, &temp6[block_len]);
-        repair_loc(block, &locator_poly[0], locator_poly_len - 1, &temp6[block_len]);
+        auto evaluator_poly = &temp6[block_len];
 
-        intt(block);
+        // init evaluator_poly with syndromes
+        std::copy_n(&block[0], block_len, &evaluator_poly[0]);
+        pntt(evaluator_poly);
+
+        auto locator_poly_len = sugiyama(&locator_poly[0], &evaluator_poly[0], &temp6[block_len * 2]);
+        auto evaluator_poly_len = ecc_len - locator_poly_len + 1;
+
+        auto error_locations = &temp6[block_len * 2];
+        auto error_count = find_roots(&locator_poly[0], locator_poly_len, &error_locations[0]);
+
+        locator_poly_len = _deriv(locator_poly, locator_poly_len);
+
+        forney(
+            &block[0],
+            &locator_poly[0], locator_poly_len,
+            &evaluator_poly[0], evaluator_poly_len,
+            &error_locations[0], error_count
+        );
     }
 
     inline void repair(GFT block[], const size_t error_pos_rbo[], size_t error_count, GFT temp2[]) const {
@@ -236,73 +264,64 @@ protected:
         }
     }
 
-    inline size_t sugiyama(const GFT synd[], GFT a1[], GFT temp5[]) const {
-        #define print_vec(v) \
-            py::print(#v ":", v##_len, std::vector(&(v)[0], &(v)[block_len]));
-        #define print_Vec(v) \
-            do { inttr(v); print_vec(v); nttr(v); } while(0)
+    inline size_t sugiyama(GFT a1[], GFT r1[], GFT temp4[]) const {
+        // r1 = synds
 
-        #define vec_add(a, b, r) r##_len = _vec_add(a, a##_len, b, b##_len, r)
-        #define vec_sub(a, b, r) r##_len = _vec_sub(a, a##_len, b, b##_len, r)
-        #define vec_mul(a, b, r) r##_len = _vec_mul(a, a##_len, b, b##_len, r)
-        #define vec_div(a, b, r) r##_len = _vec_div(a, a##_len, b, b##_len, r)
-        #define vec_copy(a, b) do { \
-            std::copy_n(a, ecc_len, b); \
-            b##_len = a##_len; \
-        } while(0) \
-
-        size_t q_len = 0;
-        auto q = &temp5[block_len * 0];
-
-        size_t t_len = 0;
-        auto t = &temp5[block_len * 1];
+        std::fill_n(&temp4[0], block_len * 4, GFT{0});
 
         size_t a1_len;
         std::fill_n(a1, block_len, GFT{0});
-        std::fill_n(&temp5[0], block_len * 5, GFT{0});
 
-        auto r1 = &temp5[block_len * 3];
-        size_t r1_len = ecc_len - 1;
-        std::copy_n(&synd[0], ecc_len - 1, &r1[0]);
-        // r1_len = _norm_size(r1, r1_len);
-        nttr(r1);
+        // TODO test when second-to-last synd is 0
+        size_t r1_len = _norm_size(r1, ecc_len - 1);
+
+        size_t q_len = 0;
+        auto q = &temp4[block_len * 0];
+
+        size_t t_len = 0;
+        auto t = &temp4[block_len * 1];
+
+        size_t a2_len = 1;
+        auto a2 = &temp4[block_len * 2];
+        // a2[0] = 1;
+        // nttr(a2);
+        std::fill_n(&a2[0], ecc_len, GFT{1});
+
+        auto r2 = &temp4[block_len * 3];
+        size_t r2_len = ecc_len;
+        std::copy_n(&r1[0], ecc_len, &r2[0]);
+        nttr(r2);
 
         {
             // Q = R2 // R1
-            a1[1] = gf.inv(synd[ecc_len - 1]);
-            a1[0] = gf.neg(gf.mul(synd[ecc_len - 2], gf.mul(a1[1], a1[1])));
-            a1_len = 2;
-
             // A1 = A2 - Q * A1
             // a2 = 0
             // a1 = 1
-            _vec_neg(a1, q_len, a1);
+            // A1 = -Q
+            a1[1] = gf.neg(gf.inv(r1[ecc_len - 1]));
+            a1[0] = gf.mul(r1[ecc_len - 2], gf.mul(a1[1], a1[1]));
+            a1_len = 2;
+
+            GFT s0 = r1[0];
+            std::fill_n(&r1[r1_len], ecc_len - r1_len, GFT{0});
             nttr(a1);
+            nttr(r1);
 
             // R1 = R2 - Q * R1
             vec_mul(a1, r1, r1);
 
             inttr(r1);
-            r1[ecc_len - 1] = 0;
-            r1_len = ecc_len - 1;
-            r1_len = _norm_size(r1, r1_len);
-            nttr(r1);
-
             inttr(a1);
+
+            r1[ecc_len - 1] = 0;
+            r1[0] = gf.mul(a1[0], s0);
+            r1_len = _norm_size(r1, r1_len);
+
             a1_len = _norm_size(a1, a1_len);
+
+            nttr(r1);
             nttr(a1);
         }
-
-        size_t a2_len = 1;
-        auto a2 = &temp5[block_len * 4];
-        // a2[0] = 1;
-        // nttr(a2);
-        std::fill_n(&a2[0], block_len, GFT{1});
-
-        auto r2 = &temp5[block_len * 2];
-        size_t r2_len = ecc_len;
-        std::copy_n(&synd[0], ecc_len, &r2[0]);
-        nttr(r2);
 
         for (size_t i = 1; i < ecc_len / 2 && r1_len > ecc_len / 2; ++i) {
             // Q = R2 // R1
@@ -341,7 +360,6 @@ protected:
             inttr(a1);
             a1_len = _norm_size(a1, a1_len);
             nttr(a1);
-
         }
 
         // locator = ref.P(GF, [a // GF(A1.x[0]) for a in A1.x])
@@ -350,8 +368,44 @@ protected:
         for (size_t i = 0; i < a1_len; ++i)
             a1[i] = gf.mul(a1[i], a1_0_inv);
 
-        std::reverse(&a1[0], &a1[a1_len]);
+        // std::reverse(&a1[0], &a1[a1_len]);
+
+        // evaluator = ref.P(GF, [a // GF(A1.x[0]) for a in R1.x])
+        inttr(r1);
+        for (size_t i = 0; i < r1_len; ++i)
+            r1[i] = gf.mul(r1[i], a1_0_inv);
+
         return a1_len;
+    }
+
+    inline size_t forney(
+        GFT block[],
+        const GFT locator_poly_deriv[], size_t locator_poly_deriv_len,
+        const GFT evaluator_poly[], size_t evaluator_poly_len,
+        const GFT error_pos[], size_t error_count
+    ) const {
+        for (size_t i = 0; i < error_count; ++i) {
+            GFT x = gf.pow(root, error_pos[i]);
+            GFT x_inv = gf.inv(x);
+            GFT numerator = _eval(evaluator_poly, evaluator_poly_len, x_inv);
+            GFT denominator = _eval(locator_poly_deriv, locator_poly_deriv_len, x_inv);
+
+            GFT error = gf.mul(x, gf.div(numerator, denominator));
+
+            auto pos = rbo(error_pos[i]);
+            block[pos] = gf.add(block[pos], error);
+        }
+        return error_count;
+    }
+
+    inline size_t find_roots(const GFT locator_poly[], size_t locator_poly_len, GFT roots[]) const {
+        size_t root_count = 0;
+        for (size_t i = 0; i < block_len; ++i) {
+            GFT x_inv = gf.inv(gf.pow(root, i));
+            if (_eval(locator_poly, locator_poly_len, x_inv) == GFT{0})
+                roots[root_count++] = i;
+        }
+        return root_count;
     }
 
     inline size_t _vec_add(const GFT a[], size_t a_len, const GFT b[], size_t b_len, GFT r[]) const {
@@ -382,6 +436,20 @@ protected:
         while (r_len > 0 && r[r_len - 1] == GFT{0})
             --r_len;
         return r_len;
+    }
+
+    inline size_t _deriv(GFT r[], size_t r_len) const {
+        for (size_t i = 0; i < r_len - 1; ++i)
+            r[i] = gf.mul(r[i + 1], i + 1);
+        r[r_len - 1] = GFT{0};
+        return r_len - 1;
+    }
+
+    inline GFT _eval(const GFT r[], size_t r_len, GFT x) const {
+        GFT sum = GFT{0};
+        for (size_t i = r_len - 1; i < r_len; --i)
+            sum = gf.add(gf.mul(sum, x), r[i]);
+        return sum;
     }
 
     inline size_t _vec_inv_mod_xn(GFT h[], GFT h0, size_t n, GFT a[]) const {
@@ -484,7 +552,8 @@ protected:
     }
 };
 
-
+#undef print_vec
+#undef print_Vec
 #undef vec_add
 #undef vec_sub
 #undef vec_mul

@@ -1,7 +1,7 @@
 
 #  test_lib_rsi16md.py
 #
-#  Copyright 2025 Gabriel Machado
+#  Copyright 2026 Gabriel Machado
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -19,12 +19,13 @@ import pytest
 import random
 
 import ffrs
-import ffrs.reference
+import ffrs.reference as ref
+import ffrs.reference.rs as ref_rs
 import ffrs.reference.ntt
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, randbytes
 
 
-ref_gf = ffrs.reference.GF(65537, 1, 3)
+ref_gf = ref.GF(65537, 1, 3)
 
 ref_ntt = lambda w, buf: to_int_list(ffrs.reference.ntt.ntt(ref_gf, ref_gf(w), rbo_sorted(buf)))
 ref_intt = lambda w, buf: rbo_sorted(to_int_list(ffrs.reference.ntt.intt(ref_gf, ref_gf(w), buf)))
@@ -73,7 +74,7 @@ class TestRS:
 
         assert to_bytearray(ecc_mix, 2) == res
 
-    @pytest.mark.parametrize("grace", [0, 1])
+    @pytest.mark.parametrize("grace", [0, 1, 2, 3, 4])
     def test_repair_unknown_locations(self, rs, grace):
         orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
 
@@ -85,24 +86,30 @@ class TestRS:
 
         error_positions = dict()
 
-        # Always add one error to the codeword
-        if len(error_positions) < max(rs.ecc_len//2, 1):
-            i = random.randrange(rs.block_len - rs.ecc_len, rs.block_len)
-            error_positions[i] = random.randrange(2**16)
-            block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
+        # # Always add one error to the codeword
+        # if len(error_positions) < max(rs.ecc_len//2, 1):
+        #     i = random.randrange(rs.block_len - rs.ecc_len, rs.block_len)
+        #     error_positions[i] = random.randrange(2**16)
+        #     block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
 
-        while len(error_positions) < rs.ecc_len//2 - grace:
+        while len(error_positions) < max(rs.ecc_len//2 - grace, 1):
             i = random.randrange(rs.block_len)
             if i in error_positions:
                 continue
             error_positions[i] = random.randrange(2**16)
             block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
 
+        # print("error_positions:", error_positions)
+
         block_enc_err = to_bytearray(block_enc_err, 2)
         msg_err = block_enc_err[:rs.message_size]
         ecc_err = block_enc_err[rs.message_size:]
 
         assert block_enc != to_int_list(msg_err + ecc_err, 2)
+
+        # synd = to_int_list(rs.synd(msg_err, ecc_err), 2)
+        # loc, ev = ref_rs.sugiyama(ref_gf, synd)
+        # rec_pos, rec_val = ref_rs.forney(rs.block_len, ref_gf(rs.root), loc, ev)
 
         rs.repair(msg_err, ecc_err)
 
@@ -155,6 +162,19 @@ class TestRS:
 
         assert rs.find_errors(msg + ecc) == []
         rs.repair(msg_err, ecc_err, [])
+
+        assert msg_err == msg
+        assert ecc_err == ecc
+
+    def test_repair_unknown_no_errors(self, rs):
+        orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
+        msg = to_bytearray(orig, 2)
+        ecc = rs.encode(msg)
+        msg_err = bytearray(msg)
+        ecc_err = bytearray(ecc)
+
+        assert rs.find_errors(msg + ecc) == []
+        rs.repair(msg_err, ecc_err)
 
         assert msg_err == msg
         assert ecc_err == ecc

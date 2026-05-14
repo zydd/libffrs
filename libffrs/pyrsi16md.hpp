@@ -267,6 +267,25 @@ public:
         rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
     }
 
+    inline py::bytearray py_synd(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc) {
+        py_assert(message.size == message_len, std::to_string(message.size));
+        py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
+
+        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
+        auto synds = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[ecc_len]);
+
+        std::copy_n(&message[0], message_len, &temp[0]);
+        std::copy_n(&ecc[0], ecc_len, &temp[message_len]);
+
+        rs16.ntt(&temp[0]);
+        std::copy_n(&temp[0], ecc_len, &synds[0]);
+
+        auto output = py::bytearray(nullptr, ecc_len * sizeof(uint16_t));
+        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
+        std::copy_n(&synds[0], ecc_len, &output_data[0]);
+        return output;
+    }
+
     inline void py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, std::optional<std::vector<size_t>> const& error_pos) {
         py_assert(message.size == message_len, std::to_string(message.size));
         py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
@@ -493,6 +512,11 @@ public:
             .def("encode_chunk", cast_args(&PyRSi16md::py_encode_chunk),
                 R"(Encode a chunk of interleaved codewords)",
                 "buffer"_a)
+
+            .def("synd", cast_args(&PyRSi16md::py_synd),
+                R"(Calculate syndromes for the given message and ecc buffers)",
+                "message"_a,
+                "ecc"_a)
 
             .def("repair", cast_args(&PyRSi16md::py_repair),
                 R"(Repair a block with the given error locations)",

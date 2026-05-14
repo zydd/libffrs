@@ -51,30 +51,37 @@ def get_system_info():
     return info
 
 
+def random_bytearray(size):
+    chunk_size = 2**20
+    if size <= chunk_size:
+        data = bytearray(random.randbytes(size))
+    else:
+        data = bytearray(size)
+        for i in range(0, size, chunk_size):
+            data[i : i + chunk_size] = random.randbytes(min(chunk_size, size - i))
+        remaining = size % chunk_size
+        if remaining:
+            data[-remaining:] = random.randbytes(remaining)
+    return data
+
+
 def benchmark_throughput(
-    benchmark_config,
-    input_size=100 * 2**20,  # 100 MB
+    statement,
+    env,
+    input_size,
+    setup=None,
     cpu_cache_flush_size=50 * 2**20,  # 50 MB
     duration=5,
     update_interval=1,
     cooldown=5,
 ):
-
     number = 1
     repeat = 5
 
-    best_time = float("inf")
+    assert "random" not in env
+    env["random"] = random
 
-    if input_size <= 500e6:
-        data = random.randbytes(input_size)
-    else:
-        data = bytearray(input_size)
-        chunk_size = 2**20
-        for i in range(0, input_size, chunk_size):
-            data[i : i + chunk_size] = random.randbytes(min(chunk_size, input_size - i))
-        remaining = input_size % chunk_size
-        if remaining:
-            data[-remaining:] = random.randbytes(remaining)
+    best_time = float("inf")
 
     # some cool down time seems to make the test results more repeatable
     while cooldown > 0:
@@ -84,20 +91,13 @@ def benchmark_throughput(
 
     elapsed_time = 0
     while elapsed_time < duration:
-        code, env = benchmark_config
+
         start_time = time.time()
 
-        env.update(
-            dict(
-                data=data,
-                random=random,
-            )
-        )
-
         times = timeit.repeat(
-            code,
+            statement,
             # operation on a large chunk of memory to hopefully flush CPU cache
-            setup=f"random.randbytes({cpu_cache_flush_size})",
+            setup=f"random.randbytes({cpu_cache_flush_size}); {setup if setup else ""}",
             number=number,
             repeat=repeat,
             globals=env,
@@ -316,7 +316,43 @@ def cmd_throughput(args):
     rs = parse_algo(args.algo)
     print(get_system_info())
     print(rs.message_size / 2**20, rs.ecc_size / 2**20, rs.ecc_size / rs.message_size)
-    benchmark_throughput((f"rs.encode(data)", dict(rs=rs)), input_size=rs.message_size)
+    data = random_bytearray(rs.message_size)
+    benchmark_throughput(f"rs.encode(data)", dict(rs=rs, data=data), input_size=rs.message_size)
+
+
+def decode_throughput(args):
+    block_size = parse_size(args.block_size)
+
+    ecc_ratio_num, ecc_ratio_den = parse_ratio(args.ecc_ratio)
+    assert ecc_ratio_num == 1
+    assert ecc_ratio_den > 0 and (ecc_ratio_den & (ecc_ratio_den - 1)) == 0
+
+    rsi_ecc, rsi_block = parse_ratio(args.hash_ratio)
+    rso_block = block_size // rsi_block
+    rs = ffrs.CIRC(rsi_block // 2, rsi_ecc // 2, rso_block, rso_block * ecc_ratio_num // ecc_ratio_den, 1)
+
+    assert rs.block_size == block_size
+
+    print(get_system_info())
+    print(rs)
+    print(rs.message_size / 2**20, rs.ecc_size / 2**20, rs.ecc_size / rs.message_size)
+
+    data = random_bytearray(rs.message_size)
+
+    def add_errors(data):
+        pos = 0
+        while pos < len(data):
+            data[pos] ^= random.randint(1, 255)
+            pos += rs.rsi.message_len + 2
+
+    ecc = rs.encode(data)
+
+    benchmark_throughput(
+        f"rs.repair(data, ecc)",
+        dict(rs=rs, data=data, ecc=ecc, add_errors=add_errors),
+        setup="add_errors(data)",
+        input_size=len(data),
+    )
 
 
 def main():
@@ -324,7 +360,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # Throughput
-    parser_add = subparsers.add_parser("throughput", help="Add an item")
+    parser_add = subparsers.add_parser("throughput", help="Benchmark throughput")
     parser_add.add_argument("algo")
     parser_add.set_defaults(func=cmd_throughput)
 
@@ -334,11 +370,18 @@ def main():
     # parser_remove.set_defaults(func=cmd_ber)
 
     # CIRC
-    parser_remove = subparsers.add_parser("circ", help="Remove an item")
+    parser_remove = subparsers.add_parser("circ", help="Benchmark CIRC decoding throughput")
     parser_remove.add_argument("block_size")
     parser_remove.add_argument("ecc_ratio")
     parser_remove.add_argument("hash_ratio")
     parser_remove.set_defaults(func=circ)
+
+    # CIRC decode throughput
+    parser_remove = subparsers.add_parser("dec_throughput", help="Benchmark CIRC decode throughput")
+    parser_remove.add_argument("block_size")
+    parser_remove.add_argument("ecc_ratio")
+    parser_remove.add_argument("hash_ratio")
+    parser_remove.set_defaults(func=decode_throughput)
 
     args = parser.parse_args()
     args.func(args)
