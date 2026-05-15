@@ -72,14 +72,14 @@ from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, rand
 class TestCIRC:
     @staticmethod
     def _rsi_ecc_size(rs):
-        return rs.rso.message_len * rs.rsi.ecc_size * rs.outer_interleave
+        return rs.outer_message_len * rs.inner_ecc_size * rs.outer_interleave
 
     @staticmethod
     def _rso_ecc_size(rs):
-        return rs.rsi.message_len * rs.rso.ecc_size * rs.outer_interleave
+        return rs.inner_message_len * rs.outer_ecc_size * rs.outer_interleave
 
     def test_properties(self, rs):
-        assert rs.ecc_len == rs.rsi.block_len * rs.rso.block_len * rs.outer_interleave - rs.message_len
+        assert rs.ecc_len == rs.inner_block_len * rs.outer_block_len * rs.outer_interleave - rs.message_len
         assert rs.block_len == rs.message_len + rs.ecc_len
 
     def test_circ_encode(self, rs):
@@ -91,16 +91,16 @@ class TestCIRC:
         assert len(res_i) == self._rsi_ecc_size(rs)
         assert res[:len(res_i)] == res_i
 
-        res_o = rs.rso.encode_chunk(buf)
+        res_o = rs.rso.encode(buf)
         assert len(res_o) == self._rso_ecc_size(rs)
         assert res[len(res_i):][:len(res_o)] == res_o
 
         res_io = rs.rsi.encode(res_o)
-        assert len(res_io) == rs.rso.ecc_len * rs.rsi.ecc_size * rs.outer_interleave
+        assert len(res_io) == rs.outer_ecc_len * rs.inner_ecc_size * rs.outer_interleave
 
         # res_o does not encode the value 0x10000
         # limit to small inputs to reduce chance of failure
-        if rs.rsi.message_len < 64:
+        if rs.inner_message_len < 64:
             assert res[-len(res_io):] == res_io
 
     def test_circ_repair(self, rs):
@@ -112,21 +112,21 @@ class TestCIRC:
         ecc_orig = bytearray(ecc)
 
         # Corrupt message
-        for i in range((rs.rso.ecc_len - 1) * rs.rsi.message_size):
+        for i in range((rs.outer_ecc_len - 1) * rs.inner_message_size):
             buf[i] = 0
 
         # Corrupt rsi corresponding to message
-        for i in range(rs.rsi.ecc_size * (rs.rso.ecc_len - 1)):
+        for i in range(rs.inner_ecc_size * (rs.outer_ecc_len - 1)):
             # FIXME: repair fails if set `ecc[i] = 0`
             ecc[i] = 1
 
         # Corrupt rso
-        for i in range(self._rsi_ecc_size(rs), self._rsi_ecc_size(rs) + rs.rsi.ecc_size):
+        for i in range(self._rsi_ecc_size(rs), self._rsi_ecc_size(rs) + rs.inner_ecc_size):
             ecc[i] = 0
 
         # Corrupt rsio corresponding to rso
         rsio_size = self._rsi_ecc_size(rs) + self._rso_ecc_size(rs)
-        for i in range(rsio_size, rsio_size + rs.rsi.ecc_size):
+        for i in range(rsio_size, rsio_size + rs.inner_ecc_size):
             # FIXME: repair fails if set `ecc[i] = 0`
             ecc[i] = 1
 
@@ -144,7 +144,7 @@ class TestCIRC:
         ecc_orig = bytearray(ecc)
 
         # Corrupt all rsi ecc
-        for i in range(rs.rsi.ecc_size * rs.rso.message_len):
+        for i in range(rs.inner_ecc_size * rs.outer_message_len):
             ecc[i] = 0
 
         rs.repair(buf, ecc)

@@ -38,7 +38,7 @@ private:
 public:
     const size_t block_len;
     const size_t message_len;
-    const size_t rsi_chunk_ecc_len;
+    const size_t rsi_interleaved_ecc_len;
     const size_t rsi_rso_ecc_len;
     const size_t ecc_len;
     const size_t outer_interleave;
@@ -57,11 +57,11 @@ public:
         rso(outer_block_len, {}, outer_ecc_len, 3, rsi.message_len * outer_interleave, simd_x4, simd_x8, simd_x16),
         // rsoc(inner_block_len, {}, inner_ecc_len, 3, outer_ecc_len * outer_interleave, simd_x4, simd_x8, simd_x16),
         block_len(inner_block_len * outer_block_len * outer_interleave),
-        message_len(rso.chunk_len),
-        rsi_chunk_ecc_len(rsi.ecc_len * rso.message_len * outer_interleave),
+        message_len(rso.interleaved_message_len),
+        rsi_interleaved_ecc_len(rsi.ecc_len * rso.message_len * outer_interleave),
         rsi_rso_ecc_len(rsi.ecc_len * rso.ecc_len * outer_interleave),
-        ecc_len(rsi_chunk_ecc_len + rso.chunk_ecc_len + rsi_rso_ecc_len),
-        // ecc_len(rsi_chunk_ecc_len + rso.chunk_ecc_len + rsoc.chunk_ecc_len),
+        ecc_len(rsi_interleaved_ecc_len + rso.interleaved_ecc_len + rsi_rso_ecc_len),
+        // ecc_len(rsi_interleaved_ecc_len + rso.interleaved_ecc_len + rsoc.interleaved_ecc_len),
         outer_interleave(outer_interleave)
     { }
 
@@ -99,6 +99,18 @@ public:
             .def_property_readonly("message_size", [](PyCIRCi16& self) { return self.message_len * sizeof(uint16_t); })
             .def_property_readonly("ecc_len", [](PyCIRCi16& self) { return self.ecc_len; })
             .def_property_readonly("ecc_size", [](PyCIRCi16& self) { return self.ecc_len * sizeof(uint16_t); })
+            .def_property_readonly("inner_block_len", [](PyCIRCi16& self) { return self.rsi.block_len; })
+            .def_property_readonly("inner_block_size", [](PyCIRCi16& self) { return self.rsi.block_len * sizeof(uint16_t); })
+            .def_property_readonly("inner_message_len", [](PyCIRCi16& self) { return self.rsi.message_len; })
+            .def_property_readonly("inner_message_size", [](PyCIRCi16& self) { return self.rsi.message_len * sizeof(uint16_t); })
+            .def_property_readonly("inner_ecc_len", [](PyCIRCi16& self) { return self.rsi.ecc_len; })
+            .def_property_readonly("inner_ecc_size", [](PyCIRCi16& self) { return self.rsi.ecc_len * sizeof(uint16_t); })
+            .def_property_readonly("outer_block_len", [](PyCIRCi16& self) { return self.rso.block_len; })
+            .def_property_readonly("outer_block_size", [](PyCIRCi16& self) { return self.rso.block_len * sizeof(uint16_t); })
+            .def_property_readonly("outer_message_len", [](PyCIRCi16& self) { return self.rso.message_len; })
+            .def_property_readonly("outer_message_size", [](PyCIRCi16& self) { return self.rso.message_len * sizeof(uint16_t); })
+            .def_property_readonly("outer_ecc_len", [](PyCIRCi16& self) { return self.rso.ecc_len; })
+            .def_property_readonly("outer_ecc_size", [](PyCIRCi16& self) { return self.rso.ecc_len * sizeof(uint16_t); })
             .def_property_readonly("outer_interleave", [](PyCIRCi16& self) { return self.outer_interleave; })
 
             .def("encode", cast_args(&PyCIRCi16::py_encode), R"(Encode data)", "buffer"_a)
@@ -107,23 +119,23 @@ public:
 
 private:
     inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
-        py_assert(buf.size % rso.chunk_len == 0, std::to_string(buf.size));
+        py_assert(buf.size % rso.interleaved_message_len == 0, std::to_string(buf.size));
         py_assert(buf.size % rsi.message_len == 0, std::to_string(buf.size));
         size_t rsi_blocks = buf.size / rsi.message_len;
         py_assert(rsi_blocks * rsi.message_len == buf.size, std::to_string(buf.size));
 
         auto output = py::bytearray(nullptr, ecc_len * sizeof(uint16_t));
         auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
-        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rso.chunk_ecc_len]);
+        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rso.interleaved_ecc_len]);
 
         rsi.encode_blocks(&buf[0], rsi_blocks, 0, &output_data[0]);
-        rso.encode_chunk(&buf[0], &temp[0]);
-        std::copy_n(&temp[0], rso.chunk_ecc_len, &output_data[rsi_chunk_ecc_len]);
+        rso.encode_interleaved(&buf[0], &temp[0]);
+        std::copy_n(&temp[0], rso.interleaved_ecc_len, &output_data[rsi_interleaved_ecc_len]);
 
-        // py_assert(rso.chunk_ecc_len == rsoc.chunk_message_len);
-        // rsoc.encode_chunk(&temp[0], &output_data[rsi_chunk_ecc_len + rso.chunk_ecc_len]);
-        py_assert(rso.chunk_ecc_len == rsi.message_len * rso.ecc_len * outer_interleave);
-        rsi.encode_blocks(&temp[0], rso.ecc_len * outer_interleave, 0, &output_data[rsi_chunk_ecc_len + rso.chunk_ecc_len]);
+        // py_assert(rso.interleaved_ecc_len == rsoc.interleaved_message_len);
+        // rsoc.encode_interleaved(&temp[0], &output_data[rsi_interleaved_ecc_len + rso.interleaved_ecc_len]);
+        py_assert(rso.interleaved_ecc_len == rsi.message_len * rso.ecc_len * outer_interleave);
+        rsi.encode_blocks(&temp[0], rso.ecc_len * outer_interleave, 0, &output_data[rsi_interleaved_ecc_len + rso.interleaved_ecc_len]);
 
         return output;
     }
@@ -142,12 +154,12 @@ private:
         rsi.synd_blocks(&message[0], &ecc[0], rso.message_len * outer_interleave, &temp2_rsi[0], &synds_rsi[0]);
 
         // py_assert(rsi.ecc_len == rsoc.ecc_len);
-        // rsoc.synd_chunk(&ecc[rsi_chunk_ecc_len], &ecc[rsi_chunk_ecc_len + rso.chunk_ecc_len], &temp2_rsi[0], &synds_rsi[rso.message_len * outer_interleave * rsi.ecc_len]);
+        // rsoc.synd_interleaved(&ecc[rsi_interleaved_ecc_len], &ecc[rsi_interleaved_ecc_len + rso.interleaved_ecc_len], &temp2_rsi[0], &synds_rsi[rso.message_len * outer_interleave * rsi.ecc_len]);
 
-        auto ecc_rso = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rso.chunk_ecc_len]);
+        auto ecc_rso = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rso.interleaved_ecc_len]);
 
-        std::copy_n(&ecc[rsi_chunk_ecc_len], rso.chunk_ecc_len, &ecc_rso[0]);
-        rsi.synd_blocks(&ecc_rso[0], &ecc[rsi_chunk_ecc_len + rso.chunk_ecc_len], rso.ecc_len * outer_interleave, &temp2_rsi[0], &synds_rsi[rso.message_len * outer_interleave * rsi.ecc_len]);
+        std::copy_n(&ecc[rsi_interleaved_ecc_len], rso.interleaved_ecc_len, &ecc_rso[0]);
+        rsi.synd_blocks(&ecc_rso[0], &ecc[rsi_interleaved_ecc_len + rso.interleaved_ecc_len], rso.ecc_len * outer_interleave, &temp2_rsi[0], &synds_rsi[rso.message_len * outer_interleave * rsi.ecc_len]);
 
         // Repair zeroes in rso ecc
         for (size_t k = 0; k < outer_interleave; ++k) {
@@ -161,7 +173,7 @@ private:
                     }
                 }
 
-                size_t ecc_offset = rsi_chunk_ecc_len + rso.chunk_ecc_len + (k + i * outer_interleave) * rsi.ecc_len;
+                size_t ecc_offset = rsi_interleaved_ecc_len + rso.interleaved_ecc_len + (k + i * outer_interleave) * rsi.ecc_len;
                 for (size_t j = 0; j < rsi.ecc_len; ++j) {
                     if (ecc[ecc_offset + j] == 0) {
                         inner_zero_locations.push_back(rsi.message_len + j);
@@ -219,17 +231,17 @@ private:
             //     py::print("synds:", k, i, std::vector(&synds_rsi[synd_offset], &synds_rsi[synd_offset + rsi.ecc_len]));
             // }
             if (outer_error_locations.size() <= rso.ecc_len)
-                rso.repair_chunk(&message[0], &ecc_rso[0], k * rsi.message_len, rsi.message_len, outer_error_locations);
+                rso.repair_interleaved(&message[0], &ecc_rso[0], k * rsi.message_len, rsi.message_len, outer_error_locations);
             else
-                rso.repair_chunk(&message[0], &ecc_rso[0], k * rsi.message_len, rsi.message_len);
+                rso.repair_interleaved(&message[0], &ecc_rso[0], k * rsi.message_len, rsi.message_len);
 
             outer_error_locations.clear();
         }
 
         // TODO: sanity check on updated ecc
-        std::copy_n(&ecc_rso[0], rso.chunk_ecc_len, &ecc[rsi_chunk_ecc_len]);
+        std::copy_n(&ecc_rso[0], rso.interleaved_ecc_len, &ecc[rsi_interleaved_ecc_len]);
         rsi.encode_blocks(&message[0], rso.message_len * outer_interleave, 0, &ecc[0]);
-        rsi.encode_blocks(&ecc_rso[0], rso.ecc_len * outer_interleave, 0, &ecc[rsi_chunk_ecc_len + rso.chunk_ecc_len]);
+        rsi.encode_blocks(&ecc_rso[0], rso.ecc_len * outer_interleave, 0, &ecc[rsi_interleaved_ecc_len + rso.interleaved_ecc_len]);
 
         return false;
     }

@@ -35,7 +35,7 @@ class CIRC(libffrs.CIRCi16):
     def __repr__(self):
         return (
             f"CIRC("
-            f"{self.rsi.block_len}, {self.rsi.ecc_len}"
-            f", {self.rso.block_len}, {self.rso.ecc_len}"
+            f"{self.inner_block_len}, {self.inner_ecc_len}"
+            f", {self.outer_block_len}, {self.outer_ecc_len}"
             f", {self.outer_interleave})"
         )

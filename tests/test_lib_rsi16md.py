@@ -255,24 +255,23 @@ class TestRS:
         assert buf_enc == buf_enc_blk
 
     @pytest.mark.parametrize("interleave", list(range(32)) + [32, 48, 100, 256])
-    def test_encode_chunk(self, rs, interleave):
+    def test_encode_interleaved(self, rs, interleave):
         data = list(range(interleave * rs.message_len))
         buf = to_bytearray(data, 2)
 
-        interleave_orig = rs.interleave
+        assert rs.interleave == 1
         rs.interleave = interleave
         try:
-            chunk_enc = rs.encode_chunk(buf)
+            interleaved_chunk = rs.encode(buf)
         finally:
-            rs.interleave = interleave_orig
+            rs.interleave = 1
 
         rs.interleave = 1
         for i in range(interleave):
             buf_enc = rs.encode(to_bytearray(data[i::interleave], 2))
 
             # Sequential ecc
-            # assert chunk_enc[i * rs.ecc_size:(i + 1) * rs.ecc_size] == buf_enc
+            # assert interleaved_chunk[i * rs.ecc_size:(i + 1) * rs.ecc_size] == buf_enc
 
             # Interleaved ecc
-            assert to_bytearray(to_int_list(chunk_enc, 2)[i::interleave], 2) == buf_enc
-
+            assert to_bytearray(to_int_list(interleaved_chunk, 2)[i::interleave], 2) == buf_enc

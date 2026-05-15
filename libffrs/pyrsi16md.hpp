@@ -66,21 +66,29 @@ private:
         message_len(args.block_len - args.ecc_len),
         ecc_len(args.ecc_len),
         interleave(interleave),
-        chunk_len(message_len * interleave),
-        chunk_message_len(message_len * interleave),
-        chunk_ecc_len(ecc_len * interleave)
-    { }
+        interleaved_block_len(block_len * interleave),
+        interleaved_message_len(message_len * interleave),
+        interleaved_ecc_len(ecc_len * interleave)
+    {
+        if (simd_x16)
+            vec_align = 16 * sizeof(uint32_t);
+        else if (simd_x8)
+            vec_align = 8 * sizeof(uint32_t);
+        else if (simd_x4)
+            vec_align = 4 * sizeof(uint32_t);
+        else
+            vec_align = sizeof(uint32_t);
+    }
 
 public:
     const size_t block_len;
     const size_t message_len;
     const size_t ecc_len;
     const size_t interleave;
-    const size_t chunk_len;
-    const size_t chunk_message_len;
-    const size_t chunk_ecc_len;
-    static constexpr size_t max_vec_size = 16;
-    static constexpr size_t vec_align = max_vec_size * sizeof(uint32_t);
+    const size_t interleaved_block_len;
+    const size_t interleaved_message_len;
+    const size_t interleaved_ecc_len;
+    size_t vec_align;
 
     inline PyRSi16md(
             std::optional<size_t> block_len,
@@ -106,7 +114,7 @@ public:
     inline void encode_blocks(const Src src[], size_t full_blocks, size_t remainder, Dst dst[]) {
         size_t block = 0;
         _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
-            auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W]);
+            auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W]);
             while (full_blocks - block >= SIMD_W) {
                 encode_block<SIMD_W>(rs, &src[block * message_len], &temp[0], &dst[block * ecc_len]);
                 block += SIMD_W;
@@ -120,24 +128,24 @@ public:
     }
 
     template<typename Src, typename Dst>
-    inline void encode_chunk(const Src src[], Dst dst[]) {
-        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * max_vec_size]);
+    inline void encode_interleaved(const Src src[], Dst dst[]) {
         _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
-            _encode_chunk<SIMD_W>(rs, &src[0], &temp[0], &dst[0]);
+            auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W]);
+            _encode_interleaved<SIMD_W>(rs, &src[0], &temp[0], &dst[0]);
         });
     }
 
-    inline void repair_chunk(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
-        _repair_chunk<1>(rs16, &message[0], &ecc[0], col_start, col_count);
+    inline void repair_interleaved(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
+        _repair_interleaved<1>(rs16, &message[0], &ecc[0], col_start, col_count);
     }
 
-    inline void repair_chunk(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) {
+    inline void repair_interleaved(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)
             error_pos_rbo[i] = rs16.rbo(error_pos[i]);
 
         _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
-            _repair_chunk<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count, error_pos_rbo);
+            _repair_interleaved<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count, error_pos_rbo);
         });
     }
 
@@ -161,7 +169,7 @@ public:
         }
     }
 
-    inline void synd_chunk(const uint16_t msg[], const uint16_t ecc[], uint32_t temp[], uint32_t synds[]) {
+    inline void synd_interleaved(const uint16_t msg[], const uint16_t ecc[], uint32_t temp[], uint32_t synds[]) {
         // len(temp) == block_len
         // len(synds) == count * ecc_len
 
@@ -189,12 +197,12 @@ public:
         using namespace pybind11::literals;
 
         py::class_<PyRSi16md>(m, "RSi16md")
-            .def_property_readonly("ecc_len", [](PyRSi16md& self) { return self.ecc_len; })
-            .def_property_readonly("ecc_size", [](PyRSi16md& self) { return self.ecc_len * sizeof(uint16_t); })
-            .def_property_readonly("block_len", [](PyRSi16md& self) { return self.block_len; })
-            .def_property_readonly("block_size", [](PyRSi16md& self) { return self.block_len * sizeof(uint16_t); })
-            .def_property_readonly("message_len", [](PyRSi16md& self) { return (self.block_len - self.ecc_len); })
-            .def_property_readonly("message_size", [](PyRSi16md& self) { return self.message_len * sizeof(uint16_t); })
+            .def_property_readonly("ecc_len", [](PyRSi16md& self) { return self.interleaved_ecc_len; })
+            .def_property_readonly("ecc_size", [](PyRSi16md& self) { return self.interleaved_ecc_len * sizeof(uint16_t); })
+            .def_property_readonly("block_len", [](PyRSi16md& self) { return self.interleaved_block_len; })
+            .def_property_readonly("block_size", [](PyRSi16md& self) { return self.interleaved_block_len * sizeof(uint16_t); })
+            .def_property_readonly("message_len", [](PyRSi16md& self) { return self.interleaved_message_len; })
+            .def_property_readonly("message_size", [](PyRSi16md& self) { return self.interleaved_message_len * sizeof(uint16_t); })
             .def_property_readonly("root", [](PyRSi16md& self) { return self.rs16.root; })
             .def_property_readonly("gf", [](PyRSi16md& self) -> auto const& { return self.gf; })
 
@@ -205,22 +213,17 @@ public:
                 },
                 R"(Number of interleaved codewords for block encoding)"
             )
-            .def_property_readonly("chunk_len", [](PyRSi16md& self) { return self.chunk_len; })
-            .def_property_readonly("chunk_size", [](PyRSi16md& self) { return self.chunk_len * sizeof(uint16_t); })
 
-            .def_property("simd_x4",
+            .def_property_readonly("simd_x4",
                 [](PyRSi16md& self) { return self.simd_x4; },
-                [](PyRSi16md& self, bool value) { self.simd_x4 = value; },
                 R"(Enable SIMD x4 encoding)"
             )
-            .def_property("simd_x8",
+            .def_property_readonly("simd_x8",
                 [](PyRSi16md& self) { return self.simd_x8; },
-                [](PyRSi16md& self, bool value) { self.simd_x8 = value; },
                 R"(Enable SIMD x8 encoding)"
             )
-            .def_property("simd_x16",
+            .def_property_readonly("simd_x16",
                 [](PyRSi16md& self) { return self.simd_x16; },
-                [](PyRSi16md& self, bool value) { self.simd_x16 = value; },
                 R"(Enable SIMD x16 encoding)"
             )
 
@@ -249,10 +252,6 @@ public:
 
             .def("encode", cast_args(&PyRSi16md::py_encode),
                 R"(Systematic encode)",
-                "buffer"_a)
-
-            .def("encode_chunk", cast_args(&PyRSi16md::py_encode_chunk),
-                R"(Encode a chunk of interleaved codewords)",
                 "buffer"_a)
 
             .def("synd", cast_args(&PyRSi16md::py_synd),
@@ -336,7 +335,7 @@ private:
     }
 
     template<size_t SIMD_W, typename RS, typename Src, typename Dst>
-    inline void _encode_chunk(RS const& rs, const Src src[], uint32_t temp[], Dst dst[]) {
+    inline void _encode_interleaved(RS const& rs, const Src src[], uint32_t temp[], Dst dst[]) {
         // src_size = message_len * interleave
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
@@ -403,15 +402,15 @@ private:
     }
 
     template<size_t SIMD_W, typename T>
-    inline void _repair_chunk(T const& rs, uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
+    inline void _repair_interleaved(T const& rs, uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
         // src_size = message_len * interleave
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
         // chunk_size = block_len * interleave
         // temp6_size = block_len * SIMD_W * 2
 
-        auto temp6 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W * 6]);
-        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W]);
+        auto temp6 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W * 6]);
+        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W]);
 
         message += col_start;
 
@@ -466,15 +465,15 @@ private:
     }
 
     template<size_t SIMD_W, typename T>
-    inline void _repair_chunk(T const& rs, uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos_rbo) {
+    inline void _repair_interleaved(T const& rs, uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos_rbo) {
         // src_size = message_len * interleave
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
-        // chunk_size = block_len * interleave
+        // interleaved_size = block_len * interleave
         // temp2_size = block_len * SIMD_W * 2
 
-        auto temp2 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W * 2]);
-        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W]);
+        auto temp2 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W * 2]);
+        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W]);
 
         message += col_start;
 
@@ -558,24 +557,32 @@ private:
     }
 
     inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
-        if (buf.size == 0 || block_len == 0 || block_len <= ecc_len)
+        if (buf.size == 0)
             return {};
 
-        size_t full_blocks = buf.size / message_len;
-        size_t output_size = full_blocks * ecc_len;
+        if (interleave == 1) {
+            size_t full_blocks = buf.size / message_len;
+            size_t output_size = full_blocks * ecc_len;
 
-        // Last block will be smaller if input size is not divisible by message_len
-        size_t input_remainder = buf.size - full_blocks * message_len;
-        if (input_remainder > 0)
-            output_size += ecc_len;
+            // Last block will be smaller if input size is not divisible by message_len
+            size_t input_remainder = buf.size - full_blocks * message_len;
+            if (input_remainder > 0)
+                output_size += ecc_len;
 
-        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * max_vec_size]);
-        auto output = py::bytearray(nullptr, output_size * sizeof(uint16_t));
-        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
+            auto output = py::bytearray(nullptr, output_size * sizeof(uint16_t));
+            auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
 
-        encode_blocks(&buf[0], full_blocks, input_remainder, &output_data[0]);
+            encode_blocks(&buf[0], full_blocks, input_remainder, &output_data[0]);
+            return output;
+        } else {
+            // TODO: encode multiple interleaved chunks
+            py_assert(buf.size == message_len * interleave, std::to_string(buf.size));
 
-        return output;
+            auto output = py::bytearray(nullptr, ecc_len * interleave * sizeof(uint16_t));
+            auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
+            encode_interleaved(&buf[0], &output_data[0]);
+            return output;
+        }
     }
 
     inline void py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, std::optional<std::vector<size_t>> const& error_pos) {
@@ -585,8 +592,8 @@ private:
         if (error_pos && error_pos->empty())
             return;
 
-        auto temp6 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * 6]);
-        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
+        auto temp6 = std::unique_ptr<uint32_t[]>(new uint32_t[block_len * 6]);
+        auto buf = std::unique_ptr<uint32_t[]>(new uint32_t[block_len]);
 
         std::copy_n(&message[0], message_len, &buf[0]);
         std::copy_n(&ecc[0], ecc_len, &buf[message_len]);
@@ -608,21 +615,12 @@ private:
         std::copy_n(&buf[message_len], ecc_len, &ecc[0]);
     }
 
-    inline py::bytearray py_encode_chunk(buffer_ro<uint16_t> buf) {
-        py_assert(buf.size == message_len * interleave, std::to_string(buf.size));
-
-        auto output = py::bytearray(nullptr, ecc_len * interleave * sizeof(uint16_t));
-        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
-        encode_chunk(&buf[0], &output_data[0]);
-        return output;
-    }
-
     inline py::bytearray py_synd(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc) {
         py_assert(message.size == message_len, std::to_string(message.size));
         py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
 
-        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
-        auto synds = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[ecc_len]);
+        auto temp = std::unique_ptr<uint32_t[]>(new uint32_t[block_len]);
+        auto synds = std::unique_ptr<uint32_t[]>(new uint32_t[ecc_len]);
 
         std::copy_n(&message[0], message_len, &temp[0]);
         std::copy_n(&ecc[0], ecc_len, &temp[message_len]);
