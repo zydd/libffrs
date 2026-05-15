@@ -102,203 +102,6 @@ public:
         )
     { }
 
-    inline void repair_chunk(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
-        _repair_chunk<1>(rs16, &message[0], &ecc[0], col_start, col_count);
-    }
-
-    template<size_t SIMD_W, typename T>
-    inline void _repair_chunk(T const& rs, uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
-        // src_size = message_len * interleave
-        // dst_size = ecc_len * interleave
-        // block_len = message_len + ecc_len
-        // chunk_size = block_len * interleave
-        // temp6_size = block_len * SIMD_W * 2
-
-        auto temp6 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W * 6]);
-        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W]);
-
-        message += col_start;
-
-        // Sequential ecc
-        // ecc += col_start * ecc_len;
-
-        // Interleaved ecc
-        ecc += col_start;
-
-        size_t vec_cols = col_count / SIMD_W;
-        for (size_t i = 0; i < vec_cols; ++i) {
-            copy_stride(&message[i * SIMD_W], interleave, &buf[0], SIMD_W, SIMD_W, message_len);
-
-            // Sequential ecc
-            // copy_transposed(&ecc[i * SIMD_W * ecc_len], ecc_len, &buf[message_len * SIMD_W], SIMD_W);
-
-            // Interleaved ecc
-            copy_stride(&ecc[i * SIMD_W], interleave, &buf[message_len * SIMD_W], SIMD_W, SIMD_W, ecc_len);
-
-            rs.repair(&buf[0], &temp6[0]);
-
-            copy_stride(&buf[0], SIMD_W, &message[i * SIMD_W], interleave, SIMD_W, message_len);
-
-            // Sequential ecc
-            // copy_transposed(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W * ecc_len], ecc_len);
-
-            // Interleaved ecc
-            copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W], interleave, SIMD_W, ecc_len);
-        }
-
-        size_t encoded_cols = vec_cols * SIMD_W;
-        if (encoded_cols < col_count) {
-            size_t remaining_cols = col_count - encoded_cols;
-            copy_stride(&message[encoded_cols], interleave, &buf[0], SIMD_W, remaining_cols, message_len);
-
-            // Sequential ecc
-            // copy_transposed(&ecc[encoded_cols * ecc_len], ecc_len, ecc_len, &buf[message_len * SIMD_W], SIMD_W, remaining_cols);
-
-            // Interleaved ecc
-            copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * SIMD_W], SIMD_W, remaining_cols, ecc_len);
-
-            rs.repair(&buf[0], &temp6[0]);
-
-            copy_stride(&buf[0], SIMD_W, &message[encoded_cols], interleave, remaining_cols, message_len);
-
-            // Sequential ecc
-            // copy_transposed(&buf[message_len * SIMD_W], SIMD_W, remaining_cols, &ecc[encoded_cols * ecc_len], ecc_len, ecc_len);
-
-            // Interleaved ecc
-            copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[encoded_cols], interleave, remaining_cols, ecc_len);
-        }
-    }
-
-    inline void repair_chunk(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) {
-        auto error_pos_rbo = std::vector<size_t>(error_pos.size());
-        for (size_t i = 0; i < error_pos.size(); ++i)
-            error_pos_rbo[i] = rs16.rbo(error_pos[i]);
-
-        _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
-            _repair_chunk<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count, error_pos_rbo);
-        });
-    }
-
-    template<size_t SIMD_W, typename T>
-    inline void _repair_chunk(T const& rs, uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos_rbo) {
-        // src_size = message_len * interleave
-        // dst_size = ecc_len * interleave
-        // block_len = message_len + ecc_len
-        // chunk_size = block_len * interleave
-        // temp2_size = block_len * SIMD_W * 2
-
-        auto temp2 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W * 2]);
-        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W]);
-
-        message += col_start;
-
-        // Sequential ecc
-        // ecc += col_start * ecc_len;
-
-        // Interleaved ecc
-        ecc += col_start;
-
-        size_t vec_cols = col_count / SIMD_W;
-        for (size_t i = 0; i < vec_cols; ++i) {
-            copy_stride(&message[i * SIMD_W], interleave, &buf[0], SIMD_W, SIMD_W, message_len);
-
-            // Sequential ecc
-            // copy_transposed(&ecc[i * SIMD_W * ecc_len], ecc_len, &buf[message_len * SIMD_W], SIMD_W);
-
-            // Interleaved ecc
-            copy_stride(&ecc[i * SIMD_W], interleave, &buf[message_len * SIMD_W], SIMD_W, SIMD_W, ecc_len);
-
-            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
-
-            copy_stride(&buf[0], SIMD_W, &message[i * SIMD_W], interleave, SIMD_W, message_len);
-
-            // Sequential ecc
-            // copy_transposed(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W * ecc_len], ecc_len);
-
-            // Interleaved ecc
-            copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W], interleave, SIMD_W, ecc_len);
-        }
-
-        size_t encoded_cols = vec_cols * SIMD_W;
-        if (encoded_cols < col_count) {
-            size_t remaining_cols = col_count - encoded_cols;
-            copy_stride(&message[encoded_cols], interleave, &buf[0], SIMD_W, remaining_cols, message_len);
-
-            // Sequential ecc
-            // copy_transposed(&ecc[encoded_cols * ecc_len], ecc_len, ecc_len, &buf[message_len * SIMD_W], SIMD_W, remaining_cols);
-
-            // Interleaved ecc
-            copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * SIMD_W], SIMD_W, remaining_cols, ecc_len);
-
-            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
-
-            copy_stride(&buf[0], SIMD_W, &message[encoded_cols], interleave, remaining_cols, message_len);
-
-            // Sequential ecc
-            // copy_transposed(&buf[message_len * SIMD_W], SIMD_W, remaining_cols, &ecc[encoded_cols * ecc_len], ecc_len, ecc_len);
-
-            // Interleaved ecc
-            copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[encoded_cols], interleave, remaining_cols, ecc_len);
-        }
-    }
-
-    inline void repair_block(uint32_t block[], std::vector<size_t> const& error_pos, uint32_t temp2[]) const {
-        auto error_pos_rbo = std::vector<size_t>(error_pos.size());
-        for (size_t i = 0; i < error_pos.size(); ++i)
-            error_pos_rbo[i] = rs16.rbo(error_pos[i]);
-
-        rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
-    }
-
-    inline py::bytearray py_synd(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc) {
-        py_assert(message.size == message_len, std::to_string(message.size));
-        py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
-
-        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
-        auto synds = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[ecc_len]);
-
-        std::copy_n(&message[0], message_len, &temp[0]);
-        std::copy_n(&ecc[0], ecc_len, &temp[message_len]);
-
-        rs16.ntt(&temp[0]);
-        std::copy_n(&temp[0], ecc_len, &synds[0]);
-
-        auto output = py::bytearray(nullptr, ecc_len * sizeof(uint16_t));
-        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
-        std::copy_n(&synds[0], ecc_len, &output_data[0]);
-        return output;
-    }
-
-    inline void py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, std::optional<std::vector<size_t>> const& error_pos) {
-        py_assert(message.size == message_len, std::to_string(message.size));
-        py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
-
-        if (error_pos && error_pos->empty())
-            return;
-
-        auto temp6 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * 6]);
-        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
-
-        std::copy_n(&message[0], message_len, &buf[0]);
-        std::copy_n(&ecc[0], ecc_len, &buf[message_len]);
-
-        if (error_pos) {
-            py_assert(error_pos->size() <= ecc_len);
-
-            auto error_pos_rbo = std::vector<size_t>(error_pos->size());
-            for (size_t i = 0; i < error_pos->size(); ++i)
-                error_pos_rbo[i] = rs16.rbo((*error_pos)[i]);
-
-            rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp6[0]);
-
-        } else {
-            rs16.repair(&buf[0], &temp6[0]);
-        }
-
-        std::copy_n(&buf[0], message_len, &message[0]);
-        std::copy_n(&buf[message_len], ecc_len, &ecc[0]);
-    }
-
     template<typename Src, typename Dst>
     inline void encode_blocks(const Src src[], size_t full_blocks, size_t remainder, Dst dst[]) {
         size_t block = 0;
@@ -316,25 +119,34 @@ public:
         });
     }
 
-    inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
-        if (buf.size == 0 || block_len == 0 || block_len <= ecc_len)
-            return {};
-
-        size_t full_blocks = buf.size / message_len;
-        size_t output_size = full_blocks * ecc_len;
-
-        // Last block will be smaller if input size is not divisible by message_len
-        size_t input_remainder = buf.size - full_blocks * message_len;
-        if (input_remainder > 0)
-            output_size += ecc_len;
-
+    template<typename Src, typename Dst>
+    inline void encode_chunk(const Src src[], Dst dst[]) {
         auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * max_vec_size]);
-        auto output = py::bytearray(nullptr, output_size * sizeof(uint16_t));
-        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
+        _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
+            _encode_chunk<SIMD_W>(rs, &src[0], &temp[0], &dst[0]);
+        });
+    }
 
-        encode_blocks(&buf[0], full_blocks, input_remainder, &output_data[0]);
+    inline void repair_chunk(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
+        _repair_chunk<1>(rs16, &message[0], &ecc[0], col_start, col_count);
+    }
 
-        return output;
+    inline void repair_chunk(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) {
+        auto error_pos_rbo = std::vector<size_t>(error_pos.size());
+        for (size_t i = 0; i < error_pos.size(); ++i)
+            error_pos_rbo[i] = rs16.rbo(error_pos[i]);
+
+        _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
+            _repair_chunk<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count, error_pos_rbo);
+        });
+    }
+
+    inline void repair_block(uint32_t block[], std::vector<size_t> const& error_pos, uint32_t temp2[]) const {
+        auto error_pos_rbo = std::vector<size_t>(error_pos.size());
+        for (size_t i = 0; i < error_pos.size(); ++i)
+            error_pos_rbo[i] = rs16.rbo(error_pos[i]);
+
+        rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
     }
 
     template<typename Src>
@@ -347,14 +159,6 @@ public:
             rs16.ntt(&temp[0]);
             std::copy_n(&temp[0], ecc_len, &synds[i * ecc_len]);
         }
-    }
-
-    inline void ntt(uint32_t block[]) {
-        rs16.ntt(&block[0]);
-    }
-
-    inline void ecc_mix(uint32_t ecc[]) {
-        rs16.ecc_mix(&ecc[0]);
     }
 
     inline void synd_chunk(const uint16_t msg[], const uint16_t ecc[], uint32_t temp[], uint32_t synds[]) {
@@ -373,21 +177,12 @@ public:
         }
     }
 
-    template<typename Src, typename Dst>
-    inline void encode_chunk(const Src src[], Dst dst[]) {
-        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * max_vec_size]);
-        _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
-            _encode_chunk<SIMD_W>(rs, &src[0], &temp[0], &dst[0]);
-        });
+    inline void ntt(uint32_t block[]) {
+        rs16.ntt(&block[0]);
     }
 
-    inline py::bytearray py_encode_chunk(buffer_ro<uint16_t> buf) {
-        py_assert(buf.size == message_len * interleave, std::to_string(buf.size));
-
-        auto output = py::bytearray(nullptr, ecc_len * interleave * sizeof(uint16_t));
-        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
-        encode_chunk(&buf[0], &output_data[0]);
-        return output;
+    inline void ecc_mix(uint32_t ecc[]) {
+        rs16.ecc_mix(&ecc[0]);
     }
 
     static inline void register_class(py::module &m) {
@@ -471,11 +266,7 @@ public:
                 "ecc"_a,
                 "error_pos"_a = py::none())
 
-            // .def("decode", cast_args(&PyRSi16md::py_decode),
-            //     R"(Systematic decode)",
-            //     "buffer"_a)
-
-            .doc() = R"(Reed-Solomon coding over :math:`GF(2^8)`)";
+            .doc() = R"(Reed-Solomon coding over :math:`GF(65537)`)";
     }
 
 private:
@@ -611,6 +402,132 @@ private:
         copy_transposed(&temp[0], SIMD_W, cols, &dst[0], ecc_len, ecc_len);
     }
 
+    template<size_t SIMD_W, typename T>
+    inline void _repair_chunk(T const& rs, uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
+        // src_size = message_len * interleave
+        // dst_size = ecc_len * interleave
+        // block_len = message_len + ecc_len
+        // chunk_size = block_len * interleave
+        // temp6_size = block_len * SIMD_W * 2
+
+        auto temp6 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W * 6]);
+        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W]);
+
+        message += col_start;
+
+        // Sequential ecc
+        // ecc += col_start * ecc_len;
+
+        // Interleaved ecc
+        ecc += col_start;
+
+        size_t vec_cols = col_count / SIMD_W;
+        for (size_t i = 0; i < vec_cols; ++i) {
+            copy_stride(&message[i * SIMD_W], interleave, &buf[0], SIMD_W, SIMD_W, message_len);
+
+            // Sequential ecc
+            // copy_transposed(&ecc[i * SIMD_W * ecc_len], ecc_len, &buf[message_len * SIMD_W], SIMD_W);
+
+            // Interleaved ecc
+            copy_stride(&ecc[i * SIMD_W], interleave, &buf[message_len * SIMD_W], SIMD_W, SIMD_W, ecc_len);
+
+            rs.repair(&buf[0], &temp6[0]);
+
+            copy_stride(&buf[0], SIMD_W, &message[i * SIMD_W], interleave, SIMD_W, message_len);
+
+            // Sequential ecc
+            // copy_transposed(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W * ecc_len], ecc_len);
+
+            // Interleaved ecc
+            copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W], interleave, SIMD_W, ecc_len);
+        }
+
+        size_t encoded_cols = vec_cols * SIMD_W;
+        if (encoded_cols < col_count) {
+            size_t remaining_cols = col_count - encoded_cols;
+            copy_stride(&message[encoded_cols], interleave, &buf[0], SIMD_W, remaining_cols, message_len);
+
+            // Sequential ecc
+            // copy_transposed(&ecc[encoded_cols * ecc_len], ecc_len, ecc_len, &buf[message_len * SIMD_W], SIMD_W, remaining_cols);
+
+            // Interleaved ecc
+            copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * SIMD_W], SIMD_W, remaining_cols, ecc_len);
+
+            rs.repair(&buf[0], &temp6[0]);
+
+            copy_stride(&buf[0], SIMD_W, &message[encoded_cols], interleave, remaining_cols, message_len);
+
+            // Sequential ecc
+            // copy_transposed(&buf[message_len * SIMD_W], SIMD_W, remaining_cols, &ecc[encoded_cols * ecc_len], ecc_len, ecc_len);
+
+            // Interleaved ecc
+            copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[encoded_cols], interleave, remaining_cols, ecc_len);
+        }
+    }
+
+    template<size_t SIMD_W, typename T>
+    inline void _repair_chunk(T const& rs, uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos_rbo) {
+        // src_size = message_len * interleave
+        // dst_size = ecc_len * interleave
+        // block_len = message_len + ecc_len
+        // chunk_size = block_len * interleave
+        // temp2_size = block_len * SIMD_W * 2
+
+        auto temp2 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W * 2]);
+        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * SIMD_W]);
+
+        message += col_start;
+
+        // Sequential ecc
+        // ecc += col_start * ecc_len;
+
+        // Interleaved ecc
+        ecc += col_start;
+
+        size_t vec_cols = col_count / SIMD_W;
+        for (size_t i = 0; i < vec_cols; ++i) {
+            copy_stride(&message[i * SIMD_W], interleave, &buf[0], SIMD_W, SIMD_W, message_len);
+
+            // Sequential ecc
+            // copy_transposed(&ecc[i * SIMD_W * ecc_len], ecc_len, &buf[message_len * SIMD_W], SIMD_W);
+
+            // Interleaved ecc
+            copy_stride(&ecc[i * SIMD_W], interleave, &buf[message_len * SIMD_W], SIMD_W, SIMD_W, ecc_len);
+
+            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
+
+            copy_stride(&buf[0], SIMD_W, &message[i * SIMD_W], interleave, SIMD_W, message_len);
+
+            // Sequential ecc
+            // copy_transposed(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W * ecc_len], ecc_len);
+
+            // Interleaved ecc
+            copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W], interleave, SIMD_W, ecc_len);
+        }
+
+        size_t encoded_cols = vec_cols * SIMD_W;
+        if (encoded_cols < col_count) {
+            size_t remaining_cols = col_count - encoded_cols;
+            copy_stride(&message[encoded_cols], interleave, &buf[0], SIMD_W, remaining_cols, message_len);
+
+            // Sequential ecc
+            // copy_transposed(&ecc[encoded_cols * ecc_len], ecc_len, ecc_len, &buf[message_len * SIMD_W], SIMD_W, remaining_cols);
+
+            // Interleaved ecc
+            copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * SIMD_W], SIMD_W, remaining_cols, ecc_len);
+
+            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
+
+            copy_stride(&buf[0], SIMD_W, &message[encoded_cols], interleave, remaining_cols, message_len);
+
+            // Sequential ecc
+            // copy_transposed(&buf[message_len * SIMD_W], SIMD_W, remaining_cols, &ecc[encoded_cols * ecc_len], ecc_len, ecc_len);
+
+            // Interleaved ecc
+            copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[encoded_cols], interleave, remaining_cols, ecc_len);
+        }
+    }
+
     template<typename F>
     inline void _simd_dispatch(F&& f) {
         if (simd_x16)
@@ -638,5 +555,84 @@ private:
             }
             py::print(row);
         }
+    }
+
+    inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
+        if (buf.size == 0 || block_len == 0 || block_len <= ecc_len)
+            return {};
+
+        size_t full_blocks = buf.size / message_len;
+        size_t output_size = full_blocks * ecc_len;
+
+        // Last block will be smaller if input size is not divisible by message_len
+        size_t input_remainder = buf.size - full_blocks * message_len;
+        if (input_remainder > 0)
+            output_size += ecc_len;
+
+        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * max_vec_size]);
+        auto output = py::bytearray(nullptr, output_size * sizeof(uint16_t));
+        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
+
+        encode_blocks(&buf[0], full_blocks, input_remainder, &output_data[0]);
+
+        return output;
+    }
+
+    inline void py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, std::optional<std::vector<size_t>> const& error_pos) {
+        py_assert(message.size == message_len, std::to_string(message.size));
+        py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
+
+        if (error_pos && error_pos->empty())
+            return;
+
+        auto temp6 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len * 6]);
+        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
+
+        std::copy_n(&message[0], message_len, &buf[0]);
+        std::copy_n(&ecc[0], ecc_len, &buf[message_len]);
+
+        if (error_pos) {
+            py_assert(error_pos->size() <= ecc_len);
+
+            auto error_pos_rbo = std::vector<size_t>(error_pos->size());
+            for (size_t i = 0; i < error_pos->size(); ++i)
+                error_pos_rbo[i] = rs16.rbo((*error_pos)[i]);
+
+            rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp6[0]);
+
+        } else {
+            rs16.repair(&buf[0], &temp6[0]);
+        }
+
+        std::copy_n(&buf[0], message_len, &message[0]);
+        std::copy_n(&buf[message_len], ecc_len, &ecc[0]);
+    }
+
+    inline py::bytearray py_encode_chunk(buffer_ro<uint16_t> buf) {
+        py_assert(buf.size == message_len * interleave, std::to_string(buf.size));
+
+        auto output = py::bytearray(nullptr, ecc_len * interleave * sizeof(uint16_t));
+        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
+        encode_chunk(&buf[0], &output_data[0]);
+        return output;
+    }
+
+    inline py::bytearray py_synd(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc) {
+        py_assert(message.size == message_len, std::to_string(message.size));
+        py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
+
+        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
+        auto synds = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[ecc_len]);
+
+        std::copy_n(&message[0], message_len, &temp[0]);
+        std::copy_n(&ecc[0], ecc_len, &temp[message_len]);
+
+        rs16.ntt(&temp[0]);
+        std::copy_n(&temp[0], ecc_len, &synds[0]);
+
+        auto output = py::bytearray(nullptr, ecc_len * sizeof(uint16_t));
+        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
+        std::copy_n(&synds[0], ecc_len, &output_data[0]);
+        return output;
     }
 };

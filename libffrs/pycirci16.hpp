@@ -65,6 +65,47 @@ public:
         outer_interleave(outer_interleave)
     { }
 
+    static inline void register_class(py::module &m) {
+        using namespace pybind11::literals;
+
+        py::class_<PyCIRCi16>(m, "CIRCi16")
+            .def(py::init<
+                    size_t,  // inner_block_len
+                    size_t,  // inner_ecc_len
+                    size_t,  // outer_block_len
+                    size_t,  // outer_ecc_len
+                    size_t,  // outer_interleave
+                    std::optional<bool>,  // simd_x4
+                    std::optional<bool>,  // simd_x8
+                    std::optional<bool>   // simd_x16
+                >(),
+                R"(Cross-interleaved Reed-Solomon coder)",
+                "inner_block_len"_a,
+                "inner_ecc_len"_a,
+                "outer_block_len"_a,
+                "outer_ecc_len"_a,
+                "outer_interleave"_a = 1,
+                "simd_x4"_a = py::none(),
+                "simd_x8"_a = py::none(),
+                "simd_x16"_a = py::none()
+            )
+
+            .def_property_readonly("rsi", [](PyCIRCi16& self) -> auto const& { return self.rsi; })
+            .def_property_readonly("rso", [](PyCIRCi16& self) -> auto const& { return self.rso; })
+
+            .def_property_readonly("block_len", [](PyCIRCi16& self) { return self.block_len; })
+            .def_property_readonly("block_size", [](PyCIRCi16& self) { return self.block_len * sizeof(uint16_t); })
+            .def_property_readonly("message_len", [](PyCIRCi16& self) { return self.message_len; })
+            .def_property_readonly("message_size", [](PyCIRCi16& self) { return self.message_len * sizeof(uint16_t); })
+            .def_property_readonly("ecc_len", [](PyCIRCi16& self) { return self.ecc_len; })
+            .def_property_readonly("ecc_size", [](PyCIRCi16& self) { return self.ecc_len * sizeof(uint16_t); })
+            .def_property_readonly("outer_interleave", [](PyCIRCi16& self) { return self.outer_interleave; })
+
+            .def("encode", cast_args(&PyCIRCi16::py_encode), R"(Encode data)", "buffer"_a)
+            .def("repair", cast_args(&PyCIRCi16::py_repair), R"(Repair data)", "message"_a, "ecc"_a);
+    }
+
+private:
     inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
         py_assert(buf.size % rso.chunk_len == 0, std::to_string(buf.size));
         py_assert(buf.size % rsi.message_len == 0, std::to_string(buf.size));
@@ -191,45 +232,5 @@ public:
         rsi.encode_blocks(&ecc_rso[0], rso.ecc_len * outer_interleave, 0, &ecc[rsi_chunk_ecc_len + rso.chunk_ecc_len]);
 
         return false;
-    }
-
-    static inline void register_class(py::module &m) {
-        using namespace pybind11::literals;
-
-        py::class_<PyCIRCi16>(m, "CIRCi16")
-            .def(py::init<
-                    size_t,  // inner_block_len
-                    size_t,  // inner_ecc_len
-                    size_t,  // outer_block_len
-                    size_t,  // outer_ecc_len
-                    size_t,  // outer_interleave
-                    std::optional<bool>,  // simd_x4
-                    std::optional<bool>,  // simd_x8
-                    std::optional<bool>   // simd_x16
-                >(),
-                R"(Cross-interleaved Reed-Solomon coder)",
-                "inner_block_len"_a,
-                "inner_ecc_len"_a,
-                "outer_block_len"_a,
-                "outer_ecc_len"_a,
-                "outer_interleave"_a = 1,
-                "simd_x4"_a = py::none(),
-                "simd_x8"_a = py::none(),
-                "simd_x16"_a = py::none()
-            )
-
-            .def_property_readonly("rsi", [](PyCIRCi16& self) -> auto const& { return self.rsi; })
-            .def_property_readonly("rso", [](PyCIRCi16& self) -> auto const& { return self.rso; })
-
-            .def_property_readonly("block_len", [](PyCIRCi16& self) { return self.block_len; })
-            .def_property_readonly("block_size", [](PyCIRCi16& self) { return self.block_len * sizeof(uint16_t); })
-            .def_property_readonly("message_len", [](PyCIRCi16& self) { return self.message_len; })
-            .def_property_readonly("message_size", [](PyCIRCi16& self) { return self.message_len * sizeof(uint16_t); })
-            .def_property_readonly("ecc_len", [](PyCIRCi16& self) { return self.ecc_len; })
-            .def_property_readonly("ecc_size", [](PyCIRCi16& self) { return self.ecc_len * sizeof(uint16_t); })
-            .def_property_readonly("outer_interleave", [](PyCIRCi16& self) { return self.outer_interleave; })
-
-            .def("encode", cast_args(&PyCIRCi16::py_encode), R"(Encode data)", "buffer"_a)
-            .def("repair", cast_args(&PyCIRCi16::py_repair), R"(Repair data)", "message"_a, "ecc"_a);
     }
 };
