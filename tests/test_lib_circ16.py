@@ -87,7 +87,7 @@ class TestCIRC:
         res = rs.encode(buf)
         assert len(res) == rs.ecc_size
 
-        res_i = rs.rsi.encode_blocks(buf)
+        res_i = rs.rsi.encode(buf)
         assert len(res_i) == self._rsi_ecc_size(rs)
         assert res[:len(res_i)] == res_i
 
@@ -95,7 +95,7 @@ class TestCIRC:
         assert len(res_o) == self._rso_ecc_size(rs)
         assert res[len(res_i):][:len(res_o)] == res_o
 
-        res_io = rs.rsi.encode_blocks(res_o)
+        res_io = rs.rsi.encode(res_o)
         assert len(res_io) == rs.rso.ecc_len * rs.rsi.ecc_size * rs.outer_interleave
 
         # res_o does not encode the value 0x10000

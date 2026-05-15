@@ -102,18 +102,6 @@ public:
         )
     { }
 
-    inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
-        py_assert(buf.size == message_len, std::to_string(buf.size));
-
-        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{vec_align}) uint32_t[block_len]);
-        auto output = py::bytearray(nullptr, ecc_len * sizeof(uint16_t));
-        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
-
-        encode_block<1>(rs16, &buf[0], &temp[0], &output_data[0]);
-
-        return output;
-    }
-
     inline void repair_chunk(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
         _repair_chunk<1>(rs16, &message[0], &ecc[0], col_start, col_count);
     }
@@ -328,7 +316,7 @@ public:
         });
     }
 
-    inline py::bytearray py_encode_blocks(buffer_ro<uint16_t> buf) {
+    inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
         if (buf.size == 0 || block_len == 0 || block_len <= ecc_len)
             return {};
 
@@ -466,11 +454,6 @@ public:
 
             .def("encode", cast_args(&PyRSi16md::py_encode),
                 R"(Systematic encode)",
-                "buffer"_a)
-
-            .def("encode_blocks", cast_args(&PyRSi16md::py_encode_blocks), R"(
-                Encode the input buffer in blocks, storing the parity bytes right next to their corresponding block
-                )",
                 "buffer"_a)
 
             .def("encode_chunk", cast_args(&PyRSi16md::py_encode_chunk),

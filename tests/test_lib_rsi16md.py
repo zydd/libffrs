@@ -215,13 +215,13 @@ class TestRS:
         assert set(error_positions.keys()) == set(rs.find_errors(to_bytearray(msg_enc_err, 2)))
 
     def test_encode_blocks_empty(self, rs):
-        assert bytearray() == rs.encode_blocks(bytearray())
+        assert bytearray() == rs.encode(bytearray())
 
     def test_encode_blocks_single(self, rs):
         buf = randbytes(rs.message_size)
 
         buf_enc = rs.encode(buf)
-        buf_enc_blk = rs.encode_blocks(buf)
+        buf_enc_blk = rs.encode(buf)
 
         assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_size
         assert buf_enc == buf_enc_blk
@@ -233,7 +233,7 @@ class TestRS:
         buf_enc = [rs.encode(buf[i * rs.message_size:(i + 1) * rs.message_size])
                         for i in range(count)]
         buf_enc = b"".join(buf_enc)
-        buf_enc_blk = rs.encode_blocks(buf)
+        buf_enc_blk = rs.encode(buf)
 
         assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_size * count
         assert buf_enc == buf_enc_blk
@@ -249,7 +249,7 @@ class TestRS:
 
         buf_enc += [rs.encode(buf[-extra:] + bytearray(rs.message_size - extra))]
         buf_enc = b"".join(buf_enc)
-        buf_enc_blk = rs.encode_blocks(buf)
+        buf_enc_blk = rs.encode(buf)
 
         assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_size * (count + 1)
         assert buf_enc == buf_enc_blk

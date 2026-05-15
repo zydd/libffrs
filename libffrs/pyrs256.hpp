@@ -57,98 +57,85 @@ using RS256 = ffrs::RS<GF, ffrs::rs_data,
 
 class PyRS256 : public RS256<PyGF256> {
 public:
-    size_t default_block_size = 255;
+    size_t block_len;
+    size_t message_len;
 
     inline PyRS256(
-            std::optional<uint8_t> block_size,
+            std::optional<uint8_t> block_len,
             std::optional<uint8_t> message_len,
             std::optional<uint8_t> ecc_len,
             uint8_t primitive,
             uint16_t polynomial):
-        PyRS256(_get_ecc_len(block_size, message_len, ecc_len),
-                block_size.value_or(255),
+        PyRS256(_get_ecc_len(block_len, message_len, ecc_len),
+                block_len.value_or(255),
                 primitive, polynomial)
     {
         if (ecc_len && message_len) {
-            if (block_size && *message_len + *ecc_len != *block_size) {
+            if (block_len && *message_len + *ecc_len != *block_len) {
                 throw py::value_error("block_len must be equal to message_len + ecc_len");
-            } else if (!block_size) {
-                set_default_block_size(size_t(*message_len) + size_t(*ecc_len));
+            } else if (!block_len) {
+                set_block_len(size_t(*message_len) + size_t(*ecc_len));
             }
         }
     }
 
-    inline PyRS256(uint8_t ecc_len, size_t block_size, uint8_t primitive, uint16_t polynomial):
+    inline PyRS256(uint8_t ecc_len, size_t block_len, uint8_t primitive, uint16_t polynomial):
         RS256<PyGF256>(rs_data(PyGF256(primitive, polynomial), ecc_len), rs_ntt_data(primitive))
     {
-        set_default_block_size(block_size);
+        set_block_len(block_len);
     }
 
-    inline void set_default_block_size(size_t block_size) {
-        if (block_size <= ecc_len)
+    inline void set_block_len(size_t block_len) {
+        if (block_len <= ecc_len)
             throw py::value_error("block_len must be greater than ecc_len");
 
-        if (block_size > 255)
+        if (block_len > 255)
             throw py::value_error("block_len must be <= 255");
 
-        default_block_size = block_size;
+        this->block_len = block_len;
+        this->message_len = block_len - ecc_len;
     }
 
-    inline void py_encode(buffer_rw<uint8_t> buf) {
-        size_t msg_size = buf.size - ecc_len;
-        encode(buf.data, msg_size, &buf.data[msg_size]);
-    }
+    inline py::bytearray py_encode(buffer_ro<uint8_t> buf) {
+        size_t message_len = block_len - ecc_len;
 
-    inline py::bytearray py_encode_blocks(buffer_ro<uint8_t> buf, std::optional<size_t> block_size) {
-        size_t output_block_size = block_size.value_or(default_block_size);
-        size_t input_block_size = output_block_size - ecc_len;
-
-        if (buf.size == 0 || output_block_size == 0 || output_block_size <= ecc_len)
+        if (buf.size == 0 || block_len == 0 || block_len <= ecc_len)
             return {};
 
-        size_t full_blocks = buf.size / input_block_size;
+        size_t full_blocks = buf.size / message_len;
+        size_t output_size = full_blocks * ecc_len;
 
-        size_t output_size = full_blocks * (input_block_size + this->ecc_len);
-
-        // Last block will be smaller if input size is not divisible by input_block_size
-        size_t input_remainder = buf.size - full_blocks * input_block_size;
+        // Last block will be smaller if input size is not divisible by message_len
+        size_t input_remainder = buf.size - full_blocks * message_len;
         if (input_remainder > 0)
-            output_size += input_remainder + this->ecc_len;
+            output_size += ecc_len;
 
         auto output = py::bytearray();
         PyByteArray_Resize(output.ptr(), output_size);
         assert(size_t(PyByteArray_Size(output.ptr())) == output_size);
         auto output_data = reinterpret_cast<uint8_t *>(PyByteArray_AsString(output.ptr()));
 
-        for (size_t block = 0; block < buf.size / input_block_size; ++block) {
-            auto output_block = &output_data[block * output_block_size];
-            std::copy_n(&buf.data[block * input_block_size], input_block_size, output_block);
-            encode(output_block, input_block_size, &output_block[input_block_size]);
+        for (size_t block = 0; block < full_blocks; ++block) {
+            encode(&buf.data[block * message_len], message_len, &output_data[block * ecc_len]);
         }
 
         if (input_remainder > 0) {
-            auto output_block = &output_data[output_size - input_remainder - this->ecc_len];
-            std::copy_n(&buf.data[buf.size - input_remainder], input_remainder, output_block);
-            encode(output_block, input_remainder, &output_block[input_remainder]);
+            encode(&buf.data[buf.size - input_remainder], input_remainder, &output_data[full_blocks * ecc_len]);
         }
 
         return output;
     }
 
-    inline bool py_decode(buffer_rw<uint8_t> buf) {
-        size_t msg_size = buf.size - ecc_len;
-        return decode(buf.data, msg_size, &buf.data[msg_size]);
+    inline bool py_repair(buffer_rw<uint8_t> buf, buffer_rw<uint8_t> ecc) {
+        return decode(&buf.data[0], message_len, &ecc.data[0]);
     }
 
     inline py::bytearray py_synds(buffer_ro<uint8_t> buf) {
         if (buf.size < ecc_len)
             return {};
 
-        size_t msg_size = buf.size - ecc_len;
         synds_array_t synds_arr;
-
-        synds(buf.data, msg_size, &buf.data[msg_size], synds_arr);
-
+        synds(buf.data, message_len, &buf.data[message_len], synds_arr);
         return py::bytearray(reinterpret_cast<const char *>(synds_arr), ecc_len);
     }
 
@@ -157,13 +144,21 @@ public:
 
         py::class_<PyRS256>(m, "RS256")
             .def_property_readonly("ecc_len", [](PyRS256& self) { return self.ecc_len; })
+            .def_property_readonly("ecc_size", [](PyRS256& self) { return self.ecc_len; })
 
             .def_property("block_len",
-                [](PyRS256& self) { return self.default_block_size; },
-                &PyRS256::set_default_block_size)
+                [](PyRS256& self) { return self.block_len; },
+                &PyRS256::set_block_len)
+
+            .def_property("block_size",
+                [](PyRS256& self) { return self.block_len; },
+                &PyRS256::set_block_len)
 
             .def_property_readonly("message_len",
-                [](PyRS256& self) { return self.default_block_size - self.ecc_len; })
+                [](PyRS256& self) { return self.block_len - self.ecc_len; })
+
+            .def_property_readonly("message_size",
+                [](PyRS256& self) { return self.block_len - self.ecc_len; })
 
             .def_property_readonly("gf", [](PyRS256& self) -> auto const& { return self.gf; })
 
@@ -182,17 +177,12 @@ public:
             .def("__sizeof__", [](PyRS256& self) { return sizeof(self); })
 
             .def("encode", cast_args(&PyRS256::py_encode),
-                R"(Systematic encode)",
+                R"(Encode message, return ecc)",
                 "buffer"_a)
 
-            .def("encode_blocks", cast_args(&PyRS256::py_encode_blocks), R"(
-                Encode the input buffer in blocks, storing the parity bytes right next to their corresponding block
-                )",
-                "buffer"_a, "block_len"_a = py::none())
-
-            .def("decode", cast_args(&PyRS256::py_decode),
-                R"(Systematic decode)",
-                "buffer"_a)
+            .def("repair", cast_args(&PyRS256::py_repair),
+                R"(Repair message + ecc)",
+                "buffer"_a, "ecc"_a)
 
             .def("_synds", cast_args(&PyRS256::py_synds),
                 R"(Compute syndromes)",
@@ -212,7 +202,7 @@ private:
             if (*message_len >= *block_len) {
                 throw py::value_error("block_len must be greater than message_len");
             }
-            return block_len.value_or(default_block_size) - *message_len;
+            return block_len.value_or(this->block_len) - *message_len;
         } else {
             throw py::value_error("Must specify either (block_len, message_len) or ecc_len");
         }
