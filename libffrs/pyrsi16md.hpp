@@ -592,7 +592,6 @@ private:
         if (error_pos && error_pos->empty())
             return;
 
-        auto temp6 = std::unique_ptr<uint32_t[]>(new uint32_t[block_len * 6]);
         auto buf = std::unique_ptr<uint32_t[]>(new uint32_t[block_len]);
 
         std::copy_n(&message[0], message_len, &buf[0]);
@@ -605,10 +604,12 @@ private:
             for (size_t i = 0; i < error_pos->size(); ++i)
                 error_pos_rbo[i] = rs16.rbo((*error_pos)[i]);
 
-            rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp6[0]);
+            auto temp2 = std::unique_ptr<uint32_t[]>(new uint32_t[block_len * 2]);
+            rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
 
         } else {
-            rs16.repair(&buf[0], &temp6[0]);
+            auto temp1_ecc6 = std::unique_ptr<uint32_t[]>(new uint32_t[std::max(block_len, ecc_len * 6)]);
+            rs16.repair(&buf[0], &temp1_ecc6[0]);
         }
 
         std::copy_n(&buf[0], message_len, &message[0]);

@@ -48,52 +48,51 @@ public:
     inline RSi16vImpl(GFi16 const& gf, size_t block_len, size_t ecc_len):
         gf(gf),
         block_len(block_len),
+        ntt_len(block_len),
         ecc_len(ecc_len),
-        pntt_blocks(block_len / ecc_len)
+        pntt_blocks(ntt_len / ecc_len)
     {
-        _rbo_shift = 16 - __builtin_ctzl(block_len);
-        block_len_iv = GFT{0} + gf.inv(block_len);
-        ecc_len_iv = GFT{0} + gf.inv(ecc_len);
+        _rbo_shift = 16 - __builtin_ctzl(ntt_len);
+        ntt_len_i = gf.inv(ntt_len);
+        ecc_len_i = gf.inv(ecc_len);
 
-        root = gf.exp(gf.div(gf.log(1), block_len));
-        if (root >= 0x8000)
-            root = gf.neg(root);
+        root = gf.exp(gf.div(gf.log(1), ntt_len));
 
-        if (gf.pow(root, block_len) != 1)
+        if (gf.pow(root, ntt_len) != 1)
             throw std::runtime_error("Root of unity not found for block size");
 
         uint32_t root_i = gf.inv(root);
-        _roots_v_block.resize(block_len);
-        _roots_iv_block.resize(block_len);
+        _roots_block.resize(block_len);
+        _roots_i_block.resize(block_len);
         for (size_t i = 0; i < block_len; ++i) {
-            _roots_v_block[i] = GFT{0} + gf.pow(root, i);
-            _roots_iv_block[i] = GFT{0} + gf.pow(root_i, i);
+            _roots_block[i] = gf.pow(root, i);
+            _roots_i_block[i] = gf.pow(root_i, i);
         }
 
-        _ecc_mix_v.resize(ecc_len);
-        _ecc_mix_iv.resize(ecc_len);
-        auto ecc_mix_w = *reinterpret_cast<uint32_t *>(&_roots_v_block[rbo(block_len - ecc_len)]);
+        _ecc_mix.resize(ecc_len);
+        _ecc_mix_i.resize(ecc_len);
+        auto ecc_mix_w = *reinterpret_cast<uint32_t *>(&_roots_block[rbo(block_len - ecc_len)]);
         auto ecc_mix_w_i = gf.inv(ecc_mix_w);
         for (size_t i = 0; i < ecc_len; ++i) {
-            _ecc_mix_v[i] = GFT{0} + gf.neg(gf.div(gf.pow(ecc_mix_w_i, i), ecc_len));
-            _ecc_mix_iv[i] = GFT{0} + gf.neg(gf.pow(ecc_mix_w, i));
+            _ecc_mix[i] = gf.neg(gf.div(gf.pow(ecc_mix_w_i, i), ecc_len));
+            _ecc_mix_i[i] = gf.neg(gf.pow(ecc_mix_w, i));
         }
 
-        uint32_t ecc_root = gf.pow(root, block_len / ecc_len);
+        uint32_t ecc_root = gf.pow(root, ntt_len / ecc_len);
         // uint32_t ecc_root = gf.exp(gf.div(gf.log(1), ecc_len));
         uint32_t ecc_root_i = gf.inv(ecc_root);
-        _roots_v_ecc.resize(ecc_len);
-        _roots_iv_ecc.resize(ecc_len);
+        _roots_ecc.resize(ecc_len);
+        _roots_i_ecc.resize(ecc_len);
         for (size_t i = 0; i < ecc_len; ++i) {
-            _roots_v_ecc[i] = GFT{0} + gf.pow(ecc_root, i);
-            _roots_iv_ecc[i] = GFT{0} + gf.pow(ecc_root_i, i);
+            _roots_ecc[i] = gf.pow(ecc_root, i);
+            _roots_i_ecc[i] = gf.pow(ecc_root_i, i);
         }
 
         _pntt_shift.resize(block_len);
         for (size_t i = 0; i < block_len; ++i) {
             auto blk = (i / ecc_len) * ecc_len;
             auto j = i - blk;
-            _pntt_shift[i] = GFT{0} + gf.pow(root, j * rbo(blk));
+            _pntt_shift[i] = gf.pow(root, j * rbo(blk));
         }
     }
 
@@ -104,40 +103,41 @@ public:
 
     inline void ecc_mix(GFT ecc[]) const {
         for (size_t j = 0; j < ecc_len; ++j)
-            ecc[j] = gf.mul(ecc[j], _ecc_mix_v[j]);
+            ecc[j] = gf.mul(ecc[j], _ecc_mix[j]);
 
-        gs_butterfly(&_roots_iv_ecc[0], &ecc[0], ecc_len, ecc_len);
+        gs_butterfly(&_roots_i_ecc[0], &ecc[0], ecc_len, ecc_len);
     }
 
     inline void ecc_unmix(GFT ecc[]) const {
-        ct_butterfly(&_roots_v_ecc[0], &ecc[0], ecc_len);
+        ct_butterfly(&_roots_ecc[0], &ecc[0], ecc_len);
 
         for (size_t j = 0; j < ecc_len; ++j)
-            ecc[j] = gf.mul(ecc[j], _ecc_mix_iv[j]);
+            ecc[j] = gf.mul(ecc[j], _ecc_mix_i[j]);
     }
 
     inline void ntt(GFT block[]) const {
-        ct_butterfly(&_roots_v_block[0], &block[0], block_len);
+        ct_butterfly(&_roots_block[0], &block[0], ntt_len);
     }
 
     inline void intt(GFT block[]) const {
-        gs_butterfly(&_roots_iv_block[0], &block[0], block_len, block_len);
-        for (size_t j = 0; j < block_len; ++j)
-            block[j] = gf.mul(block[j], block_len_iv);
+        gs_butterfly(&_roots_i_block[0], &block[0], ntt_len, ntt_len);
+        for (size_t j = 0; j < ntt_len; ++j)
+            block[j] = gf.mul(block[j], ntt_len_i);
     }
 
-    inline void repair(GFT block[], GFT temp6[]) const {
-        auto locator_poly = &temp6[0];
-        auto evaluator_poly = &temp6[block_len];
+    inline void repair(GFT block[], GFT temp1_ecc6[]) const {
+        // temp1_ecc6 = max(block_len, ecc_len * 6)
 
         // init evaluator_poly with syndromes
+        auto evaluator_poly = &temp1_ecc6[0];
         std::copy_n(&block[0], block_len, &evaluator_poly[0]);
         pntt(evaluator_poly);
 
-        auto locator_poly_len = sugiyama(&locator_poly[0], &evaluator_poly[0], &temp6[block_len * 2]);
+        auto locator_poly = &temp1_ecc6[ecc_len];
+        auto locator_poly_len = sugiyama(&locator_poly[0], &evaluator_poly[0], &temp1_ecc6[ecc_len * 2]);
         auto evaluator_poly_len = ecc_len - locator_poly_len + 1;
 
-        auto error_locations = &temp6[block_len * 2];
+        auto error_locations = &temp1_ecc6[ecc_len * 2];
         auto error_count = find_roots(&locator_poly[0], locator_poly_len, &error_locations[0]);
 
         locator_poly_len = _deriv(locator_poly, locator_poly_len);
@@ -164,7 +164,7 @@ public:
         // copy synds
         std::copy_n(&block_ntt[0], ecc_len, &temp[0]);
 
-        for (size_t j = ecc_len; j < block_len; ++j) {
+        for (size_t j = ecc_len; j < ntt_len; ++j) {
             GFT sum = GFT{0};
             for (size_t i = 0; i < error_count; ++i)
                 sum = gf.sub(sum, gf.mul(locator_poly[i], temp[j - error_count + i]));
@@ -178,7 +178,7 @@ public:
         // TODO limit to error positions only, test if performance improvement
         // for (size_t j = 0; j < error_count; ++j) {
         //     size_t i = error_pos_rbo[j];
-        //     block[i] = gf.div(block[i], block_len);
+        //     block[i] = gf.div(block[i], ntt_len);
         // }
     }
 
@@ -190,36 +190,37 @@ protected:
     GFi16 const& gf;
     uint16_t _rbo_shift;
     size_t block_len;
+    size_t ntt_len;
     size_t ecc_len;
     size_t pntt_blocks;
-    GFT block_len_iv;
-    GFT ecc_len_iv;
-    std::vector<GFT> _roots_v_block;
-    std::vector<GFT> _roots_iv_block;
-    std::vector<GFT> _roots_v_ecc;
-    std::vector<GFT> _roots_iv_ecc;
-    std::vector<GFT> _ecc_mix_v;
-    std::vector<GFT> _ecc_mix_iv;
-    std::vector<GFT> _pntt_shift;
+    uint32_t ntt_len_i;
+    uint32_t ecc_len_i;
+    std::vector<uint32_t> _roots_block;
+    std::vector<uint32_t> _roots_i_block;
+    std::vector<uint32_t> _roots_ecc;
+    std::vector<uint32_t> _roots_i_ecc;
+    std::vector<uint32_t> _ecc_mix;
+    std::vector<uint32_t> _ecc_mix_i;
+    std::vector<uint32_t> _pntt_shift;
 
-    inline void ct_butterfly(const GFT roots[], GFT block[], size_t block_len) const {
-        for (size_t stride = 1, exp_f = block_len >> 1; stride < block_len; stride *= 2, exp_f >>= 1) {
-            for (size_t start = 0; start < block_len /*input_size*/; start += stride * 2) {
+    inline void ct_butterfly(const uint32_t roots[], GFT block[], size_t ntt_len) const {
+        for (size_t stride = 1, exp_f = ntt_len >> 1; stride < ntt_len; stride *= 2, exp_f >>= 1) {
+            for (size_t start = 0; start < ntt_len /*input_size*/; start += stride * 2) {
                 {
                     // Cooley-Tukey butterfly
-                    GFT a = block[start];
-                    GFT b = block[start + stride];
+                    auto a = block[start];
+                    auto b = block[start + stride];
                     block[start] = gf.add(a, b);
                     block[start + stride] = gf.sub(a, b);
                 }
                 for (size_t i = start + 1; i < start + stride; ++i) {
                     // j = i - start
-                    GFT w = roots[exp_f * (i - start)];
+                    auto w = roots[exp_f * (i - start)];
 
                     // Cooley-Tukey butterfly
-                    GFT a = block[i];
-                    GFT b = block[i + stride];
-                    GFT m = gf.mul(b, w);
+                    auto a = block[i];
+                    auto b = block[i + stride];
+                    auto m = gf.mul(b, w);
                     block[i] = gf.add(a, m);
                     block[i + stride] = gf.sub(a, m);
                 }
@@ -227,22 +228,22 @@ protected:
         }
     }
 
-    inline void gs_butterfly(const GFT roots[], GFT block[], size_t block_len, size_t end) const {
-        for (size_t stride = block_len / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
+    inline void gs_butterfly(const uint32_t roots[], GFT block[], size_t ntt_len, size_t end) const {
+        for (size_t stride = ntt_len / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
             for (size_t start = 0; start < end; start += stride * 2) {
                 {
                     // Gentleman-Sande butterfly
-                    GFT a = block[start];
-                    GFT b = block[start + stride];
+                    auto a = block[start];
+                    auto b = block[start + stride];
                     block[start] = gf.add(a, b);
                     block[start + stride] = gf.sub(a, b);
                 }
                 for (size_t i = start + 1; i < start + stride; ++i) {
                     // Gentleman-Sande butterfly
-                    GFT w = roots[(i - start) << exp_f];
+                    auto w = roots[(i - start) << exp_f];
 
-                    GFT a = block[i];
-                    GFT b = block[i + stride];
+                    auto a = block[i];
+                    auto b = block[i + stride];
                     block[i] = gf.add(a, b);
                     block[i + stride] = gf.mul(gf.sub(a, b), w);
                 }
@@ -264,30 +265,31 @@ protected:
         }
     }
 
-    inline size_t sugiyama(GFT a1[], GFT r1[], GFT temp4[]) const {
+    inline size_t sugiyama(GFT a1[], GFT r1[], GFT temp_ecc4[]) const {
         // r1 = synds
+        // temp_ecc4 = 4 * ecc_len
 
-        std::fill_n(&temp4[0], block_len * 4, GFT{0});
+        std::fill_n(&temp_ecc4[0], ecc_len * 4, GFT{0});
 
         size_t a1_len;
-        std::fill_n(a1, block_len, GFT{0});
+        std::fill_n(a1, ecc_len, GFT{0});
 
         // TODO test when second-to-last synd is 0
         size_t r1_len = _norm_size(r1, ecc_len - 1);
 
         size_t q_len = 0;
-        auto q = &temp4[block_len * 0];
+        auto q = &temp_ecc4[ecc_len * 0];
 
         size_t t_len = 0;
-        auto t = &temp4[block_len * 1];
+        auto t = &temp_ecc4[ecc_len * 1];
 
         size_t a2_len = 1;
-        auto a2 = &temp4[block_len * 2];
+        auto a2 = &temp_ecc4[ecc_len * 2];
         // a2[0] = 1;
         // nttr(a2);
         std::fill_n(&a2[0], ecc_len, GFT{1});
 
-        auto r2 = &temp4[block_len * 3];
+        auto r2 = &temp_ecc4[ecc_len * 3];
         size_t r2_len = ecc_len;
         std::copy_n(&r1[0], ecc_len, &r2[0]);
 
@@ -508,18 +510,18 @@ protected:
     }
 
     inline void nttr(GFT block[]) const {
-        gs_butterfly(&_roots_v_ecc[0], &block[0], ecc_len, ecc_len);
+        gs_butterfly(&_roots_ecc[0], &block[0], ecc_len, ecc_len);
     }
 
     inline void inttr(GFT block[]) const {
-        ct_butterfly(&_roots_iv_ecc[0], &block[0], ecc_len);
+        ct_butterfly(&_roots_i_ecc[0], &block[0], ecc_len);
         for (size_t j = 0; j < ecc_len; ++j)
-            block[j] = gf.mul(block[j], ecc_len_iv);
+            block[j] = gf.mul(block[j], ecc_len_i);
     }
 
     inline void pntt(GFT block[]) const {
         {
-            ct_butterfly(&_roots_v_ecc[0], &block[0], ecc_len);
+            ct_butterfly(&_roots_ecc[0], &block[0], ecc_len);
 
             for (size_t j = 0; j < ecc_len; ++j)
                 block[j] = gf.mul(block[j], _pntt_shift[j]);
@@ -527,7 +529,7 @@ protected:
 
         for (size_t i = 1; i < pntt_blocks; ++i) {
             auto p = &block[i * ecc_len];
-            ct_butterfly(&_roots_v_ecc[0], &p[0], ecc_len);
+            ct_butterfly(&_roots_ecc[0], &p[0], ecc_len);
 
             for (size_t j = 0; j < ecc_len; ++j)
                 p[j] = gf.mul(p[j], _pntt_shift[i * ecc_len + j]);
