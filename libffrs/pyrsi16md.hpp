@@ -164,7 +164,7 @@ public:
         for (size_t i = 0; i < count; ++i) {
             std::copy_n(&msg[i * message_len], message_len, &temp[0]);
             std::copy_n(&ecc[i * ecc_len], ecc_len, &temp[message_len]);
-            rs16.ntt(&temp[0]);
+            rs16.pntt(&temp[0]);
             std::copy_n(&temp[0], ecc_len, &synds[i * ecc_len]);
         }
     }
@@ -179,14 +179,10 @@ public:
             copy_stride(&msg[i * SIMD_W], interleave, &temp[0], SIMD_W, SIMD_W, message_len);
             // std::copy_n(&ecc[i * ecc_len], ecc_len, &temp[message_len]);
             copy_transposed(&ecc[i * ecc_len], ecc_len, &temp[message_len * SIMD_W], SIMD_W);
-            rs16.ntt(&temp[0]);
+            rs16.pntt(&temp[0]);
             // std::copy_n(&temp[0], ecc_len, &synds[i * ecc_len]);
             copy_transposed(&temp[0], SIMD_W, &synds[i * ecc_len * SIMD_W], ecc_len);
         }
-    }
-
-    inline void ntt(uint32_t block[]) {
-        rs16.ntt(&block[0]);
     }
 
     inline void ecc_mix(uint32_t ecc[]) {
@@ -203,6 +199,8 @@ public:
             .def_property_readonly("block_size", [](PyRSi16md& self) { return self.interleaved_block_len * sizeof(uint16_t); })
             .def_property_readonly("message_len", [](PyRSi16md& self) { return self.interleaved_message_len; })
             .def_property_readonly("message_size", [](PyRSi16md& self) { return self.interleaved_message_len * sizeof(uint16_t); })
+            .def_property_readonly("ntt_len", [](PyRSi16md& self) { return self.rs16.ntt_len; })
+            .def_property_readonly("ntt_size", [](PyRSi16md& self) { return self.rs16.ntt_len * sizeof(uint16_t); })
             .def_property_readonly("root", [](PyRSi16md& self) { return self.rs16.root; })
             .def_property_readonly("gf", [](PyRSi16md& self) -> auto const& { return self.gf; })
 
@@ -626,7 +624,7 @@ private:
         std::copy_n(&message[0], message_len, &temp[0]);
         std::copy_n(&ecc[0], ecc_len, &temp[message_len]);
 
-        rs16.ntt(&temp[0]);
+        rs16.pntt(&temp[0]);
         std::copy_n(&temp[0], ecc_len, &synds[0]);
 
         auto output = py::bytearray(nullptr, ecc_len * sizeof(uint16_t));

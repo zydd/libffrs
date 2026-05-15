@@ -137,6 +137,12 @@ constexpr T ilog2_floor(T a) {
 }
 
 
+template<typename T>
+constexpr T ilog2_ceil(T a) {
+    return ilog2_floor(a - 1) + 1;
+}
+
+
 constexpr size_t ipow(size_t a, size_t b) {
     size_t r = 1;
     for (size_t i = 0; i < b; ++i)

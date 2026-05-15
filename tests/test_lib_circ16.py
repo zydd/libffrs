@@ -22,54 +22,7 @@ import ffrs
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, randbytes
 
 
-@pytest.mark.parametrize("rs", [
-    ffrs.CIRC(4, 2, 4, 2),
-    ffrs.CIRC(8, 2, 8, 2),
-    # ffrs.CIRC(8, 2, 65536, 2),  # TODO: validate RSi16md with 64k block
-    ffrs.CIRC(16, 4, 16, 4),
-    ffrs.CIRC(32, 16, 4, 2),
-    ffrs.CIRC(128, 8, 128, 128 // 16),
-    ffrs.CIRC(512, 4, 512, 512 // 16),
-    ffrs.CIRC(32768, 4, 16, 4),
-    ffrs.CIRC(16, 4, 32768, 4),
-    # ffrs.CIRC(1024, 4, 1024, 1024 // 16),
-    # ffrs.CIRC(4096, 4, 4096, 4096 // 16),
-
-    ffrs.CIRC(4, 2, 4, 2, simd_x16=False),
-    ffrs.CIRC(8, 2, 8, 2, simd_x16=False),
-    ffrs.CIRC(16, 4, 16, 4, simd_x16=False),
-    ffrs.CIRC(32, 16, 4, 2, simd_x16=False),
-    ffrs.CIRC(128, 8, 128, 128 // 16, simd_x16=False),
-    ffrs.CIRC(512, 4, 512, 512 // 16, simd_x16=False),
-    # ffrs.CIRC(1024, 4, 1024, 1024 // 16, simd_x16=False),
-    # ffrs.CIRC(4096, 4, 4096, 4096 // 16, simd_x16=False),
-
-    ffrs.CIRC(4, 2, 4, 2, simd_x16=False, simd_x8=False),
-    ffrs.CIRC(8, 2, 8, 2, simd_x16=False, simd_x8=False),
-    ffrs.CIRC(16, 4, 16, 4, simd_x16=False, simd_x8=False),
-    ffrs.CIRC(32, 16, 4, 2, simd_x16=False, simd_x8=False),
-    ffrs.CIRC(128, 8, 128, 128 // 16, simd_x16=False, simd_x8=False),
-    ffrs.CIRC(512, 4, 512, 512 // 16, simd_x16=False, simd_x8=False),
-    # ffrs.CIRC(1024, 4, 1024, 1024 // 16, simd_x16=False, simd_x8=False),
-    # ffrs.CIRC(4096, 4, 4096, 4096 // 16, simd_x16=False, simd_x8=False),
-
-    ffrs.CIRC(4, 2, 4, 2, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.CIRC(8, 2, 8, 2, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.CIRC(16, 4, 16, 4, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.CIRC(32, 16, 4, 2, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.CIRC(128, 8, 128, 128 // 16, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.CIRC(512, 4, 512, 512 // 16, simd_x16=False, simd_x8=False, simd_x4=False),
-    # ffrs.CIRC(1024, 4, 1024, 1024 // 16, simd_x16=False, simd_x8=False, simd_x4=False),
-    # ffrs.CIRC(4096, 4, 4096, 4096 // 16, simd_x16=False, simd_x8=False, simd_x4=False),
-
-    ffrs.CIRC(128, 2, 32, 2, 32),
-    ffrs.CIRC(512, 4, 128, 8, 8),
-    ffrs.CIRC(128, 8, 128, 128 // 16, 4),
-    ffrs.CIRC(128, 8, 128, 128 // 16, 4, simd_x16=False),
-    ffrs.CIRC(128, 8, 128, 128 // 16, 4, simd_x16=False, simd_x8=False),
-    ffrs.CIRC(128, 8, 128, 128 // 16, 4, simd_x16=False, simd_x8=False, simd_x4=False),
-])
-class TestCIRC:
+class BaseTestCIRC:
     @staticmethod
     def _rsi_ecc_size(rs):
         return rs.outer_message_len * rs.inner_ecc_size * rs.outer_interleave
@@ -163,3 +116,70 @@ class TestCIRC:
 
         assert buf == msg_orig
         assert ecc == ecc_orig
+
+
+@pytest.mark.parametrize("rs", [
+    ffrs.CIRC(4, 2, 4, 2),
+    ffrs.CIRC(8, 2, 8, 2),
+    # ffrs.CIRC(8, 2, 65536, 2),  # TODO: validate RSi16md with 64k block
+    ffrs.CIRC(16, 4, 16, 4),
+    ffrs.CIRC(32, 16, 4, 2),
+    ffrs.CIRC(128, 8, 128, 128 // 16),
+    ffrs.CIRC(512, 4, 512, 512 // 16),
+    ffrs.CIRC(32768, 4, 16, 4),
+    ffrs.CIRC(16, 4, 32768, 4),
+    # ffrs.CIRC(1024, 4, 1024, 1024 // 16),
+    # ffrs.CIRC(4096, 4, 4096, 4096 // 16),
+
+    ffrs.CIRC(4, 2, 4, 2, simd_x16=False),
+    ffrs.CIRC(8, 2, 8, 2, simd_x16=False),
+    ffrs.CIRC(16, 4, 16, 4, simd_x16=False),
+    ffrs.CIRC(32, 16, 4, 2, simd_x16=False),
+    ffrs.CIRC(128, 8, 128, 128 // 16, simd_x16=False),
+    ffrs.CIRC(512, 4, 512, 512 // 16, simd_x16=False),
+    # ffrs.CIRC(1024, 4, 1024, 1024 // 16, simd_x16=False),
+    # ffrs.CIRC(4096, 4, 4096, 4096 // 16, simd_x16=False),
+
+    ffrs.CIRC(4, 2, 4, 2, simd_x16=False, simd_x8=False),
+    ffrs.CIRC(8, 2, 8, 2, simd_x16=False, simd_x8=False),
+    ffrs.CIRC(16, 4, 16, 4, simd_x16=False, simd_x8=False),
+    ffrs.CIRC(32, 16, 4, 2, simd_x16=False, simd_x8=False),
+    ffrs.CIRC(128, 8, 128, 128 // 16, simd_x16=False, simd_x8=False),
+    ffrs.CIRC(512, 4, 512, 512 // 16, simd_x16=False, simd_x8=False),
+    # ffrs.CIRC(1024, 4, 1024, 1024 // 16, simd_x16=False, simd_x8=False),
+    # ffrs.CIRC(4096, 4, 4096, 4096 // 16, simd_x16=False, simd_x8=False),
+
+    ffrs.CIRC(4, 2, 4, 2, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.CIRC(8, 2, 8, 2, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.CIRC(16, 4, 16, 4, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.CIRC(32, 16, 4, 2, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.CIRC(128, 8, 128, 128 // 16, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.CIRC(512, 4, 512, 512 // 16, simd_x16=False, simd_x8=False, simd_x4=False),
+    # ffrs.CIRC(1024, 4, 1024, 1024 // 16, simd_x16=False, simd_x8=False, simd_x4=False),
+    # ffrs.CIRC(4096, 4, 4096, 4096 // 16, simd_x16=False, simd_x8=False, simd_x4=False),
+
+    ffrs.CIRC(128, 2, 32, 2, 32),
+    ffrs.CIRC(512, 4, 128, 8, 8),
+    ffrs.CIRC(128, 8, 128, 128 // 16, 3),
+    ffrs.CIRC(128, 8, 128, 128 // 16, 4),
+    ffrs.CIRC(128, 8, 128, 128 // 16, 4, simd_x16=False),
+    ffrs.CIRC(128, 8, 128, 128 // 16, 4, simd_x16=False, simd_x8=False),
+    ffrs.CIRC(128, 8, 128, 128 // 16, 4, simd_x16=False, simd_x8=False, simd_x4=False),
+])
+class TestCircPower2(BaseTestCIRC):
+    pass
+
+
+@pytest.mark.parametrize("rs", [
+    ffrs.CIRC(4*3, 2, 8*3, 2),
+    ffrs.CIRC(100, 2, 100, 2),
+    ffrs.CIRC(1026, 2, 128*3, 128),
+    ffrs.CIRC(100, 2, 100, 2, 3),
+    ffrs.CIRC(1026, 2, 128*3, 128, 7),
+])
+class TestCircMult(BaseTestCIRC):
+    # Limited support for multiples of powers of 2
+    # TODO: partial intt or switch to forney algo
+    test_circ_repair = pytest.mark.skip(BaseTestCIRC.test_circ_repair)
+    test_repair_fallback = pytest.mark.skip(BaseTestCIRC.test_repair_fallback)
+    test_repair_no_errors = pytest.mark.skip(BaseTestCIRC.test_repair_no_errors)

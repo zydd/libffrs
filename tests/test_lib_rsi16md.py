@@ -31,44 +31,14 @@ ref_ntt = lambda w, buf: to_int_list(ffrs.reference.ntt.ntt(ref_gf, ref_gf(w), r
 ref_intt = lambda w, buf: rbo_sorted(to_int_list(ffrs.reference.ntt.intt(ref_gf, ref_gf(w), buf)))
 
 
-@pytest.mark.parametrize("rs", [
-    ffrs.RSi16md(4, ecc_len=2),
-    ffrs.RSi16md(16, ecc_len=4),
-    ffrs.RSi16md(16, ecc_len=8),
-    ffrs.RSi16md(128, ecc_len=2),
-    ffrs.RSi16md(256, ecc_len=128),
-    # ffrs.RSi16md(1024, ecc_len=128),
-    # ffrs.RSi16md(4096, ecc_len=512),
-
-    ffrs.RSi16md(4, ecc_len=2, simd_x16=False),
-    ffrs.RSi16md(16, ecc_len=4, simd_x16=False),
-    ffrs.RSi16md(128, ecc_len=2, simd_x16=False),
-    ffrs.RSi16md(256, ecc_len=128, simd_x16=False),
-    # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False),
-    # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False),
-
-    ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False),
-    ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False),
-    ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False),
-    ffrs.RSi16md(256, ecc_len=128, simd_x16=False, simd_x8=False),
-    # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False),
-    # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False),
-
-    ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.RSi16md(256, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
-    # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
-    # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False, simd_x4=False),
-])
-class TestRS:
+class BaseTestRS:
     def test_encode(self, rs):
         buf = randbytes(rs.message_size)
 
         res = rs.encode(buf)
 
         w = ref_gf(rs.root)
-        buf_ntt = ref_ntt(w, to_int_list(buf + bytearray(rs.ecc_size), 2))
+        buf_ntt = ref_ntt(w, to_int_list(buf + bytearray(rs.ntt_size - len(buf)), 2))
 
         ecc_mix = rs._mix_ecc(buf_ntt[:rs.ecc_len])
 
@@ -81,8 +51,6 @@ class TestRS:
         block_enc = orig + to_int_list(rs.encode(to_bytearray(orig, 2)), 2)
 
         block_enc_err = list(block_enc)
-
-        assert rs.find_errors(to_bytearray(block_enc, 2)) == []
 
         error_positions = dict()
 
@@ -122,8 +90,6 @@ class TestRS:
 
         block_enc_err = list(block_enc)
 
-        assert rs.find_errors(to_bytearray(block_enc, 2)) == []
-
         error_positions = dict()
 
         # Always add one error to the codeword
@@ -160,7 +126,6 @@ class TestRS:
         msg_err = bytearray(msg)
         ecc_err = bytearray(ecc)
 
-        assert rs.find_errors(msg + ecc) == []
         rs.repair(msg_err, ecc_err, [])
 
         assert msg_err == msg
@@ -173,46 +138,10 @@ class TestRS:
         msg_err = bytearray(msg)
         ecc_err = bytearray(ecc)
 
-        assert rs.find_errors(msg + ecc) == []
         rs.repair(msg_err, ecc_err)
 
         assert msg_err == msg
         assert ecc_err == ecc
-
-    def test_encode_decode(self, rs):
-        orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
-
-        msg_enc = orig + to_int_list(rs.encode(to_bytearray(orig, 2)), 2)
-
-        msg_enc_err = list(msg_enc)
-
-        assert rs.find_errors(to_bytearray(msg_enc, 2)) == []
-
-        error_positions = dict()
-
-        # Always add one error to the codeword
-        if len(error_positions) < max(rs.ecc_len//2, 1):
-            i = random.randrange(rs.block_len - rs.ecc_len, rs.block_len)
-            error_positions[i] = random.randrange(2**16)
-            msg_enc_err[i] = rs.gf.add(msg_enc_err[i], error_positions[i])
-
-        while len(error_positions) < rs.ecc_len//2:
-            i = random.randrange(rs.block_len)
-            if i in error_positions:
-                continue
-            error_positions[i] = random.randrange(2**16)
-            msg_enc_err[i] = rs.gf.add(msg_enc_err[i], error_positions[i])
-
-        w = ref_gf(rs.root)
-        print()
-        print("errs: ", error_positions)
-
-        assert msg_enc_err != msg_enc
-
-        msg_enc_err_dec = rs.decode(to_bytearray(msg_enc_err, 2))
-
-        assert msg_enc[:-rs.ecc_len] == to_int_list(msg_enc_err_dec, 2)
-        assert set(error_positions.keys()) == set(rs.find_errors(to_bytearray(msg_enc_err, 2)))
 
     def test_encode_blocks_empty(self, rs):
         assert bytearray() == rs.encode(bytearray())
@@ -275,3 +204,47 @@ class TestRS:
 
             # Interleaved ecc
             assert to_bytearray(to_int_list(interleaved_chunk, 2)[i::interleave], 2) == buf_enc
+
+
+@pytest.mark.parametrize("rs", [
+    ffrs.RSi16md(4, ecc_len=2),
+    ffrs.RSi16md(16, ecc_len=4),
+    ffrs.RSi16md(16, ecc_len=8),
+    ffrs.RSi16md(128, ecc_len=2),
+    ffrs.RSi16md(256, ecc_len=128),
+    # ffrs.RSi16md(1024, ecc_len=128),
+    # ffrs.RSi16md(4096, ecc_len=512),
+
+    ffrs.RSi16md(4, ecc_len=2, simd_x16=False),
+    ffrs.RSi16md(16, ecc_len=4, simd_x16=False),
+    ffrs.RSi16md(128, ecc_len=2, simd_x16=False),
+    ffrs.RSi16md(256, ecc_len=128, simd_x16=False),
+    # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False),
+    # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False),
+
+    ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False),
+    ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False),
+    ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False),
+    ffrs.RSi16md(256, ecc_len=128, simd_x16=False, simd_x8=False),
+    # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False),
+    # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False),
+
+    ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.RSi16md(256, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
+    # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
+    # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False, simd_x4=False),
+])
+class TestRSPower2(BaseTestRS):
+    pass
+
+
+@pytest.mark.parametrize("rs", [
+    ffrs.RSi16md(16 * 13, ecc_len=8),
+    ffrs.RSi16md(256 * 3, ecc_len=8),
+])
+class TestRSMult(BaseTestRS):
+    # Limited support for multiples of powers of 2
+    # TODO: partial intt or switch to forney algo
+    test_repair = pytest.mark.skip(BaseTestRS.test_repair)

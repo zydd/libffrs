@@ -65,15 +65,5 @@ class RSi16md(libffrs.RSi16md):
 
         return [rbo(self.block_len, pos) for pos in err_pos_rbo]
 
-    def decode(self, block: bytearray):
-        error_pos = self.find_errors(block)
-
-        msg = block[:self.message_size]
-        ecc = block[self.message_size:]
-
-        self.repair(msg, ecc, error_pos)
-
-        return msg
-
     def __repr__(self):
         return f"RSi16md({self.block_len}, ecc_len={self.ecc_len})"

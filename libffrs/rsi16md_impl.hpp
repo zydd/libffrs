@@ -44,14 +44,15 @@ template<typename GFT>
 class RSi16vImpl {
 public:
     uint32_t root;
+    size_t ntt_len;
 
     inline RSi16vImpl(GFi16 const& gf, size_t block_len, size_t ecc_len):
         gf(gf),
         block_len(block_len),
-        ntt_len(block_len),
         ecc_len(ecc_len),
-        pntt_blocks(ntt_len / ecc_len)
+        pntt_blocks(block_len / ecc_len)
     {
+        ntt_len = 1 << ffrs::detail::ilog2_ceil(block_len);
         _rbo_shift = 16 - __builtin_ctzl(ntt_len);
         ntt_len_i = gf.inv(ntt_len);
         ecc_len_i = gf.inv(ecc_len);
@@ -117,6 +118,28 @@ public:
 
     inline void ntt(GFT block[]) const {
         ct_butterfly(&_roots_block[0], &block[0], ntt_len);
+    }
+
+    inline void pntt(GFT block[]) const {
+        // partial ntt
+        // computes the first n symbols of the ntt of size m, given m is divisible by n
+        {
+            ct_butterfly(&_roots_ecc[0], &block[0], ecc_len);
+
+            for (size_t j = 0; j < ecc_len; ++j)
+                block[j] = gf.mul(block[j], _pntt_shift[j]);
+        }
+
+        for (size_t i = 1; i < pntt_blocks; ++i) {
+            auto p = &block[i * ecc_len];
+            ct_butterfly(&_roots_ecc[0], &p[0], ecc_len);
+
+            for (size_t j = 0; j < ecc_len; ++j)
+                p[j] = gf.mul(p[j], _pntt_shift[i * ecc_len + j]);
+
+            for (size_t j = 0; j < ecc_len; ++j)
+                block[j] = gf.add(block[j], block[i * ecc_len + j]);
+        }
     }
 
     inline void intt(GFT block[]) const {
@@ -190,7 +213,6 @@ protected:
     GFi16 const& gf;
     uint16_t _rbo_shift;
     size_t block_len;
-    size_t ntt_len;
     size_t ecc_len;
     size_t pntt_blocks;
     uint32_t ntt_len_i;
@@ -373,15 +395,14 @@ protected:
         const GFT error_pos[], size_t error_count
     ) const {
         for (size_t i = 0; i < error_count; ++i) {
-            GFT x = gf.pow(root, error_pos[i]);
+            GFT x = gf.pow(root, rbo(error_pos[i]));
             GFT x_inv = gf.inv(x);
             GFT numerator = _eval(evaluator_poly, evaluator_poly_len, x_inv);
             GFT denominator = _eval(locator_poly_deriv, locator_poly_deriv_len, x_inv);
 
             GFT error = gf.mul(x, gf.div(numerator, denominator));
 
-            auto pos = rbo(error_pos[i]);
-            block[pos] = gf.add(block[pos], error);
+            block[error_pos[i]] = gf.add(block[error_pos[i]], error);
         }
         return error_count;
     }
@@ -389,7 +410,7 @@ protected:
     inline size_t find_roots(const GFT locator_poly[], size_t locator_poly_len, GFT roots[]) const {
         size_t root_count = 0;
         for (size_t i = 0; i < block_len; ++i) {
-            GFT x_inv = gf.inv(gf.pow(root, i));
+            GFT x_inv = gf.inv(gf.pow(root, rbo(i)));
             if (_eval(locator_poly, locator_poly_len, x_inv) == GFT{0})
                 roots[root_count++] = i;
         }
@@ -517,26 +538,6 @@ protected:
         ct_butterfly(&_roots_i_ecc[0], &block[0], ecc_len);
         for (size_t j = 0; j < ecc_len; ++j)
             block[j] = gf.mul(block[j], ecc_len_i);
-    }
-
-    inline void pntt(GFT block[]) const {
-        {
-            ct_butterfly(&_roots_ecc[0], &block[0], ecc_len);
-
-            for (size_t j = 0; j < ecc_len; ++j)
-                block[j] = gf.mul(block[j], _pntt_shift[j]);
-        }
-
-        for (size_t i = 1; i < pntt_blocks; ++i) {
-            auto p = &block[i * ecc_len];
-            ct_butterfly(&_roots_ecc[0], &p[0], ecc_len);
-
-            for (size_t j = 0; j < ecc_len; ++j)
-                p[j] = gf.mul(p[j], _pntt_shift[i * ecc_len + j]);
-
-            for (size_t j = 0; j < ecc_len; ++j)
-                block[j] = gf.add(block[j], block[i * ecc_len + j]);
-        }
     }
 };
 
