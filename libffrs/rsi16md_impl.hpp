@@ -290,7 +290,6 @@ protected:
         auto r2 = &temp4[block_len * 3];
         size_t r2_len = ecc_len;
         std::copy_n(&r1[0], ecc_len, &r2[0]);
-        nttr(r2);
 
         {
             // Q = R2 // R1
@@ -302,64 +301,51 @@ protected:
             a1[0] = gf.mul(r1[ecc_len - 2], gf.mul(a1[1], a1[1]));
             a1_len = 2;
 
-            GFT s0 = r1[0];
             std::fill_n(&r1[r1_len], ecc_len - r1_len, GFT{0});
-            nttr(a1);
-            nttr(r1);
+            for (size_t i = 0; i < r1_len; ++i)
+                r1[i] = gf.mul(a1[0], r1[i]);
+            for (size_t i = 1; i < r1_len; ++i)
+                r1[i] = gf.add(r1[i], gf.mul(a1[1], r2[i - 1]));
 
-            // R1 = R2 - Q * R1
-            vec_mul(a1, r1, r1);
-
-            inttr(r1);
-            inttr(a1);
-
-            r1[ecc_len - 1] = 0;
-            r1[0] = gf.mul(a1[0], s0);
-            r1_len = _norm_size(r1, r1_len);
-
+            r1_len = _norm_size(r1, r1_len + 1);
             a1_len = _norm_size(a1, a1_len);
 
-            nttr(r1);
             nttr(a1);
+            // nttr(r1); // div ntt elision
+            // nttr(r2); // div ntt elision
         }
 
         for (size_t i = 1; i < ecc_len / 2 && r1_len > ecc_len / 2; ++i) {
-            // Q = R2 // R1
-
+            // q = r2 // r1
             vec_div(r2, r1, q);
 
-            // t = A2 - Q * A1
-
+            // t = q * a1
             vec_mul(q, a1, t);
+            // q = q * r1
+            vec_mul(q, r1, q);
+
+            // t = a2 - q * a1
             vec_sub(a2, t, t);
+            // t = r2 - q * r1
+            vec_sub(r2, q, q);
 
-            // A2 = A1
+            // a2 = a1
             vec_copy(a1, a2);
+            // r2 = r1
+            vec_copy(r1, r2);
 
-
-            // A1 = t if R1.deg() >= len(synds) // 2 else A1
             // TODO: adapt to work with simd
             // if (r1_len > ecc_len)
                 vec_copy(t, a1);
-
-            // t = R2 - Q * R1
-            vec_mul(q, r1, t);
-            vec_sub(r2, t, t);
-
-            // R2 = R1
-            vec_copy(r1, r2);
-
-            // R1 = t if R1.deg() >= len(synds) // 2 else R1
-            // if (r1_len > ecc_len)
-                vec_copy(t, r1);
-
-            inttr(r1);
-            r1_len = _norm_size(r1, r1_len);
-            nttr(r1);
+                vec_copy(q, r1);
 
             inttr(a1);
+            inttr(r1);
+            inttr(r2); // div ntt elision
+            r1_len = _norm_size(r1, r1_len);
             a1_len = _norm_size(a1, a1_len);
             nttr(a1);
+            // nttr(r1); // div ntt elision
         }
 
         // locator = ref.P(GF, [a // GF(A1.x[0]) for a in A1.x])
@@ -371,7 +357,7 @@ protected:
         // std::reverse(&a1[0], &a1[a1_len]);
 
         // evaluator = ref.P(GF, [a // GF(A1.x[0]) for a in R1.x])
-        inttr(r1);
+        // inttr(r1); // div ntt elision
         for (size_t i = 0; i < r1_len; ++i)
             r1[i] = gf.mul(r1[i], a1_0_inv);
 
@@ -487,14 +473,14 @@ protected:
 
         // rev_f = P(f.x[::-1])
         // rev_g = P(g.x[::-1])
-        inttr(f);
+        // inttr(f); // div ntt elision
         std::reverse(&f[0], &f[f_len]);
         GFT f_n = f[f_len - 1];
         if (f_len > q_len)
             f[f_len - 1] = 0;
         nttr(f);
 
-        inttr(g);
+        // inttr(g); // div ntt elision
         std::reverse(&g[0], &g[g_len]);
         auto g0 = g[0];
         nttr(g);

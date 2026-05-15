@@ -316,8 +316,12 @@ def cmd_throughput(args):
     rs = parse_algo(args.algo)
     print(get_system_info())
     print(rs.message_size / 2**20, rs.ecc_size / 2**20, rs.ecc_size / rs.message_size)
-    data = random_bytearray(rs.message_size)
-    benchmark_throughput(f"rs.encode(data)", dict(rs=rs, data=data), input_size=rs.message_size)
+    if hasattr(rs, "interleave") and rs.interleave > 1:
+        data = random_bytearray(rs.chunk_size)
+        benchmark_throughput(f"rs.encode_chunk(data)", dict(rs=rs, data=data), input_size=len(data))
+    else:
+        data = random_bytearray(rs.message_size)
+        benchmark_throughput(f"rs.encode(data)", dict(rs=rs, data=data), input_size=rs.message_size)
 
 
 def decode_throughput(args):
