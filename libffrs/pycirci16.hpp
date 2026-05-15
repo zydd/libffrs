@@ -75,14 +75,14 @@ public:
         auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
         auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rso.chunk_ecc_len]);
 
-        rsi.encode_full_blocks(&buf[0], rsi_blocks, 0, &output_data[0]);
+        rsi.encode_blocks(&buf[0], rsi_blocks, 0, &output_data[0]);
         rso.encode_chunk(&buf[0], &temp[0]);
         std::copy_n(&temp[0], rso.chunk_ecc_len, &output_data[rsi_chunk_ecc_len]);
 
         // py_assert(rso.chunk_ecc_len == rsoc.chunk_message_len);
         // rsoc.encode_chunk(&temp[0], &output_data[rsi_chunk_ecc_len + rso.chunk_ecc_len]);
         py_assert(rso.chunk_ecc_len == rsi.message_len * rso.ecc_len * outer_interleave);
-        rsi.encode_full_blocks(&temp[0], rso.ecc_len * outer_interleave, 0, &output_data[rsi_chunk_ecc_len + rso.chunk_ecc_len]);
+        rsi.encode_blocks(&temp[0], rso.ecc_len * outer_interleave, 0, &output_data[rsi_chunk_ecc_len + rso.chunk_ecc_len]);
 
         return output;
     }
@@ -187,8 +187,8 @@ public:
 
         // TODO: sanity check on updated ecc
         std::copy_n(&ecc_rso[0], rso.chunk_ecc_len, &ecc[rsi_chunk_ecc_len]);
-        rsi.encode_full_blocks(&message[0], rso.message_len * outer_interleave, 0, &ecc[0]);
-        rsi.encode_full_blocks(&ecc_rso[0], rso.ecc_len * outer_interleave, 0, &ecc[rsi_chunk_ecc_len + rso.chunk_ecc_len]);
+        rsi.encode_blocks(&message[0], rso.message_len * outer_interleave, 0, &ecc[0]);
+        rsi.encode_blocks(&ecc_rso[0], rso.ecc_len * outer_interleave, 0, &ecc[rsi_chunk_ecc_len + rso.chunk_ecc_len]);
 
         return false;
     }
