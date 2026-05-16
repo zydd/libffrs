@@ -405,9 +405,8 @@ private:
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
         // chunk_size = block_len * interleave
-        // temp6_size = block_len * SIMD_W * 2
 
-        auto temp6 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W * 6]);
+        auto temp1_ecc6 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[std::max(block_len, ecc_len * 6) * SIMD_W]);
         auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W]);
 
         message += col_start;
@@ -428,7 +427,7 @@ private:
             // Interleaved ecc
             copy_stride(&ecc[i * SIMD_W], interleave, &buf[message_len * SIMD_W], SIMD_W, SIMD_W, ecc_len);
 
-            rs.repair(&buf[0], &temp6[0]);
+            rs.repair(&buf[0], &temp1_ecc6[0]);
 
             copy_stride(&buf[0], SIMD_W, &message[i * SIMD_W], interleave, SIMD_W, message_len);
 
@@ -450,7 +449,7 @@ private:
             // Interleaved ecc
             copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * SIMD_W], SIMD_W, remaining_cols, ecc_len);
 
-            rs.repair(&buf[0], &temp6[0]);
+            rs.repair(&buf[0], &temp1_ecc6[0]);
 
             copy_stride(&buf[0], SIMD_W, &message[encoded_cols], interleave, remaining_cols, message_len);
 

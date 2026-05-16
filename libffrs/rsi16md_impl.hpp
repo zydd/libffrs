@@ -153,8 +153,6 @@ public:
     }
 
     inline void repair(GFT block[], GFT temp1_ecc6[]) const {
-        // auto block = reinterpret_cast<GFT *>(_block);
-        // auto temp1_ecc6 = reinterpret_cast<GFT *>(_temp1_ecc6);
         // temp1_ecc6 = max(block_len, ecc_len * 6)
 
         // init evaluator_poly with syndromes
@@ -289,7 +287,7 @@ protected:
         auto a2 = &temp_ecc4[ecc_len * 2];
         // a2[0] = 1;
         // nttr(a2);
-        std::fill_n(&a2[0], ecc_len, GFT{1});
+        std::fill_n(&a2[0], ecc_len, GFT{} + 1);
 
         auto r2 = &temp_ecc4[ecc_len * 3];
         size_t r2_len = ecc_len;
@@ -301,7 +299,7 @@ protected:
             // a2 = 0
             // a1 = 1
             // A1 = -Q
-            a1[1] = gf.neg(gf_inv(r1[ecc_len - 1]));
+            a1[1] = gf.neg(gf.inv(r1[ecc_len - 1]));
             a1[0] = gf.mul(r1[ecc_len - 2], gf.mul(a1[1], a1[1]));
             a1_len = 2;
 
@@ -354,7 +352,7 @@ protected:
 
         // locator = ref.P(GF, [a // GF(A1.x[0]) for a in A1.x])
         inttr(a1);
-        GFT a1_0_inv = gf_inv(a1[0]);
+        GFT a1_0_inv = gf.inv(a1[0]);
         for (size_t i = 0; i < a1_len; ++i)
             a1[i] = gf.mul(a1[i], a1_0_inv);
 
@@ -376,15 +374,15 @@ protected:
     ) const {
         for (size_t i = 0; i < error_count; ++i) {
             auto x = error_pos_rbo[i];
-            auto x_inv = gf_inv(x);
+            auto x_inv = gf.inv(x);
             auto numerator = _eval(evaluator_poly, evaluator_poly_len, x_inv);
             auto denominator = _eval(locator_poly_deriv, locator_poly_deriv_len, x_inv);
+            auto error = gf.mul(gf.div(numerator, denominator), x);
 
-            auto error = gf.mul(gf_div(numerator, denominator), x);
-            auto is_error = (error_pos[i] < 0x10001);
-
-            // block[error_pos[i]] = gf.add(gather(block, error_pos[i]), error & is_error);
-            scatter(&block[0], error_pos[i], gf.add(gather(&block[0], error_pos[i]), gf.mul(error, is_error)));
+            if constexpr (std::is_integral_v<GFT>)
+                block[error_pos[i]] = gf.add(block[error_pos[i]], error);
+            // else
+            //     gf.scatter(&block[0], error_pos[i], gf.add(gf.gather(&block[0], error_pos[i]), error), GFT{error_pos[i] < 0x10001});
         }
         return error_count;
     }
@@ -395,7 +393,7 @@ protected:
         size_t last_error = error_count - 1;
 
         for (size_t j = 0; j < error_count; ++j) {
-            GFT x = GFT{0} + gf.neg(gf.pow(root, error_pos_rbo[j]));
+            GFT x = GFT{} + gf.neg(gf.pow(root, error_pos_rbo[j]));
             for (size_t i = last_error - j; i < last_error; ++i) {
                 locator_poly[i] = gf.add(locator_poly[i], gf.mul(locator_poly[i + 1], x));
             }
@@ -407,8 +405,8 @@ protected:
         size_t root_count = 0;
         for (uint32_t i = 0; i < block_len; ++i) {
             auto x = gf.pow(root, rbo(i));
-            auto x_inv = gf.inv(x);
-            auto is_zero = (_eval(locator_poly, locator_poly_len, GFT{x_inv}) == 0);
+            auto x_inv = GFT{} + gf.inv(x);
+            auto is_zero = (_eval(locator_poly, locator_poly_len, x_inv) == 0);
 
             if constexpr (std::is_integral_v<GFT>) {
                 if (is_zero) {
@@ -419,8 +417,8 @@ protected:
             } else {
                 for (uint32_t j = 0; i < sizeof(GFT) / sizeof(uint32_t); ++i) {
                     if (is_zero[j]) {
-                        roots[root_count] = (is_zero & GFT{i}) | !is_zero;
-                        roots_rbo[root_count] = (is_zero & GFT{x}) | !is_zero;
+                        roots[root_count] = (is_zero & (GFT{} + i)) | !is_zero;
+                        roots_rbo[root_count] = (is_zero & (GFT{} + x)) | !is_zero;
                         ++root_count;
                         break;
                     }
@@ -450,44 +448,6 @@ protected:
         //     size_t i = error_pos_rbo[j];
         //     block[i] = gf.div(block[i], ntt_len);
         // }
-    }
-
-    inline GFT gf_inv(GFT const& a) const {
-        if constexpr (std::is_integral_v<GFT>) {
-            return gf.inv(a);
-        } else {
-            // return gf._exp[gf.field_elements-1 - _log[a]];
-            GFT i = GFT{0x10000} - gather(&gf.log(0), a);
-            return gather(&gf.exp(0), i);
-        }
-    }
-
-    inline GFT gf_div(GFT const& a, GFT const& b) const {
-        if constexpr (std::is_integral_v<GFT>) {
-            return gf.div(a, b);
-        } else {
-            auto q = gather(&gf.log(0), a) + 0x10000 - gather(&gf.log(0), b);
-            q -= (q >= 0x10000) & 0x10000;
-            return gather(&gf.exp(0), q);
-        }
-    }
-
-    template<typename B>
-    inline GFT gf_pow(B const& b, GFT const& e) const {
-        if constexpr (std::is_integral_v<GFT>) {
-            return gf.pow(b, e);
-        } else {
-            // return _exp[(_log[b] * e) % (gf.field_elements - 1)];
-            GFT p;
-            if constexpr (std::is_integral_v<B>) {
-                p = GFT{gf.log(b)};
-            } else {
-                p = gather(&gf.log(0), b);
-            }
-
-            p = (p * e) & 0xffff;
-            return gather(&gf.exp(0), p);
-        }
     }
 
     inline size_t _vec_sub(const GFT a[], size_t a_len, const GFT b[], size_t b_len, GFT r[]) const {
@@ -537,14 +497,14 @@ protected:
         size_t l = 1;
 
         // a = P([h.x[0].inv()])
-        std::fill_n(&a[0], ecc_len, gf_inv(h0));
+        std::fill_n(&a[0], ecc_len, gf.inv(h0));
 
         while (l < n) {
             // A = [a * (GF(2) - a * h) for a, h in zip(A, H)]
             for (size_t i = 0; i < ecc_len; ++i) {
                 GFT a_i = a[i];
                 GFT ah = gf.mul(a_i, h[i]);
-                a[i] = gf.mul(a_i, gf.sub(GFT{2}, ah));
+                a[i] = gf.mul(a_i, gf.sub(GFT{} + 2, ah));
             }
 
             // A = A % x**n
@@ -621,14 +581,6 @@ protected:
         for (size_t j = 0; j < ntt_len; ++j)
             block[j] = gf.mul(block[j], ntt_len_i);
     }
-
-    GFT gather(const uint32_t vec[], GFT const& i) const;
-    template<typename T=GFT, typename=std::enable_if_t<!std::is_integral_v<T>>>
-    GFT gather(const GFT vec[], GFT const& i) const;
-
-    void scatter(uint32_t vec[], GFT const& i, GFT const& v) const;
-    template<typename T=GFT, typename=std::enable_if_t<!std::is_integral_v<T>>>
-    void scatter(GFT vec[], GFT const& i, GFT const& v) const;
 };
 
 
@@ -689,10 +641,10 @@ void RSi16v<W>::repair(GFT block[], const size_t error_pos_rbo[], size_t error_c
 
 
 template <size_t W>
-void RSi16v<W>::repair(GFT block[], GFT temp2[]) const {
+void RSi16v<W>::repair(GFT block[], GFT temp1_ecc6[]) const {
     d->repair(
         reinterpret_cast<simd_map_t<W> *>(block),
-        reinterpret_cast<simd_map_t<W> *>(temp2)
+        reinterpret_cast<simd_map_t<W> *>(temp1_ecc6)
     );
 }
 

@@ -6,7 +6,9 @@ project(ffrs)
 add_subdirectory(pybind11)
 
 
-if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-g -O0)
+else()
     add_compile_options(-O3 -flto=auto)
 endif()
 add_compile_options(-Wall -Wextra -Wpedantic)

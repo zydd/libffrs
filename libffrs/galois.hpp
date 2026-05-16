@@ -127,6 +127,9 @@ struct gf_exp_log_lut {
         }
 
     protected:
+        std::array<GFT, MaxFieldElements> _exp = {};
+        std::array<GFT, MaxFieldElements> _log = {};
+
         inline type() {
             auto& gf = GF::cast(this);
             using GF_mul = ffrs::GF<GFT, ffrs::gf_data, MulOperation>;
@@ -139,10 +142,6 @@ struct gf_exp_log_lut {
                 x = gf_cpu.mul(x, gf.primitive);
             }
         }
-
-    private:
-        std::array<GFT, MaxFieldElements> _exp = {};
-        std::array<GFT, MaxFieldElements> _log = {};
     };
 };
 
@@ -152,56 +151,77 @@ struct gf_exp_log_lut {
  *************/
 
 
-// TODO: how to define `gather`
+struct simd_gather_base {
+    template<typename Vec, typename Idx, typename=std::enable_if_t<std::is_integral_v<Idx>>>
+    static inline Vec gather(const Vec vec[], Idx const& i) {
+        return vec[i];
+    }
 
-// template<template<class, class>typename MulOperation>
-// struct gf_exp_log_lut_i16 {
-//     template<typename GFT, typename GF>
-//     class type : public gf_exp_log_lut<MulOperation, 65537>::type<GFT, GF> {
-//     public:
-//         using Super = gf_exp_log_lut<MulOperation, 65537>::template type<GFT, GF>;
-//         using Super::type;
+    template<typename Vec, typename Idx, typename=std::enable_if_t<!std::is_integral_v<Idx>>>
+    static Idx gather(const Vec vec[], Idx const& i);
 
-//         template<typename T>
-//         inline T inv(T const& a) const {
-//             if constexpr (std::is_integral_v<T>) {
-//                 return Super::inv(a);
-//             } else {
-//                 // return gf._exp[gf.field_elements-1 - _log[a]];
-//                 T i = T{0x10000} - gather(&type::log(0), a);
-//                 return gather(&type::_exp[0], i);
-//             }
-//         }
+    template<typename Vec, typename Idx, typename=std::enable_if_t<std::is_integral_v<Vec> && std::is_integral_v<Idx>>>
+    static inline void scatter(Vec vec[], Idx const& i, Vec const& value) {
+        vec[i] = value;
+    }
 
-//         inline GFT div(GFT const& a, GFT const& b) const {
-//             if constexpr (std::is_integral_v<GFT>) {
-//                 return type::div(a, b);
-//             } else {
-//                 auto q = gather(&type::log(0), a) + 0x10000 - gather(&type::log(0), b);
-//                 q -= (q >= 0x10000) & 0x10000;
-//                 return gather(&type::_exp[0], q);
-//             }
-//         }
+    template<typename Vec, typename Idx>
+    static void scatter(Vec vec[], Idx const& i, Vec const& value, Idx const& mask);
+};
 
-//         template<typename B>
-//         inline GFT pow(B const& b, GFT const& e) const {
-//             if constexpr (std::is_integral_v<GFT>) {
-//                 return type::pow(b, e);
-//             } else {
-//                 // return _exp[(_log[b] * e) % (type::field_elements - 1)];
-//                 GFT p;
-//                 if constexpr (std::is_integral_v<B>) {
-//                     p = GFT{type::_log[b]};
-//                 } else {
-//                     p = gather(&type::_log[0], b);
-//                 }
+template<typename GFT, typename GF>
+using simd_gather = simd_gather_base;
 
-//                 p = (p * e) & 0xffff;
-//                 return gather(&type::_exp[0], p);
-//             }
-//         }
-//     };
-// };
+
+template<template<class, class>typename MulOperation>
+struct gf_exp_log_lut_i16 {
+    template<typename GFT, typename GF>
+    class type : public gf_exp_log_lut<MulOperation, 65537>::template type<GFT, GF> {
+    public:
+        using Super = gf_exp_log_lut<MulOperation, 65537>::template type<GFT, GF>;
+        // using gf_exp_log_lut<MulOperation, 65537>::template type<GFT, GF>::type;
+
+        template<typename T>
+        inline T inv(T const& a) const {
+            if constexpr (std::is_integral_v<T>) {
+                return Super::inv(a);
+            } else {
+                // return _exp[0x10000 - _log[a]];
+                auto log_a = GF::gather(&Super::_log[0], a);
+                return GF::gather(&Super::_exp[0], 0x10000 - log_a);
+            }
+        }
+
+        template<typename T, typename U, typename R=std::conditional_t<std::is_integral_v<T>, U, T>>
+        inline R div(T const& a, U const& b) const {
+            if constexpr (std::is_integral_v<T> && std::is_integral_v<U>) {
+                return Super::div(a, b);
+            } else {
+                auto q = GF::gather(&Super::log(0), a) + 0x10000 - GF::gather(&Super::log(0), b);
+                q -= (q >= 0x10000) & 0x10000;
+                return GF::gather(&Super::_exp[0], q);
+            }
+        }
+
+        template<typename B>
+        inline GFT pow(B const& b, GFT const& e) const {
+            if constexpr (std::is_integral_v<GFT>) {
+                return Super::pow(b, e);
+            } else {
+                // return _exp[(_log[b] * e) % (field_elements - 1)];
+                GFT p;
+                if constexpr (std::is_integral_v<B>) {
+                    p = GFT{Super::_log[b]};
+                } else {
+                    p = GF::gather(&Super::_log[0], b);
+                }
+
+                p = (p * e) & 0xffff;
+                return GF::gather(&Super::_exp[0], p);
+            }
+        }
+    };
+};
 
 
 template<typename GFT, typename GF>

@@ -22,14 +22,3 @@
 #include "rsi16md_impl.hpp"
 
 template class RSi16v<1>;
-
-
-template<>
-inline uint32_t RSi16vImpl<uint32_t>::gather(const uint32_t vec[], uint32_t const& i) const {
-    return vec[i];
-}
-
-template<>
-inline void RSi16vImpl<uint32_t>::scatter(uint32_t vec[], uint32_t const& i, uint32_t const& v) const {
-    vec[i] = v;
-}

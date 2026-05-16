@@ -256,4 +256,6 @@ class TestRSPower2(BaseTestRS):
 class TestRSMult(BaseTestRS):
     # Limited support for multiples of powers of 2
     # TODO: partial intt or switch to forney algo
-    test_repair = pytest.mark.skip(BaseTestRS.test_repair)
+    @pytest.mark.skip
+    def test_skip(self, rs): pass
+    test_repair = test_skip

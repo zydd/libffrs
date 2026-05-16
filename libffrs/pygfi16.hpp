@@ -33,8 +33,8 @@ using GFi16 = ffrs::GF<uint32_t,
     // ffrs::gf_mul_mod,
     ffrs::gf_add_i16_shift,
     ffrs::gf_mul_i16_shift,
-    ffrs::gf_exp_log_lut<ffrs::gf_mul_mod, 0x10001>::type
-    // ffrs::gf_exp_log_lut_i16<ffrs::gf_mul_mod>::type
+    ffrs::simd_gather,
+    ffrs::gf_exp_log_lut_i16<ffrs::gf_mul_mod>::type
     >;
 
 
@@ -63,11 +63,11 @@ public:
             .def("mul", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::mul), R"(Multiplication: :math:`\text{lhs} \times \text{rhs}`)", "lhs"_a, "rhs"_a)
             .def("add", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::add), R"(Addition: :math:`\text{lhs} + \text{rhs}`)", "lhs"_a, "rhs"_a)
             .def("sub", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::sub), R"(Subtraction: :math:`\text{lhs} - \text{rhs}`)", "lhs"_a, "rhs"_a)
-            .def("inv", &PyGFi16::inv, R"(Reciprocal: :math:`\frac{1}{\text{value}}`)", "value"_a)
-            .def("div", &PyGFi16::div, R"(Division: :math:`\frac{\text{num}}{\text{den}}`)", "num"_a, "den"_a)
-            .def("exp", &PyGFi16::exp, R"(Exponential function: :math:`a^{\text{value}}`)", "value"_a)
-            .def("log", &PyGFi16::log, R"(Logarithm: :math:`\log_a (\text{value})`)", "value"_a)
-            .def("pow", &PyGFi16::pow, R"(Power: :math:`\text{base}^\text{exponent}`)", "base"_a, "exponent"_a)
+            .def("inv", static_cast<GFT (PyGFi16::*)(GFT const&) const>(&PyGFi16::inv), R"(Reciprocal: :math:`\frac{1}{\text{value}}`)", "value"_a)
+            .def("div", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::div), R"(Division: :math:`\frac{\text{num}}{\text{den}}`)", "num"_a, "den"_a)
+            .def("exp", static_cast<GFT const& (PyGFi16::*)(GFT const&) const>(&PyGFi16::exp), R"(Exponential function: :math:`a^{\text{value}}`)", "value"_a)
+            .def("log", static_cast<GFT const& (PyGFi16::*)(GFT const&) const>(&PyGFi16::log), R"(Logarithm: :math:`\log_a (\text{value})`)", "value"_a)
+            .def("pow", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::pow), R"(Power: :math:`\text{base}^\text{exponent}`)", "base"_a, "exponent"_a)
             .doc() = R"(
             Finite-field operations for prime fields <= 65537
             )";
