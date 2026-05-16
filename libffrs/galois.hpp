@@ -311,7 +311,7 @@ public:
             return res;
         } else {
             auto res = lhs * rhs;
-            auto overflow = (res == 0 && lhs && rhs);
+            auto overflow = (res == 0 && lhs != 0 && rhs != 0);
             res = (res & !overflow) + (1 & overflow);
             res = (res & 0xffff) - (res >> 16);
             res += (res >= 0x80000000) & 0x10001;

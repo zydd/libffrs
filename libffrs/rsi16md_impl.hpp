@@ -633,7 +633,7 @@ protected:
 
 
 template <size_t W>
-struct RSi16v<W>::Impl : RSi16vImpl<simd_map_t<W>> {
+class RSi16v<W>::Impl : public RSi16vImpl<simd_map_t<W>> {
     using RSi16vImpl<simd_map_t<W>>::RSi16vImpl;
 };
 
