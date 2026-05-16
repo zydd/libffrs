@@ -1,7 +1,7 @@
 /**************************************************************************
  * rsi16md_avx2.cpp
  *
- * Copyright 2025 Gabriel Machado
+ * Copyright 2026 Gabriel Machado
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,38 +17,18 @@
  **************************************************************************/
 
 #include <cstdint>
-
+#include <immintrin.h>
 
 #include "rsi16md_impl.hpp"
-#include "rsi16md.h"
-
-
-typedef uint32_t u32x8 __attribute__((vector_size(8 * sizeof(uint32_t))));
-
-template <size_t N>
-struct RSi16v<N>::data : RSi16vImpl<u32x8> { using RSi16vImpl::RSi16vImpl; };
-
-
-template <size_t N>
-RSi16v<N>::RSi16v(GFi16 const& gf, size_t block_size, size_t ecc_len) {
-    d = new data(gf, block_size, ecc_len);
-}
-
-
-template <size_t N>
-void RSi16v<N>::encode(uint32_t block[]) const {
-    d->encode(reinterpret_cast<u32x8 *>(block));
-}
-
-template <size_t N>
-void RSi16v<N>::repair(uint32_t block[], const size_t error_pos_rbo[], size_t error_count, uint32_t temp2[]) const {
-    d->repair(
-        reinterpret_cast<u32x8 *>(block),
-        error_pos_rbo,
-        error_count,
-        reinterpret_cast<u32x8 *>(temp2)
-    );
-}
-
 
 template class RSi16v<8>;
+
+
+template<>
+GFTx8 RSi16vImpl<GFTx8>::gather(const uint32_t vec[], GFTx8 const& i) const {
+    return (GFTx8) _mm256_i32gather_epi32(
+        (const int *) vec,
+        (__m256i) i,
+        4
+    );
+}

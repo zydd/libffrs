@@ -24,7 +24,7 @@
 #include <pybind11/stl.h>
 
 #include "util.hpp"
-#include "rsi16md_impl.hpp"
+// #include "rsi16md_impl.hpp"
 #include "rsi16md.h"
 
 namespace py = pybind11;
@@ -38,10 +38,10 @@ private:
     };
 
     PyGFi16 gf;
-    RSi16vImpl<uint32_t> rs16;
-    RSi16v<4> rs16v4;
-    RSi16v<8> rs16v8;
-    RSi16v<16> rs16v16;
+    RSi16v<1> rs16;
+    RSi16v<4> rs16x4;
+    RSi16v<8> rs16x8;
+    RSi16v<16> rs16x16;
     bool simd_x4;
     bool simd_x8;
     bool simd_x16;
@@ -56,9 +56,9 @@ private:
     ):
         gf(primitive),
         rs16(gf, args.block_len, args.ecc_len),
-        rs16v4(gf, args.block_len, args.ecc_len),
-        rs16v8(gf, args.block_len, args.ecc_len),
-        rs16v16(gf, args.block_len, args.ecc_len),
+        rs16x4(gf, args.block_len, args.ecc_len),
+        rs16x8(gf, args.block_len, args.ecc_len),
+        rs16x16(gf, args.block_len, args.ecc_len),
         simd_x4(simd_x4),
         simd_x8(simd_x8),
         simd_x16(simd_x16),
@@ -528,11 +528,11 @@ private:
     template<typename F>
     inline void _simd_dispatch(F&& f) {
         if (simd_x16)
-            f(std::integral_constant<size_t, 16>{}, rs16v16);
+            f(std::integral_constant<size_t, 16>{}, rs16x16);
         else if (simd_x8)
-            f(std::integral_constant<size_t, 8>{}, rs16v8);
+            f(std::integral_constant<size_t, 8>{}, rs16x8);
         else if (simd_x4)
-            f(std::integral_constant<size_t, 4>{}, rs16v4);
+            f(std::integral_constant<size_t, 4>{}, rs16x4);
         else
             f(std::integral_constant<size_t, 1>{}, rs16);
     }

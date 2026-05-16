@@ -56,124 +56,6 @@ public:
 };
 
 
-/*************
- * Prime Field
- *************/
-
-
-template<typename GFT, typename GF>
-class gf_add_mod {
-public:
-    inline GFT add(GFT const& lhs, GFT const& rhs) const {
-        auto& gf = GF::cast(this);
-        // assert(gf.power == 1);
-        return (lhs + rhs) % gf.prime;
-    }
-
-    inline GFT sub(GFT const& lhs, GFT const& rhs) const {
-        auto& gf = GF::cast(this);
-        // assert(gf.power == 1);
-        if (lhs >= rhs)
-            return (lhs - rhs) % gf.prime;
-        else
-            return ((gf.field_elements - rhs) + lhs) % gf.prime;
-    }
-};
-
-
-template<typename GFT, typename GF>
-class gf_mul_mod {
-public:
-    inline GFT mul(GFT const& lhs, GFT const& rhs) const {
-        auto& gf = GF::cast(this);
-        // assert(gf.power == 1);
-        GFT res;
-        if (__builtin_mul_overflow(lhs, rhs, &res))
-            res = 1;
-        return res % gf.prime;
-    }
-};
-
-
-template<typename GFT, typename GF>
-class gf_add_i16_shift {
-public:
-    template<typename = std::enable_if_t<std::is_integral_v<GFT>>>
-    inline GFT add(GFT const& lhs, GFT const& rhs) const {
-        uint32_t res = lhs + rhs;
-        if (res >= 0x10001)
-            res -= 0x10001;
-        // res -= (res >= 0x10001) * 0x10001;
-        return res;
-    }
-
-    template<typename = std::enable_if_t<std::is_integral_v<GFT>>>
-    inline GFT sub(GFT const& lhs, GFT const& rhs) const {
-        uint32_t res = lhs - rhs;
-        if (int32_t(res) < 0)
-            res += 0x10001;
-        // res += (res >= 0x80000000) * 0x10001;
-        return res;
-    }
-
-    template<typename = std::enable_if_t<std::is_integral_v<GFT>>>
-    inline GFT neg(GFT const& a) const {
-        if (a == 0)
-            return a;
-        return 0x10001 - a;
-    }
-
-    template<typename T, typename U, typename = std::enable_if_t<!std::is_integral_v<T>>>
-    static inline T add(T const& lhs, U const& rhs) {
-        T res = lhs + rhs;
-        res -= (res >= 0x10001) & 0x10001;
-        return res;
-    }
-
-    template<typename T, typename U, typename = std::enable_if_t<!std::is_integral_v<T>>>
-    static inline T sub(T const& lhs, U const& rhs) {
-        T res = lhs - rhs;
-        res += (res >= 0x80000000) & 0x10001;
-        return res;
-    }
-};
-
-
-template<typename GFT, typename GF>
-class gf_mul_i16_shift {
-public:
-    inline GFT mul(GFT const& lhs, GFT const& rhs) const {
-        uint32_t res = lhs * rhs;
-        if (res == 0 && lhs && rhs) [[unlikely]]
-            return 1;
-
-        // uint32_t overflow = (res == 0 && lhs && rhs) * 0xffffffff;
-        // res = (res & ~overflow) + (1 & overflow);
-
-        // uint32_t res;
-        // if (__builtin_mul_overflow(lhs, rhs, &res))
-        //     res = 1;
-
-        res = (res & 0xffff) - (res >> 16);
-
-        if (int32_t(res) < 0)
-            res += 0x10001;
-
-        return res;
-    }
-
-    template<typename T, typename U, typename = std::enable_if_t<!std::is_integral_v<T>>>
-    static inline T mul(T const& lhs, U const& rhs) {
-        T res = lhs * rhs;
-        T overflow = (res == 0 && lhs && rhs);
-        res = (res & !overflow) + (1 & overflow);
-        res = (res & 0xffff) - (res >> 16);
-        res += (res >= 0x80000000) & 0x10001;
-        return res;
-    }
-};
-
-
 /*********
  * Generic
  *********/
@@ -231,11 +113,11 @@ struct gf_exp_log_lut {
             return _exp[r];
         }
 
-        inline GFT exp(GFT const& a) const {
+        inline GFT const& exp(GFT const& a) const {
             return _exp[a];
         }
 
-        inline GFT log(GFT const& a) const {
+        inline GFT const& log(GFT const& a) const {
             return _log[a];
         }
 
@@ -263,6 +145,185 @@ struct gf_exp_log_lut {
         std::array<GFT, MaxFieldElements> _log = {};
     };
 };
+
+
+/*************
+ * Prime Field
+ *************/
+
+
+// TODO: how to define `gather`
+
+// template<template<class, class>typename MulOperation>
+// struct gf_exp_log_lut_i16 {
+//     template<typename GFT, typename GF>
+//     class type : public gf_exp_log_lut<MulOperation, 65537>::type<GFT, GF> {
+//     public:
+//         using Super = gf_exp_log_lut<MulOperation, 65537>::template type<GFT, GF>;
+//         using Super::type;
+
+//         template<typename T>
+//         inline T inv(T const& a) const {
+//             if constexpr (std::is_integral_v<T>) {
+//                 return Super::inv(a);
+//             } else {
+//                 // return gf._exp[gf.field_elements-1 - _log[a]];
+//                 T i = T{0x10000} - gather(&type::log(0), a);
+//                 return gather(&type::_exp[0], i);
+//             }
+//         }
+
+//         inline GFT div(GFT const& a, GFT const& b) const {
+//             if constexpr (std::is_integral_v<GFT>) {
+//                 return type::div(a, b);
+//             } else {
+//                 auto q = gather(&type::log(0), a) + 0x10000 - gather(&type::log(0), b);
+//                 q -= (q >= 0x10000) & 0x10000;
+//                 return gather(&type::_exp[0], q);
+//             }
+//         }
+
+//         template<typename B>
+//         inline GFT pow(B const& b, GFT const& e) const {
+//             if constexpr (std::is_integral_v<GFT>) {
+//                 return type::pow(b, e);
+//             } else {
+//                 // return _exp[(_log[b] * e) % (type::field_elements - 1)];
+//                 GFT p;
+//                 if constexpr (std::is_integral_v<B>) {
+//                     p = GFT{type::_log[b]};
+//                 } else {
+//                     p = gather(&type::_log[0], b);
+//                 }
+
+//                 p = (p * e) & 0xffff;
+//                 return gather(&type::_exp[0], p);
+//             }
+//         }
+//     };
+// };
+
+
+template<typename GFT, typename GF>
+class gf_add_mod {
+public:
+    inline GFT add(GFT const& lhs, GFT const& rhs) const {
+        auto& gf = GF::cast(this);
+        // assert(gf.power == 1);
+        return (lhs + rhs) % gf.prime;
+    }
+
+    inline GFT sub(GFT const& lhs, GFT const& rhs) const {
+        auto& gf = GF::cast(this);
+        // assert(gf.power == 1);
+        if (lhs >= rhs)
+            return (lhs - rhs) % gf.prime;
+        else
+            return ((gf.field_elements - rhs) + lhs) % gf.prime;
+    }
+};
+
+
+template<typename GFT, typename GF>
+class gf_mul_mod {
+public:
+    inline GFT mul(GFT const& lhs, GFT const& rhs) const {
+        auto& gf = GF::cast(this);
+        // assert(gf.power == 1);
+        GFT res;
+        if (__builtin_mul_overflow(lhs, rhs, &res))
+            res = 1;
+        return res % gf.prime;
+    }
+};
+
+
+template<typename GFT, typename GF>
+class gf_add_i16_shift {
+public:
+    template<typename T>
+    inline T add(T const& lhs, T const& rhs) const {
+        if constexpr (std::is_integral_v<T>) {
+            uint32_t res = lhs + rhs;
+            if (res >= 0x10001)
+                res -= 0x10001;
+            // res -= (res >= 0x10001) * 0x10001;
+            return res;
+        } else {
+            auto res = lhs + rhs;
+            res -= (res >= 0x10001) & 0x10001;
+            return res;
+        }
+    }
+
+    template<typename T>
+    inline T sub(T const& lhs, T const& rhs) const {
+        if constexpr (std::is_integral_v<T>) {
+            uint32_t res = lhs - rhs;
+            if (int32_t(res) < 0)
+                res += 0x10001;
+            // res += (res >= 0x80000000) * 0x10001;
+            return res;
+        } else {
+            auto res = lhs - rhs;
+            res += (res >= 0x80000000) & 0x10001;
+            return res;
+        }
+    }
+
+    template<typename T>
+    inline T neg(T const& a) const {
+        if constexpr (std::is_integral_v<T>) {
+            if (a == 0)
+                return a;
+            return 0x10001 - a;
+        } else {
+            auto res = -a;
+            res += (res >= 0x80000000) & 0x10001;
+            return res;
+        }
+    }
+};
+
+
+template<typename GFT, typename GF>
+class gf_mul_i16_shift {
+public:
+    template<typename T, typename U>
+    inline T mul(T const& lhs, U const& rhs) const {
+        if constexpr (std::is_integral_v<T>) {
+            uint32_t res = lhs * rhs;
+            if (res == 0 && lhs && rhs) [[unlikely]]
+                return 1;
+
+            // uint32_t overflow = (res == 0 && lhs && rhs) * 0xffffffff;
+            // res = (res & ~overflow) + (1 & overflow);
+
+            // uint32_t res;
+            // if (__builtin_mul_overflow(lhs, rhs, &res))
+            //     res = 1;
+
+            res = (res & 0xffff) - (res >> 16);
+
+            if (int32_t(res) < 0)
+                res += 0x10001;
+
+            return res;
+        } else {
+            auto res = lhs * rhs;
+            auto overflow = (res == 0 && lhs && rhs);
+            res = (res & !overflow) + (1 & overflow);
+            res = (res & 0xffff) - (res >> 16);
+            res += (res >= 0x80000000) & 0x10001;
+            return res;
+        }
+    }
+};
+
+
+/*************
+ * Prime Field
+ *************/
 
 
 template<typename GFT, typename GF>

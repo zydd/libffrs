@@ -1,5 +1,5 @@
 /**************************************************************************
- * rsi16md.h
+ * rsi16md.cpp
  *
  * Copyright 2026 Gabriel Machado
  *
@@ -16,34 +16,20 @@
  * limitations under the License.
  **************************************************************************/
 
-# pragma once
-
-#include <array>
 #include <cstdint>
-#include <vector>
-
-#include "pygfi16.hpp"
-
-typedef uint32_t GFT;
 
 
-template<size_t W>
-class RSi16v {
-public:
-    RSi16v(GFi16 const& gf, size_t block_size, size_t ecc_len);
-    ~RSi16v();
-    void encode(GFT block[]) const;
-    void repair(GFT block[], const size_t error_pos_rbo[], size_t error_count, GFT temp2[]) const;
-    void repair(GFT block[], GFT temp2[]) const;
-    void pntt(GFT block[]) const;
-    void ecc_mix(GFT block[]) const;
-    uint16_t rbo(uint16_t) const;
+#include "rsi16md_impl.hpp"
 
-protected:
-    class Impl;
-    Impl *d;
+template class RSi16v<1>;
 
-public:
-    const GFT root;
-    const size_t ntt_len;
-};
+
+template<>
+inline uint32_t RSi16vImpl<uint32_t>::gather(const uint32_t vec[], uint32_t const& i) const {
+    return vec[i];
+}
+
+template<>
+inline void RSi16vImpl<uint32_t>::scatter(uint32_t vec[], uint32_t const& i, uint32_t const& v) const {
+    vec[i] = v;
+}

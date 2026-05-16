@@ -1,6 +1,6 @@
 #  benchmark.py
 #
-#  Copyright 2025 Gabriel Machado
+#  Copyright 2026 Gabriel Machado
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -15,14 +15,11 @@
 #  limitations under the License.
 
 import argparse
-import collections
 import csv
 import platform
-import pprint
 import random
 import re
 import subprocess
-import sys
 import time
 import timeit
 
@@ -329,9 +326,9 @@ def decode_throughput(args):
 
     rsi_ecc, rsi_block = parse_ratio(args.hash_ratio)
     rso_block = block_size // rsi_block
-    rs = ffrs.CIRC(rsi_block // 2, rsi_ecc // 2, rso_block, rso_block * ecc_ratio_num // ecc_ratio_den, 1)
+    rs = ffrs.CIRC(rsi_block // 2, rsi_ecc // 2, rso_block, rso_block * ecc_ratio_num // ecc_ratio_den, args.outer_interleave)
 
-    assert rs.block_size == block_size
+    assert rs.block_size == block_size * args.outer_interleave
 
     print(get_system_info())
     print(rs)
@@ -360,28 +357,29 @@ def main():
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # Throughput
-    parser_add = subparsers.add_parser("throughput", help="Benchmark throughput")
-    parser_add.add_argument("algo")
-    parser_add.set_defaults(func=cmd_throughput)
+    parser_thr = subparsers.add_parser("throughput", help="Benchmark throughput")
+    parser_thr.add_argument("algo")
+    parser_thr.set_defaults(func=cmd_throughput)
 
     # # BER
-    # parser_remove = subparsers.add_parser("ber", help="Remove an item")
-    # parser_remove.add_argument("algo")
-    # parser_remove.set_defaults(func=cmd_ber)
+    # parser_ber = subparsers.add_parser("ber", help="Remove an item")
+    # parser_ber.add_argument("algo")
+    # parser_ber.set_defaults(func=cmd_ber)
 
     # CIRC
-    parser_remove = subparsers.add_parser("circ", help="Benchmark CIRC decoding throughput")
-    parser_remove.add_argument("block_size")
-    parser_remove.add_argument("ecc_ratio")
-    parser_remove.add_argument("hash_ratio")
-    parser_remove.set_defaults(func=circ)
+    parser_circ = subparsers.add_parser("circ", help="Benchmark CIRC decoding throughput")
+    parser_circ.add_argument("block_size")
+    parser_circ.add_argument("ecc_ratio")
+    parser_circ.add_argument("hash_ratio")
+    parser_circ.set_defaults(func=circ)
 
     # CIRC decode throughput
-    parser_remove = subparsers.add_parser("dec_throughput", help="Benchmark CIRC decode throughput")
-    parser_remove.add_argument("block_size")
-    parser_remove.add_argument("ecc_ratio")
-    parser_remove.add_argument("hash_ratio")
-    parser_remove.set_defaults(func=decode_throughput)
+    parser_dec = subparsers.add_parser("dec_throughput", help="Benchmark CIRC decode throughput")
+    parser_dec.add_argument("block_size")
+    parser_dec.add_argument("ecc_ratio")
+    parser_dec.add_argument("hash_ratio")
+    parser_dec.add_argument("outer_interleave", nargs="?", default=1, type=int)
+    parser_dec.set_defaults(func=decode_throughput)
 
     args = parser.parse_args()
     args.func(args)

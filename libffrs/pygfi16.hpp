@@ -34,6 +34,7 @@ using GFi16 = ffrs::GF<uint32_t,
     ffrs::gf_add_i16_shift,
     ffrs::gf_mul_i16_shift,
     ffrs::gf_exp_log_lut<ffrs::gf_mul_mod, 0x10001>::type
+    // ffrs::gf_exp_log_lut_i16<ffrs::gf_mul_mod>::type
     >;
 
 
