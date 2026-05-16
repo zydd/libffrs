@@ -135,11 +135,17 @@ public:
         });
     }
 
-    inline void repair_interleaved(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
-        _repair_interleaved<1>(rs16, &message[0], &ecc[0], col_start, col_count);
+    template<typename Msg, typename Ecc>
+    inline void repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count) {
+        // _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
+            const size_t SIMD_W = 1;
+            auto const& rs = rs16;
+            _repair_interleaved<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count);
+        // });
     }
 
-    inline void repair_interleaved(uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) {
+    template<typename Msg, typename Ecc>
+    inline void repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)
             error_pos_rbo[i] = rs16.rbo(error_pos[i]);
@@ -203,14 +209,8 @@ public:
             .def_property_readonly("ntt_size", [](PyRSi16md& self) { return self.rs16.ntt_len * sizeof(uint16_t); })
             .def_property_readonly("root", [](PyRSi16md& self) { return self.rs16.root; })
             .def_property_readonly("gf", [](PyRSi16md& self) -> auto const& { return self.gf; })
-
-            .def_property("interleave",
-                [](PyRSi16md& self) { return self.interleave; },
-                [](PyRSi16md& self, size_t value) {
-                    const_cast<size_t&>(self.interleave) = value;
-                },
-                R"(Number of interleaved codewords for block encoding)"
-            )
+            .def_property_readonly("interleave", [](PyRSi16md& self) { return self.interleave; },
+                R"(Number of interleaved codewords for block encoding)")
 
             .def_property_readonly("simd_x4",
                 [](PyRSi16md& self) { return self.simd_x4; },
@@ -399,8 +399,8 @@ private:
         copy_transposed(&temp[0], SIMD_W, cols, &dst[0], ecc_len, ecc_len);
     }
 
-    template<size_t SIMD_W, typename T>
-    inline void _repair_interleaved(T const& rs, uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count) {
+    template<size_t SIMD_W, typename Rs, typename Msg, typename Ecc>
+    inline void _repair_interleaved(Rs const& rs, Msg message[], Ecc ecc[], size_t col_start, size_t col_count) {
         // src_size = message_len * interleave
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
@@ -462,8 +462,8 @@ private:
         }
     }
 
-    template<size_t SIMD_W, typename T>
-    inline void _repair_interleaved(T const& rs, uint16_t message[], uint32_t ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos_rbo) {
+    template<size_t SIMD_W, typename Rs, typename Msg, typename Ecc>
+    inline void _repair_interleaved(Rs const& rs, Msg message[], Ecc ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos_rbo) {
         // src_size = message_len * interleave
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
@@ -584,34 +584,47 @@ private:
     }
 
     inline void py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, std::optional<std::vector<size_t>> const& error_pos) {
-        py_assert(message.size == message_len, std::to_string(message.size));
-        py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
-
         if (error_pos && error_pos->empty())
             return;
 
-        auto buf = std::unique_ptr<uint32_t[]>(new uint32_t[block_len]);
+        if (interleave == 1) {
+            py_assert(message.size == message_len, std::to_string(message.size));
+            py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
 
-        std::copy_n(&message[0], message_len, &buf[0]);
-        std::copy_n(&ecc[0], ecc_len, &buf[message_len]);
+            auto buf = std::unique_ptr<uint32_t[]>(new uint32_t[block_len]);
 
-        if (error_pos) {
-            py_assert(error_pos->size() <= ecc_len);
+            std::copy_n(&message[0], message_len, &buf[0]);
+            std::copy_n(&ecc[0], ecc_len, &buf[message_len]);
 
-            auto error_pos_rbo = std::vector<size_t>(error_pos->size());
-            for (size_t i = 0; i < error_pos->size(); ++i)
-                error_pos_rbo[i] = rs16.rbo((*error_pos)[i]);
+            if (error_pos) {
+                py_assert(error_pos->size() <= ecc_len);
 
-            auto temp2 = std::unique_ptr<uint32_t[]>(new uint32_t[block_len * 2]);
-            rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
+                auto error_pos_rbo = std::vector<size_t>(error_pos->size());
+                for (size_t i = 0; i < error_pos->size(); ++i)
+                    error_pos_rbo[i] = rs16.rbo((*error_pos)[i]);
 
+                auto temp2 = std::unique_ptr<uint32_t[]>(new uint32_t[block_len * 2]);
+                rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
+
+            } else {
+                auto temp1_ecc6 = std::unique_ptr<uint32_t[]>(new uint32_t[std::max(block_len, ecc_len * 6)]);
+                rs16.repair(&buf[0], &temp1_ecc6[0]);
+            }
+
+            std::copy_n(&buf[0], message_len, &message[0]);
+            std::copy_n(&buf[message_len], ecc_len, &ecc[0]);
         } else {
-            auto temp1_ecc6 = std::unique_ptr<uint32_t[]>(new uint32_t[std::max(block_len, ecc_len * 6)]);
-            rs16.repair(&buf[0], &temp1_ecc6[0]);
-        }
+            py_assert(message.size == interleaved_message_len, std::to_string(message.size));
+            py_assert(ecc.size == interleaved_ecc_len, std::to_string(ecc.size));
 
-        std::copy_n(&buf[0], message_len, &message[0]);
-        std::copy_n(&buf[message_len], ecc_len, &ecc[0]);
+            if (error_pos) {
+                py_assert(error_pos->size() <= ecc_len);
+                repair_interleaved(&message[0], &ecc[0], 0, interleave, *error_pos);
+            } else {
+                repair_interleaved(&message[0], &ecc[0], 0, interleave);
+            }
+
+        }
     }
 
     inline py::bytearray py_synd(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc) {

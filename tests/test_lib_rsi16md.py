@@ -32,96 +32,80 @@ ref_intt = lambda w, buf: rbo_sorted(to_int_list(ffrs.reference.ntt.intt(ref_gf,
 
 
 class BaseTestRS:
+    @staticmethod
+    def add_errors(msg, ecc, count):
+        error_positions = {}
+
+        # Force 1 error in ecc
+        i = random.randrange(len(ecc))
+        error_positions[len(msg) + i] = random.randrange(2**16)
+        ecc[i] ^= error_positions[len(msg) + i]
+
+        while len(error_positions) < count:
+            i = random.randrange(len(msg) + len(ecc))
+            if i in error_positions:
+                continue
+            error_positions[i] = random.randrange(2**16)
+            if i < len(msg):
+                msg[i] ^= error_positions[i]
+            else:
+                ecc[i - len(msg)] ^= error_positions[i]
+
+        return msg, ecc, error_positions
+
     def test_encode(self, rs):
         buf = randbytes(rs.message_size)
 
         res = rs.encode(buf)
 
         w = ref_gf(rs.root)
-        buf_ntt = ref_ntt(w, to_int_list(buf + bytearray(rs.ntt_size - len(buf)), 2))
+        buf_ntt = ref_ntt(w, to_int_list(buf + bytearray(rs.ntt_size - len(buf))))
 
         ecc_mix = rs._mix_ecc(buf_ntt[:rs.ecc_len])
 
-        assert to_bytearray(ecc_mix, 2) == res
+        assert to_bytearray(ecc_mix) == res
 
     @pytest.mark.parametrize("grace", [0, 1, 2, 3, 4])
     def test_repair_unknown_locations(self, rs, grace):
-        orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
+        msg_orig = [random.randrange(0, 2**16) for _ in range(rs.message_len)]
+        ecc_orig = to_int_list(rs.encode(to_bytearray(msg_orig)))
+        msg_err = list(msg_orig)
+        ecc_err = list(ecc_orig)
 
-        block_enc = orig + to_int_list(rs.encode(to_bytearray(orig, 2)), 2)
+        msg_err, ecc_err, _error_positions = self.add_errors(msg_err, ecc_err, max(rs.ecc_len//2 - grace, 1))
 
-        block_enc_err = list(block_enc)
+        assert msg_err + ecc_err != msg_orig + ecc_orig
 
-        error_positions = dict()
-
-        # # Always add one error to the codeword
-        # if len(error_positions) < max(rs.ecc_len//2, 1):
-        #     i = random.randrange(rs.block_len - rs.ecc_len, rs.block_len)
-        #     error_positions[i] = random.randrange(2**16)
-        #     block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
-
-        while len(error_positions) < max(rs.ecc_len//2 - grace, 1):
-            i = random.randrange(rs.block_len)
-            if i in error_positions:
-                continue
-            error_positions[i] = random.randrange(2**16)
-            block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
-
-        # print("error_positions:", error_positions)
-
-        block_enc_err = to_bytearray(block_enc_err, 2)
-        msg_err = block_enc_err[:rs.message_size]
-        ecc_err = block_enc_err[rs.message_size:]
-
-        assert block_enc != to_int_list(msg_err + ecc_err, 2)
-
-        # synd = to_int_list(rs.synd(msg_err, ecc_err), 2)
-        # loc, ev = ref_rs.sugiyama(ref_gf, synd)
-        # rec_pos, rec_val = ref_rs.forney(rs.block_len, ref_gf(rs.root), loc, ev)
-
+        msg_err = to_bytearray(msg_err)
+        ecc_err = to_bytearray(ecc_err)
         rs.repair(msg_err, ecc_err)
+        msg_err = to_int_list(msg_err)
+        ecc_err = to_int_list(ecc_err)
 
-        assert block_enc == to_int_list(msg_err + ecc_err, 2)
+        assert msg_err + ecc_err == msg_orig + ecc_orig
 
-    def test_repair(self, rs):
-        orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
+    @pytest.mark.parametrize("grace", [0, 1, 2, 3, 4])
+    def test_repair(self, rs, grace):
+        msg_orig = [random.randrange(0, 2**16) for _ in range(rs.message_len)]
+        ecc_orig = to_int_list(rs.encode(to_bytearray(msg_orig)))
+        msg_err = list(msg_orig)
+        ecc_err = list(ecc_orig)
 
-        block_enc = orig + to_int_list(rs.encode(to_bytearray(orig, 2)), 2)
+        msg_err, ecc_err, error_positions = self.add_errors(msg_err, ecc_err, max(rs.ecc_len - grace, 1))
 
-        block_enc_err = list(block_enc)
+        assert msg_err + ecc_err != msg_orig + ecc_orig
 
-        error_positions = dict()
-
-        # Always add one error to the codeword
-        if len(error_positions) < max(rs.ecc_len, 1):
-            i = random.randrange(rs.block_len - rs.ecc_len, rs.block_len)
-            error_positions[i] = random.randrange(2**16)
-            block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
-
-        while len(error_positions) < rs.ecc_len:
-            i = random.randrange(rs.block_len)
-            if i in error_positions:
-                continue
-            error_positions[i] = random.randrange(2**16)
-            block_enc_err[i] = rs.gf.add(block_enc_err[i], error_positions[i])
-
-        w = ref_gf(rs.root)
-        print()
-        print("errs: ", error_positions)
-
-        block_enc_err = to_bytearray(block_enc_err, 2)
-        msg_err = block_enc_err[:rs.message_size]
-        ecc_err = block_enc_err[rs.message_size:]
-
-        assert block_enc != to_int_list(msg_err + ecc_err, 2)
-
+        msg_err = to_bytearray(msg_err)
+        ecc_err = to_bytearray(ecc_err)
         rs.repair(msg_err, ecc_err, list(error_positions.keys()))
+        msg_err = to_int_list(msg_err)
+        ecc_err = to_int_list(ecc_err)
 
-        assert block_enc == to_int_list(msg_err + ecc_err, 2)
+        assert msg_err + ecc_err == msg_orig + ecc_orig
 
     def test_repair_no_errors(self, rs):
         orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
-        msg = to_bytearray(orig, 2)
+        msg = to_bytearray(orig)
         ecc = rs.encode(msg)
         msg_err = bytearray(msg)
         ecc_err = bytearray(ecc)
@@ -133,7 +117,7 @@ class BaseTestRS:
 
     def test_repair_unknown_no_errors(self, rs):
         orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
-        msg = to_bytearray(orig, 2)
+        msg = to_bytearray(orig)
         ecc = rs.encode(msg)
         msg_err = bytearray(msg)
         ecc_err = bytearray(ecc)
@@ -185,54 +169,79 @@ class BaseTestRS:
 
     @pytest.mark.parametrize("interleave", list(range(32)) + [32, 48, 100, 256])
     def test_encode_interleaved(self, rs, interleave):
-        data = list(range(interleave * rs.message_len))
-        buf = to_bytearray(data, 2)
-
         assert rs.interleave == 1
-        rs.interleave = interleave
-        try:
-            interleaved_chunk = rs.encode(buf)
-        finally:
-            rs.interleave = 1
+        rsi = ffrs.RSi16md(rs.block_len, rs.message_len, interleave=interleave)
 
-        rs.interleave = 1
+        data = list(range(interleave * rs.message_len))
+        buf = to_bytearray(data)
+
+        interleaved_chunk = rsi.encode(buf)
+
         for i in range(interleave):
-            buf_enc = rs.encode(to_bytearray(data[i::interleave], 2))
+            buf_enc = rs.encode(to_bytearray(data[i::interleave]))
 
             # Sequential ecc
             # assert interleaved_chunk[i * rs.ecc_size:(i + 1) * rs.ecc_size] == buf_enc
 
             # Interleaved ecc
-            assert to_bytearray(to_int_list(interleaved_chunk, 2)[i::interleave], 2) == buf_enc
+            assert to_bytearray(to_int_list(interleaved_chunk)[i::interleave]) == buf_enc
+
+    @pytest.mark.parametrize("interleave", list(range(1, 16)) + [32, 48, 50, 100, 256])
+    def test_repair_interleaved_unknown(self, rs, interleave):
+        assert rs.interleave == 1
+        rsi = ffrs.RSi16md(rs.block_len, rs.message_len, interleave=interleave)
+
+        msg_orig = list(range(rsi.message_len))
+        msg_buf_orig = to_bytearray(msg_orig)
+
+        ecc_buf_orig = rsi.encode(msg_buf_orig)
+        ecc_orig = to_int_list(ecc_buf_orig)
+
+        msg_err = list(msg_orig)
+        ecc_err = list(ecc_orig)
+
+        errors = []
+        for i in range(interleave):
+            msg_err[i::interleave], ecc_err[i::interleave], col_errs = self.add_errors(
+                msg_err[i::interleave], ecc_err[i::interleave], rs.ecc_len//2)
+            errors.append(col_errs)
+
+        msg_buf_err = to_bytearray(msg_err)
+        ecc_buf_err = to_bytearray(ecc_err)
+
+        assert msg_buf_err + ecc_buf_err != msg_buf_orig + ecc_buf_orig
+        rsi.repair(msg_buf_err, ecc_buf_err)
+        assert msg_buf_err + ecc_buf_err == msg_buf_orig + ecc_buf_orig
 
 
 @pytest.mark.parametrize("rs", [
     ffrs.RSi16md(4, ecc_len=2),
+    ffrs.RSi16md(8, ecc_len=2),
     ffrs.RSi16md(16, ecc_len=4),
     ffrs.RSi16md(16, ecc_len=8),
     ffrs.RSi16md(128, ecc_len=2),
-    ffrs.RSi16md(256, ecc_len=128),
+    ffrs.RSi16md(256, ecc_len=32),
     # ffrs.RSi16md(1024, ecc_len=128),
     # ffrs.RSi16md(4096, ecc_len=512),
 
     ffrs.RSi16md(4, ecc_len=2, simd_x16=False),
     ffrs.RSi16md(16, ecc_len=4, simd_x16=False),
     ffrs.RSi16md(128, ecc_len=2, simd_x16=False),
-    ffrs.RSi16md(256, ecc_len=128, simd_x16=False),
+    ffrs.RSi16md(256, ecc_len=32, simd_x16=False),
     # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False),
     # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False),
 
     ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False),
     ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False),
     ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False),
-    ffrs.RSi16md(256, ecc_len=128, simd_x16=False, simd_x8=False),
+    ffrs.RSi16md(256, ecc_len=32, simd_x16=False, simd_x8=False),
     # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False),
     # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False),
 
     ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
     ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False, simd_x4=False),
     ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.RSi16md(256, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
+    ffrs.RSi16md(256, ecc_len=32, simd_x16=False, simd_x8=False, simd_x4=False),
     # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
     # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False, simd_x4=False),
 ])

@@ -39,7 +39,7 @@ def sample_field(GF, start=0, samples=1000):
         yield random.randrange(start, GF.field_elements)
 
 
-def to_bytearray(v, sizeof, byteorder="little"):
+def to_bytearray(v, sizeof=2, byteorder="little"):
     if type(v) in [bytearray, bytes, str]:
         return bytearray(v, "utf-8")
 
@@ -50,7 +50,7 @@ def to_bytearray(v, sizeof, byteorder="little"):
     return buf
 
 
-def to_int_list(v, sizeof=None, byteorder="little"):
+def to_int_list(v, sizeof=2, byteorder="little"):
     if type(v) is list:
         return list(map(int, v))
     else:

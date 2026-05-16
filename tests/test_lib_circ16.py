@@ -31,6 +31,23 @@ class BaseTestCIRC:
     def _rso_ecc_size(rs):
         return rs.inner_message_len * rs.outer_ecc_size * rs.outer_interleave
 
+    @staticmethod
+    def add_errors_stride(msg, ecc, stride, max=float("inf")):
+        pos = 0
+        count = 0
+        while pos < len(msg) and count < max:
+            msg[pos] ^= 0xff
+            pos += stride
+            count += 1
+
+        pos -= len(msg)
+        while pos < len(ecc) and count < max:
+            ecc[pos] ^= 0xff
+            pos += stride
+            count += 1
+
+        return count
+
     def test_properties(self, rs):
         assert rs.ecc_len == rs.inner_block_len * rs.outer_block_len * rs.outer_interleave - rs.message_len
         assert rs.block_len == rs.message_len + rs.ecc_len
@@ -97,8 +114,10 @@ class BaseTestCIRC:
         ecc_orig = bytearray(ecc)
 
         # Corrupt all rsi ecc
-        for i in range(rs.inner_ecc_size * rs.outer_message_len):
-            ecc[i] = 0
+        ecc[:self._rsi_ecc_size(rs)] = bytearray(self._rsi_ecc_size(rs))
+
+        err_count = self.add_errors_stride(buf, [], rs.inner_message_size + 2, rs.inner_message_len * rs.outer_ecc_len // 2)
+        print(rs, err_count)
 
         rs.repair(buf, ecc)
 
@@ -180,6 +199,8 @@ class TestCircPower2(BaseTestCIRC):
 class TestCircMult(BaseTestCIRC):
     # Limited support for multiples of powers of 2
     # TODO: partial intt or switch to forney algo
-    test_circ_repair = pytest.mark.skip(BaseTestCIRC.test_circ_repair)
-    test_repair_fallback = pytest.mark.skip(BaseTestCIRC.test_repair_fallback)
-    test_repair_no_errors = pytest.mark.skip(BaseTestCIRC.test_repair_no_errors)
+    @pytest.mark.skip
+    def test_skip(self, rs): pass
+    test_circ_repair = test_skip
+    test_repair_fallback = test_skip
+    test_repair_no_errors = test_skip
