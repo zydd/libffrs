@@ -106,7 +106,7 @@ public:
             interleave,
             simd_x4.value_or(__builtin_cpu_supports("sse2")),
             simd_x8.value_or(__builtin_cpu_supports("avx2")),
-            simd_x16.value_or(__builtin_cpu_supports("avx512f"))
+            simd_x16.value_or(__builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512dq"))
         )
     { }
 
@@ -137,11 +137,9 @@ public:
 
     template<typename Msg, typename Ecc>
     inline void repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count) {
-        // _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
-            const size_t SIMD_W = 1;
-            auto const& rs = rs16;
+        _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
             _repair_interleaved<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count);
-        // });
+        });
     }
 
     template<typename Msg, typename Ecc>
@@ -441,6 +439,8 @@ private:
 
         size_t encoded_cols = vec_cols * SIMD_W;
         if (encoded_cols < col_count) {
+            std::fill_n(&buf[0], block_len * SIMD_W, GFT{0});
+
             size_t remaining_cols = col_count - encoded_cols;
             copy_stride(&message[encoded_cols], interleave, &buf[0], SIMD_W, remaining_cols, message_len);
 

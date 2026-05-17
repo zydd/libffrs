@@ -31,6 +31,18 @@
     py::print(#v ":", v##_len, std::vector(&(v)[0], &(v)[v##_len]));
 #define print_Vec(v) \
     do { inttr(v); print_vec(v); nttr(v); } while(0)
+#define print_VEC(v) \
+    do { \
+        py::print("-- VEC " #v); \
+        for (size_t i = 0; i < v##_len; ++i){ \
+            for (size_t j = 0; j < sizeof(v)/sizeof(::GFT); ++j) { \
+                auto coeff = *(reinterpret_cast<const ::GFT *>(&error_locations[i]) + j); \
+                std::printf("%6d ", coeff); \
+                fflush(stdout); \
+            } \
+            py::print(); \
+        } \
+    } while(0)
 
 #define vec_sub(a, b, r) r##_len = _vec_sub(a, a##_len, b, b##_len, r)
 #define vec_mul(a, b, r) r##_len = _vec_mul(a, a##_len, b, b##_len, r)
@@ -367,10 +379,10 @@ protected:
         GFT block[],
         const GFT locator_poly_deriv[], size_t locator_poly_deriv_len,
         const GFT evaluator_poly[], size_t evaluator_poly_len,
-        const GFT error_pos[], const GFT error_pos_rbo[], size_t error_count
+        const GFT error_pos[], const GFT error_root_inv[], size_t error_count
     ) const {
         for (size_t i = 0; i < error_count; ++i) {
-            auto x = error_pos_rbo[i];
+            auto x = error_root_inv[i];
             auto x_inv = gf.inv(x);
             auto numerator = _eval(evaluator_poly, evaluator_poly_len, x_inv);
             auto denominator = _eval(locator_poly_deriv, locator_poly_deriv_len, x_inv);
@@ -378,11 +390,13 @@ protected:
 
             if constexpr (std::is_integral_v<GFT>)
                 block[error_pos[i]] = gf.add(block[error_pos[i]], error);
-            // else
-            //     gf.scatter(&block[0], error_pos[i], gf.add(gf.gather(&block[0], error_pos[i]), error), GFT{error_pos[i] < 0x10001});
+            else
+                add_masked(&block[0], error_pos[i], error, error_pos[i] < 0x10001);
         }
         return error_count;
     }
+
+    void add_masked(GFT vec[], GFT const& i, GFT const& value, GFT const& condition) const;
 
     inline void error_locator(const size_t error_pos_rbo[], size_t error_count, GFT locator_poly[]) const {
         std::fill_n(&locator_poly[0], ecc_len, GFT{0});
@@ -398,8 +412,12 @@ protected:
         }
     }
 
-    inline size_t find_roots(const GFT locator_poly[], size_t locator_poly_len, GFT roots[], GFT roots_rbo[]) const {
-        size_t root_count = 0;
+    inline size_t find_roots(const GFT locator_poly[], size_t locator_poly_len, GFT root_location[], GFT root_inv[]) const {
+        // TODO: use NTT to find roots
+
+        std::fill_n(&root_location[0], ecc_len, GFT{} | ~::GFT{0});
+        std::fill_n(&root_inv[0], ecc_len, GFT{0});
+        GFT root_count = GFT{0};
         for (uint32_t i = 0; i < block_len; ++i) {
             auto x = gf.pow(root, rbo(i));
             auto x_inv = GFT{} + gf.inv(x);
@@ -407,22 +425,21 @@ protected:
 
             if constexpr (std::is_integral_v<GFT>) {
                 if (is_zero) {
-                    roots[root_count] = i;
-                    roots_rbo[root_count] = x;
+                    root_location[root_count] = i;
+                    root_inv[root_count] = x;
                     ++root_count;
                 }
             } else {
-                for (uint32_t j = 0; i < sizeof(GFT) / sizeof(uint32_t); ++i) {
+                for (uint32_t j = 0; j < sizeof(GFT) / sizeof(::GFT); ++j) {
                     if (is_zero[j]) {
-                        roots[root_count] = (is_zero & (GFT{} + i)) | !is_zero;
-                        roots_rbo[root_count] = (is_zero & (GFT{} + x)) | !is_zero;
-                        ++root_count;
-                        break;
+                        root_location[root_count[j]][j] = i;
+                        root_inv[root_count[j]][j] = x;
+                        ++root_count[j];
                     }
                 }
             }
         }
-        return root_count;
+        return *std::max_element(reinterpret_cast<::GFT *>(&root_count), reinterpret_cast<::GFT *>(&root_count + 1));
     }
 
     inline void repair_ntt(GFT block_ntt[], const GFT locator_poly[], size_t error_count, GFT temp[]) const {
@@ -648,6 +665,7 @@ void RSi16v<W>::repair(GFT block[], GFT temp1_ecc6[]) const {
 
 #undef print_vec
 #undef print_Vec
+#undef print_VEC
 #undef vec_sub
 #undef vec_mul
 #undef vec_div

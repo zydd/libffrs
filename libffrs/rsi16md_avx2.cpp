@@ -37,19 +37,21 @@ GFTx8 ffrs::simd_gather_base::gather(const uint32_t vec[], GFTx8 const& i) {
     );
 }
 
-// template<>
-// GFTx8 ffrs::simd_gather_base::gather(const GFTx8 vec[], GFTx8 const& i) {
-//     py_assert(!"GFTx8 ffrs::simd_gather_base::gather");
-// }
 
+template<>
+void RSi16vImpl<GFTx8>::add_masked(GFTx8 vec[], GFTx8 const& i, GFTx8 const& value, GFTx8 const& condition) const {
+    auto index = i * 8 + GFTx8{0, 1, 2, 3, 4, 5, 6, 7};
+    auto prev_value = (GFTx8) _mm256_mask_i32gather_epi32(
+        __m256i{},
+        (const int *) vec,
+        (__m256i) index,
+        (__m256i) condition,
+        4
+    );
 
-// template<>
-// void ffrs::simd_gather_base::scatter(GFTx8 vec[], GFTx8 const& i, GFTx8 const& value, GFTx8 const& mask) {
-//     _mm256_mask_i32scatter_epi32(
-//         vec,
-//         _mm256_movemask_epi8((__m256i) mask),
-//         (__m256i) i,
-//         (__m256i) value,
-//         4
-//     );
-// }
+    auto sum = gf.add(prev_value, value);
+
+    for (int j = 0; j < 8; j++)
+        if (condition[j])
+            vec[i[j]][j] = sum[j];
+}

@@ -33,19 +33,24 @@ GFTx16 ffrs::simd_gather_base::gather(const uint32_t vec[], GFTx16 const& i) {
     );
 }
 
-// template<>
-// GFTx16 ffrs::simd_gather_base::gather(const GFTx16 vec[], GFTx16 const& i) {
-//     py_assert(!"GFTx16 ffrs::simd_gather_base::gather");
-// }
 
+template<>
+void RSi16vImpl<GFTx16>::add_masked(GFTx16 vec[], GFTx16 const& i, GFTx16 const& value, GFTx16 const& condition) const {
+    auto mask = _mm512_movepi32_mask((__m512i) condition);
+    auto index = i * 16 + GFTx16{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+    auto prev_value = (GFTx16) _mm512_mask_i32gather_epi32(
+        __m512i{},
+        mask,
+        (__m512i) index,
+        vec,
+        4
+    );
 
-// template<>
-// void ffrs::simd_gather_base::scatter(GFTx16 vec[], GFTx16 const& i, GFTx16 const& value, GFTx16 const& mask) {
-//     _mm512_mask_i32scatter_epi32(
-//         vec,
-//         _mm512_movepi32_mask((__m512i) mask),
-//         (__m512i) i,
-//         (__m512i) value,
-//         4
-//     );
-// }
+    _mm512_mask_i32scatter_epi32(
+        vec,
+        mask,
+        (__m512i) index,
+        (__m512i) gf.add(prev_value, value),
+        4
+    );
+}

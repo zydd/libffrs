@@ -40,20 +40,12 @@ GFTx4 ffrs::simd_gather_base::gather(const uint32_t vec[], GFTx4 const& i) {
     };
 }
 
-// template<>
-// GFTx4 ffrs::simd_gather_base::gather(const GFTx4 vec[], GFTx4 const& i) {
-//     py_assert(!"GFTx4 ffrs::simd_gather_base::gather");
-// }
-
-
-// template<>
-// void ffrs::simd_gather_base::scatter(GFTx4 vec[], GFTx4 const& i, GFTx4 const& value, GFTx4 const& mask) {
-//     _mm_mask_i32scatter_epi32(
-//         vec,
-//         _mm_movemask_epi8((__m128i) mask),
-//         (__m128i) i,
-//         (__m128i) value,
-//         4
-//     );
-// }
-
+template<>
+void RSi16vImpl<GFTx4>::add_masked(GFTx4 vec[], GFTx4 const& i, GFTx4 const& value, GFTx4 const& condition) const {
+    for (int j = 0; j < 4; j++) {
+        if (condition[j]) {
+            auto &prev = vec[i[j]][j];
+            prev = gf.add(prev, value[j]);
+        }
+    }
+}

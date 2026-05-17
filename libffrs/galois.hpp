@@ -159,14 +159,6 @@ struct simd_gather_base {
 
     template<typename Vec, typename Idx, typename=std::enable_if_t<!std::is_integral_v<Idx>>>
     static Idx gather(const Vec vec[], Idx const& i);
-
-    template<typename Vec, typename Idx, typename=std::enable_if_t<std::is_integral_v<Vec> && std::is_integral_v<Idx>>>
-    static inline void scatter(Vec vec[], Idx const& i, Vec const& value) {
-        vec[i] = value;
-    }
-
-    template<typename Vec, typename Idx>
-    static void scatter(Vec vec[], Idx const& i, Vec const& value, Idx const& mask);
 };
 
 template<typename GFT, typename GF>
