@@ -124,6 +124,10 @@ class BaseTestCIRC:
         # Corrupt rsi corresponding to message
         for i in range(rs.inner_ecc_size * (rs.outer_ecc_len - 1)):
             # FIXME: repair fails if set `ecc[i] = 0`
+            # Likely because these are not marked as errors since message is also `0`
+            # Then NTT repair does not work properly
+            # TODO: see if this can be used in all cases:
+            # https://en.wikiversity.org/wiki/Reed%E2%80%93Solomon_codes_for_coders#Error_and_erasure_correction
             ecc[self._rso_ecc_size(rs) + i] = 0
 
         # Corrupt rsio corresponding to rso
@@ -236,5 +240,6 @@ class TestCircMult(BaseTestCIRC):
     @pytest.mark.skip
     def test_skip(self, rs): pass
     test_circ_repair = test_skip
+    test_circ_repair_zeroes = test_skip
     test_repair_fallback = test_skip
     test_repair_no_errors = test_skip

@@ -71,13 +71,13 @@ private:
         interleaved_ecc_len(ecc_len * interleave)
     {
         if (simd_x16)
-            vec_align = 16 * sizeof(uint32_t);
+            vec_align = 16 * sizeof(GFT);
         else if (simd_x8)
-            vec_align = 8 * sizeof(uint32_t);
+            vec_align = 8 * sizeof(GFT);
         else if (simd_x4)
-            vec_align = 4 * sizeof(uint32_t);
+            vec_align = 4 * sizeof(GFT);
         else
-            vec_align = sizeof(uint32_t);
+            vec_align = sizeof(GFT);
     }
 
 public:
@@ -114,7 +114,7 @@ public:
     inline void encode_blocks(const Src src[], size_t full_blocks, size_t remainder, Dst dst[]) {
         size_t block = 0;
         _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
-            auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W]);
+            auto temp = new_aligned<GFT>(block_len * SIMD_W, SIMD_W * sizeof(GFT));
             while (full_blocks - block >= SIMD_W) {
                 encode_block<SIMD_W>(rs, &src[block * message_len], &temp[0], &dst[block * ecc_len]);
                 block += SIMD_W;
@@ -130,7 +130,7 @@ public:
     template<typename Src, typename Dst>
     inline void encode_interleaved(const Src src[], Dst dst[]) {
         _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
-            auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W]);
+            auto temp = new_aligned<GFT>(block_len * SIMD_W, SIMD_W * sizeof(GFT));
             _encode_interleaved<SIMD_W>(rs, &src[0], &temp[0], &dst[0]);
         });
     }
@@ -160,6 +160,7 @@ public:
         for (size_t i = 0; i < error_pos.size(); ++i)
             error_pos_rbo[i] = rs16.rbo(error_pos[i]);
 
+        py_assert(block_len == rs16.ntt_len, "block len != NTT len: " + std::to_string(block_len) + " != " + std::to_string(rs16.ntt_len));
         rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
     }
 
@@ -343,7 +344,7 @@ private:
         for (size_t i = 0; i < vec_cols; ++i) {
             copy_stride(&src[i * SIMD_W], interleave, &temp[0], SIMD_W, SIMD_W, message_len);
             std::fill_n(&temp[message_len * SIMD_W], ecc_len * SIMD_W, 0);
-            // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(uint32_t));
+            // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(GFT));
 
             rs.encode(&temp[0]);
             // std::copy_n(&temp[0], ecc_len * SIMD_W, &dst[i * SIMD_W * ecc_len]);
@@ -359,7 +360,7 @@ private:
             size_t remaining_cols = interleave - encoded_cols;
             copy_stride(&src[encoded_cols], interleave, &temp[0], SIMD_W, remaining_cols, message_len);
             std::fill_n(&temp[message_len * SIMD_W], ecc_len * SIMD_W, 0);
-            // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(uint32_t));
+            // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(GFT));
 
             rs.encode(&temp[0]);
             // copy_stride(&temp[0], SIMD_W, &dst[encoded_cols], remaining_cols, remaining_cols, ecc_len);
@@ -376,7 +377,7 @@ private:
     inline void encode_block(T const& rs, const Src src[], uint32_t temp[], Dst dst[]) {
         copy_transposed(&src[0], message_len, &temp[0], SIMD_W);
         std::fill_n(&temp[message_len * SIMD_W], ecc_len * SIMD_W, 0);
-        // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(uint32_t));
+        // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(GFT));
 
         rs.encode(&temp[0]);
         copy_transposed(&temp[0], SIMD_W, &dst[0], ecc_len);
@@ -406,8 +407,8 @@ private:
         // block_len = message_len + ecc_len
         // chunk_size = block_len * interleave
 
-        auto temp1_ecc6 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[std::max(block_len, ecc_len * 6) * SIMD_W]);
-        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W]);
+        auto temp1_ecc6 = new_aligned<GFT>(std::max(block_len, ecc_len * 6) * SIMD_W, SIMD_W * sizeof(GFT));
+        auto buf = new_aligned<GFT>(block_len * SIMD_W, SIMD_W * sizeof(GFT));
 
         message += col_start;
 
@@ -469,8 +470,10 @@ private:
         // interleaved_size = block_len * interleave
         // temp2_size = block_len * SIMD_W * 2
 
-        auto temp2 = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W * 2]);
-        auto buf = std::unique_ptr<uint32_t[]>(new(std::align_val_t{SIMD_W * sizeof(uint32_t)}) uint32_t[block_len * SIMD_W]);
+        auto temp2 = new_aligned<GFT>(block_len * SIMD_W * 2, SIMD_W * sizeof(GFT));
+
+        py_assert(block_len == rs.ntt_len, "block len != NTT len: " + std::to_string(block_len) + " != " + std::to_string(rs.ntt_len));
+        auto buf = new_aligned<GFT>(block_len * SIMD_W, SIMD_W * sizeof(GFT));
 
         message += col_start;
 
@@ -590,7 +593,7 @@ private:
             py_assert(message.size == message_len, std::to_string(message.size));
             py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
 
-            auto buf = std::unique_ptr<uint32_t[]>(new uint32_t[block_len]);
+            auto buf = new_aligned<GFT>(block_len, vec_align);
 
             std::copy_n(&message[0], message_len, &buf[0]);
             std::copy_n(&ecc[0], ecc_len, &buf[message_len]);
@@ -602,11 +605,12 @@ private:
                 for (size_t i = 0; i < error_pos->size(); ++i)
                     error_pos_rbo[i] = rs16.rbo((*error_pos)[i]);
 
-                auto temp2 = std::unique_ptr<uint32_t[]>(new uint32_t[block_len * 2]);
+                auto temp2 = new_aligned<GFT>(block_len * 2, sizeof(GFT));
+                py_assert(block_len == rs16.ntt_len, "block len != NTT len: " + std::to_string(block_len) + " != " + std::to_string(rs16.ntt_len));
                 rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
 
             } else {
-                auto temp1_ecc6 = std::unique_ptr<uint32_t[]>(new uint32_t[std::max(block_len, ecc_len * 6)]);
+                auto temp1_ecc6 = new_aligned<GFT>(std::max(block_len, ecc_len * 6), sizeof(GFT));
                 rs16.repair(&buf[0], &temp1_ecc6[0]);
             }
 
@@ -630,8 +634,8 @@ private:
         py_assert(message.size == message_len, std::to_string(message.size));
         py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
 
-        auto temp = std::unique_ptr<uint32_t[]>(new uint32_t[block_len]);
-        auto synds = std::unique_ptr<uint32_t[]>(new uint32_t[ecc_len]);
+        auto temp = new_aligned<GFT>(block_len, sizeof(GFT));
+        auto synds = new_aligned<GFT>(ecc_len, sizeof(GFT));
 
         std::copy_n(&message[0], message_len, &temp[0]);
         std::copy_n(&ecc[0], ecc_len, &temp[message_len]);

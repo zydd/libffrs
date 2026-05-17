@@ -123,7 +123,7 @@ private:
 
         auto output = py::bytearray(nullptr, ecc_len * sizeof(uint16_t));
         auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
-        auto temp = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rso.interleaved_ecc_len]);
+        auto temp = new_aligned<GFT>(rso.interleaved_ecc_len, rsi.vec_align);
 
         auto rso_ecc = &output_data[0];  // size = rso.interleaved_ecc_len
         auto rsi_ecc = &output_data[rso.interleaved_ecc_len];  // size = rsi_interleaved_ecc_len
@@ -144,12 +144,12 @@ private:
         size_t inner_blocks = message.size / rsi.message_len;
         py_assert(inner_blocks == rso.message_len * outer_interleave);
 
-        auto buf_rsi = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rsi.block_len]);
-        auto temp2_rsi = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rsi.block_len * 2]);
-        auto synds_rsi = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rso.block_len * rsi.ecc_len * outer_interleave]);
+        auto buf_rsi = new_aligned<GFT>(rsi.block_len, rsi.vec_align);
+        auto temp2_rsi = new_aligned<GFT>(rsi.block_len * 2, rsi.vec_align);
+        auto synds_rsi = new_aligned<GFT>(rso.block_len * rsi.ecc_len * outer_interleave, rsi.vec_align);
 
         // Widen rso ecc to u32
-        auto rso_ecc = std::unique_ptr<uint32_t[]>(new(std::align_val_t{rsi.vec_align}) uint32_t[rso.interleaved_ecc_len]);
+        auto rso_ecc = new_aligned<GFT>(rso.interleaved_ecc_len, rsi.vec_align);
         std::copy_n(&ecc[0], rso.interleaved_ecc_len, &rso_ecc[0]);
 
         auto rsi_ecc = &ecc[rso.interleaved_ecc_len];

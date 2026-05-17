@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdlib>
 #include <pybind11/pybind11.h>
 
 
@@ -89,3 +90,14 @@ constexpr auto cast_args(Return (Class::*method)(Args...)) {
 #define _PY_ASSERT_ARG(arg1, arg2, arg3, ...) arg3
 #define _PY_ASSERT_GET(...) _PY_ASSERT_ARG(__VA_ARGS__, _PY_ASSERT_MSG, _PY_ASSERT)
 #define py_assert(...) _PY_ASSERT_GET(__VA_ARGS__)(__VA_ARGS__)
+
+
+template <typename T>
+std::unique_ptr<T[], decltype(&std::free)> new_aligned(size_t count, size_t alignment) {
+    // round up to multiple of alignment
+    size_t size = (count * sizeof(T) + alignment - 1) & ~(alignment - 1);
+
+    auto *raw_ptr = static_cast<T *>(std::aligned_alloc(alignment, size));
+    if (!raw_ptr) throw std::bad_alloc();
+    return std::unique_ptr<T[], decltype(&std::free)>(raw_ptr, &std::free);
+}
