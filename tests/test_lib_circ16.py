@@ -16,6 +16,7 @@
 #  limitations under the License.
 
 import pytest
+import random
 
 import ffrs
 
@@ -57,13 +58,13 @@ class BaseTestCIRC:
         res = rs.encode(buf)
         assert len(res) == rs.ecc_size
 
-        res_i = rs.rsi.encode(buf)
-        assert len(res_i) == self._rsi_ecc_size(rs)
-        assert res[:len(res_i)] == res_i
-
         res_o = rs.rso.encode(buf)
         assert len(res_o) == self._rso_ecc_size(rs)
-        assert res[len(res_i):][:len(res_o)] == res_o
+        assert res[:len(res_o)] == res_o
+
+        res_i = rs.rsi.encode(buf)
+        assert len(res_i) == self._rsi_ecc_size(rs)
+        assert res[len(res_o):][:len(res_i)] == res_i
 
         res_io = rs.rsi.encode(res_o)
         assert len(res_io) == rs.outer_ecc_len * rs.inner_ecc_size * rs.outer_interleave
@@ -83,22 +84,53 @@ class BaseTestCIRC:
 
         # Corrupt message
         for i in range((rs.outer_ecc_len - 1) * rs.inner_message_size):
+            buf[i] ^= random.randint(0, 255)
+
+        # Corrupt rso
+        for i in range(rs.inner_ecc_size):
+            ecc[i] ^= random.randint(0, 255)
+
+        # Corrupt rsi corresponding to message
+        for i in range(rs.inner_ecc_size * (rs.outer_ecc_len - 1)):
+            ecc[self._rso_ecc_size(rs) + i] ^= random.randint(0, 255)
+
+        # Corrupt rsio corresponding to rso
+        rsio_size = self._rsi_ecc_size(rs) + self._rso_ecc_size(rs)
+        for i in range(rsio_size, rsio_size + rs.inner_ecc_size):
+            ecc[i] ^= random.randint(0, 255)
+
+        rs.repair(buf, ecc)
+
+        assert buf == msg_orig
+        assert ecc == ecc_orig
+
+    @pytest.mark.skip
+    def test_circ_repair_zeroes(self, rs):
+        buf = randbytes(rs.message_size)
+        ecc = rs.encode(buf)
+        assert len(ecc) == rs.ecc_size
+
+        msg_orig = bytearray(buf)
+        ecc_orig = bytearray(ecc)
+
+        # Corrupt message
+        for i in range((rs.outer_ecc_len - 1) * rs.inner_message_size):
             buf[i] = 0
+
+        # Corrupt rso
+        for i in range(rs.inner_ecc_size):
+            ecc[i] = 0
 
         # Corrupt rsi corresponding to message
         for i in range(rs.inner_ecc_size * (rs.outer_ecc_len - 1)):
             # FIXME: repair fails if set `ecc[i] = 0`
-            ecc[i] = 1
-
-        # Corrupt rso
-        for i in range(self._rsi_ecc_size(rs), self._rsi_ecc_size(rs) + rs.inner_ecc_size):
-            ecc[i] = 0
+            ecc[self._rso_ecc_size(rs) + i] = 0
 
         # Corrupt rsio corresponding to rso
         rsio_size = self._rsi_ecc_size(rs) + self._rso_ecc_size(rs)
         for i in range(rsio_size, rsio_size + rs.inner_ecc_size):
             # FIXME: repair fails if set `ecc[i] = 0`
-            ecc[i] = 1
+            ecc[i] = 0
 
         rs.repair(buf, ecc)
 
@@ -114,7 +146,9 @@ class BaseTestCIRC:
         ecc_orig = bytearray(ecc)
 
         # Corrupt all rsi ecc
-        ecc[:self._rsi_ecc_size(rs)] = bytearray(self._rsi_ecc_size(rs))
+        o = self._rso_ecc_size(rs)
+        i = self._rsi_ecc_size(rs)
+        ecc[o:o + i] = bytearray(self._rsi_ecc_size(rs))
 
         err_count = self.add_errors_stride(buf, [], rs.inner_message_size + 2, rs.inner_message_len * rs.outer_ecc_len // 2)
         print(rs, err_count)

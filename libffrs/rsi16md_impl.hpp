@@ -179,9 +179,6 @@ public:
     }
 
     inline void repair(GFT block[], const size_t error_pos_rbo[], size_t error_count, GFT temp2[]) const {
-        // auto block = reinterpret_cast<GFT *>(_block);
-        // auto temp2 = reinterpret_cast<GFT *>(_temp2);
-
         ntt(block);
 
         auto locator_poly = &temp2[block_len];
