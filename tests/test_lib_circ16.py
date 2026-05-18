@@ -29,7 +29,7 @@ class BaseTestCIRC:
 
     @staticmethod
     def _rso_ecc_size(rs):
-        return rs.inner_message_len * rs.outer_ecc_size * rs.outer_interleave
+        return rs.inner_message_size * rs.outer_ecc_len * rs.outer_interleave
 
     @staticmethod
     def add_errors_stride(msg, ecc, stride, max=float("inf")):

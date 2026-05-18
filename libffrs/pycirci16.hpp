@@ -82,6 +82,7 @@ public:
                 "outer_block_len"_a,
                 "outer_ecc_len"_a,
                 "outer_interleave"_a = 1,
+                py::kw_only(),
                 "simd_x4"_a = py::none(),
                 "simd_x8"_a = py::none(),
                 "simd_x16"_a = py::none()
@@ -103,11 +104,8 @@ public:
             .def_property_readonly("inner_ecc_len", [](PyCIRCi16& self) { return self.rsi.ecc_len; })
             .def_property_readonly("inner_ecc_size", [](PyCIRCi16& self) { return self.rsi.ecc_len * sizeof(uint16_t); })
             .def_property_readonly("outer_block_len", [](PyCIRCi16& self) { return self.rso.block_len; })
-            .def_property_readonly("outer_block_size", [](PyCIRCi16& self) { return self.rso.block_len * sizeof(uint16_t); })
             .def_property_readonly("outer_message_len", [](PyCIRCi16& self) { return self.rso.message_len; })
-            .def_property_readonly("outer_message_size", [](PyCIRCi16& self) { return self.rso.message_len * sizeof(uint16_t); })
             .def_property_readonly("outer_ecc_len", [](PyCIRCi16& self) { return self.rso.ecc_len; })
-            .def_property_readonly("outer_ecc_size", [](PyCIRCi16& self) { return self.rso.ecc_len * sizeof(uint16_t); })
             .def_property_readonly("outer_interleave", [](PyCIRCi16& self) { return self.outer_interleave; })
 
             .def("encode", cast_args(&PyCIRCi16::py_encode), R"(Encode data)", "buffer"_a)

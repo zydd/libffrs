@@ -243,6 +243,7 @@ public:
                 R"(Instantiate a Reed-Solomon encoder with the given configuration)",
                 "block_len"_a = py::none(),
                 "message_len"_a = py::none(),
+                py::kw_only(),
                 "ecc_len"_a = py::none(),
                 "primitive"_a = 3,
                 "interleave"_a = 1,
@@ -411,7 +412,7 @@ private:
         // block_len = message_len + ecc_len
         // chunk_size = block_len * interleave
 
-        auto temp1_ecc6 = new_aligned<GFT>(std::max(block_len, ecc_len * 6) * SIMD_W, SIMD_W * sizeof(GFT));
+        auto temp1_ecc6 = new_aligned<GFT>((block_len + ecc_len * 6) * SIMD_W, SIMD_W * sizeof(GFT));
         auto buf = new_aligned<GFT>(block_len * SIMD_W, SIMD_W * sizeof(GFT));
 
         message += col_start;
@@ -616,7 +617,7 @@ private:
                 rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
 
             } else {
-                auto temp1_ecc6 = new_aligned<GFT>(std::max(block_len, ecc_len * 6), sizeof(GFT));
+                auto temp1_ecc6 = new_aligned<GFT>(block_len + ecc_len * 6, sizeof(GFT));
                 rs16.repair(&buf[0], &temp1_ecc6[0]);
             }
 

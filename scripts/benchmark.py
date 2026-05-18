@@ -324,10 +324,21 @@ def decode_throughput(args):
     assert ecc_ratio_num == 1
     assert ecc_ratio_den > 0 and (ecc_ratio_den & (ecc_ratio_den - 1)) == 0
 
+    extra_args = dict()
+    if args.no_simd:
+        extra_args["simd_x4"] = False
+        extra_args["simd_x8"] = False
+        extra_args["simd_x16"] = False
+
     rsi_ecc, rsi_block = parse_ratio(args.hash_ratio)
     rso_block = block_size // rsi_block
     rs = ffrs.CIRC(
-        rsi_block // 2, rsi_ecc // 2, rso_block, rso_block * ecc_ratio_num // ecc_ratio_den, args.outer_interleave
+        rsi_block // 2,
+        rsi_ecc // 2,
+        rso_block,
+        rso_block * ecc_ratio_num // ecc_ratio_den,
+        args.outer_interleave,
+        **extra_args,
     )
 
     assert rs.block_size == block_size * args.outer_interleave
@@ -338,13 +349,18 @@ def decode_throughput(args):
 
     data = random_bytearray(rs.message_size)
 
+    if args.errors_per_col is None:
+        args.errors_per_col = 4
+
     def add_errors(data):
-        pos = 0
-        while pos < len(data):
-            data[pos] ^= random.randint(1, 255)
-            pos += rs.rsi.message_len + 2
+        for col in range(rs.inner_message_len):
+            error_positions = random.sample(range(rs.outer_message_len), args.errors_per_col)
+            for pos in error_positions:
+                data[pos * rs.inner_message_size + col * 2] ^= random.randint(1, 255)
+                data[pos * rs.inner_message_size + col * 2 + 1] ^= random.randint(1, 255)
 
     ecc = rs.encode(data)
+    # orig = bytearray(data)
 
     benchmark_throughput(
         f"rs.repair(data, ecc)",
@@ -352,6 +368,8 @@ def decode_throughput(args):
         setup="add_errors(data)",
         input_size=len(data),
     )
+
+    # assert data == orig
 
 
 def main():
@@ -377,6 +395,8 @@ def main():
 
     # CIRC decode throughput
     parser_dec = subparsers.add_parser("dec_throughput", help="Benchmark CIRC decode throughput")
+    parser_dec.add_argument("--no-simd", action="store_true", help="Disable SIMD optimizations")
+    parser_dec.add_argument("--errors-per-col", type=int, default=None, help="Number of errors to introduce per column")
     parser_dec.add_argument("block_size")
     parser_dec.add_argument("ecc_ratio")
     parser_dec.add_argument("hash_ratio")
