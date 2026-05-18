@@ -57,13 +57,13 @@ class RSi16md(libffrs.RSi16md):
             err_loc_coefs = ref.linalg.gaussian_elim(mat, [GF(0) - s for s in synds[err_count:2*err_count]])
             lm = ref.P(GF, [1] + err_loc_coefs[::-1])
 
-            err_pos_rbo = [i for i in range(self.block_len) if int(lm.eval(w.inv().pow(i))) == 0]
+            err_pos_rbo = [i for i in range(self.codeword_len) if int(lm.eval(w.inv().pow(i))) == 0]
             if err_pos_rbo:
                 break
         else:
             raise RuntimeError("Decoding failed")
 
-        return [rbo(self.block_len, pos) for pos in err_pos_rbo]
+        return [rbo(self.codeword_len, pos) for pos in err_pos_rbo]
 
     def __repr__(self):
-        return f"RSi16md({self.block_len}, ecc_len={self.ecc_len})"
+        return f"RSi16md({self.rs_block_len}, ecc_len={self.rs_ecc_len}{f", interleave={self.interleave}" if self.interleave != 1 else ""})"

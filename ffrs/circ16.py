@@ -15,7 +15,7 @@
 #  limitations under the License.
 
 import libffrs
-
+from . import rsi16md
 
 class CIRC(libffrs.CIRCi16):
     def check(self, data, ecc, synd=None):
