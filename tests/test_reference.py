@@ -1,4 +1,3 @@
-
 #  rest_reference.py
 #
 #  Copyright 2025 Gabriel Machado
@@ -25,17 +24,16 @@ from ffrs.reference.util import sample_field
 GF256 = GF(2, 8)
 
 
-fields = [
-    GF(p) for p in [2, 3, 5, 7, 11, 13, 127, 257]] + [
-
-    GF(2, 8, 2, 0x11d),
+fields = [GF(p) for p in [2, 3, 5, 7, 11, 13, 127, 257]] + [
+    GF(2, 8, 2, 0x11D),
     GF(2, 1, 1),
     GF(3, 4),
     GF(5, 3),
     GF(7, 2),
     GF(11, 2),
-    GF(2, 16, 2, 0x1002d)
+    GF(2, 16, 2, 0x1002D),
 ]
+
 
 @pytest.mark.parametrize("GF", fields)
 def test_field(GF):
@@ -57,12 +55,12 @@ def test_field(GF):
         except ZeroDivisionError:
             pass
 
-        assert_eq(a,    zero,   a * zero,       zero)
-        assert_eq(zero, a,      zero // a,      zero)
-        assert_eq(a,    one,    a * one,        a)
-        assert_eq(a,    a,      a.inv() * a,    one)
-        assert_eq(a,    a,      a.inv().inv(),  a)
-        assert_eq(one,  a,      a.inv(),        one // a)
+        assert_eq(a, zero, a * zero, zero)
+        assert_eq(zero, a, zero // a, zero)
+        assert_eq(a, one, a * one, a)
+        assert_eq(a, a, a.inv() * a, one)
+        assert_eq(a, a, a.inv().inv(), a)
+        assert_eq(one, a, a.inv(), one // a)
 
         for j in sample_field(GF, start=1, samples=50):
             b = GF(j)
@@ -93,12 +91,12 @@ def test_gf256():
     assert str(g) == "𝑥⁴ + 15𝑥³ + 54𝑥² + 120𝑥 + 64"
 
     for i in range(4):
-        assert int(g.eval(GF256.gen(i))) == 0, (i)
+        assert int(g.eval(GF256.gen(i))) == 0, i
 
     assert len(list(GF.irr_polynomials(2, 8, 2))) == 16
 
 
-@pytest.mark.parametrize('n', [1, 2, 3, 4, 5, 10, 20])
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 10, 20])
 def test_matmul(n):
     id1 = identity(GF256, n)
     id2 = identity(GF256, n)
@@ -107,7 +105,7 @@ def test_matmul(n):
     assert id1 == matmul(GF256, id2, id3)
 
 
-@pytest.mark.parametrize('n', [1, 2, 3, 4, 5, 10, 20])
+@pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 10, 20])
 def test_vandermonde_inverse(n):
     id = identity(GF256, n)
     v = vandermonde_ntt(GF256(2), n)
@@ -116,4 +114,3 @@ def test_vandermonde_inverse(n):
     assert v == vandermonde_ntt(GF256(2), n)
     assert id == matmul(GF256, v, vi)
     assert inverse(GF256, vi) == v
-

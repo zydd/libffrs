@@ -5,7 +5,6 @@ import ffrs.reference.ntt as ref_ntt
 import ffrs.reference.rs as ref_rs
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted
 
-
 GF = ref.GF(0x10001, 1, 3)
 ntt = lambda w, x: ref_ntt.ntt(GF, w, x)
 intt = lambda w, x: ref_ntt.intt(GF, w, x)
@@ -56,7 +55,7 @@ def forney(locator, evaluator):
 
     err_val = []
     for pos in err_pos:
-        err_val.append(- w**pos * evaluator.eval(w**-pos) // locator.deriv().eval(w**-pos))
+        err_val.append(-(w**pos) * evaluator.eval(w**-pos) // locator.deriv().eval(w**-pos))
 
     err_pos = [rbo(size, i) for i in err_pos]
     print("err_pos:", err_pos)
@@ -93,7 +92,7 @@ def test():
     print()
 
     e = [GF(0) for i in range(size)]
-    err_pos = [random.randint(0, size-1) for _ in range(1)]
+    err_pos = [random.randint(0, size - 1) for _ in range(1)]
     for pos in err_pos:
         e[pos] += GF(random.randint(0, 0x10000))
     print("e:", to_int_list(e))

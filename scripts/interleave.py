@@ -5,7 +5,6 @@ for src_size in [48]:
     interleave = 2
     dst = [0] * ((dst_rows + 2) * dst_cols)
 
-
     def interleave1(src, dst):
         for i in range(len(src)):
             col = i % interleave + interleave * (i // (interleave * dst_rows))
@@ -21,7 +20,7 @@ for src_size in [48]:
             for row in range(max_rows):
                 for col in range(min(interleave, dst_cols)):
                     src_pos = int_col * dst_rows + row * interleave + col
-                    dst_pos = int_col            + row * dst_cols   + col
+                    dst_pos = int_col + row * dst_cols + col
                     assert dst[dst_pos] == 0
                     assert src_pos == count
 
@@ -58,11 +57,12 @@ for src_size in [48]:
         # deinterleave(list(dst), dst)
     except:
         import traceback
+
         traceback.print_exc()
         print("src_size:", src_size)
         raise
 
     for i in range(len(dst) // dst_cols):
-        print(dst[i * dst_cols:(i + 1) * dst_cols])
+        print(dst[i * dst_cols : (i + 1) * dst_cols])
 
     print()

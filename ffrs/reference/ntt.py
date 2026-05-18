@@ -1,9 +1,10 @@
 from ffrs.reference import P
 from ffrs.reference.linalg import *
 
+
 def ntt(GF, w, arr):
     poly = P(GF, arr)
-    return [poly.eval(w ** i) for i in range(len(arr))]
+    return [poly.eval(w**i) for i in range(len(arr))]
 
 
 def intt(GF, w, arr):
@@ -55,4 +56,3 @@ def vandermonde_neg_intt(p, n):
 #         # res[j] /= len(arr)
 
 #     return res
-

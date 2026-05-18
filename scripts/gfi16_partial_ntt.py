@@ -4,7 +4,6 @@ import ffrs.reference as ref
 import ffrs.reference.ntt as ref_ntt
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted
 
-
 GF = ref.GF(0x10001, 1, 3)
 
 ntt = lambda w, x: ref_ntt.ntt(GF, w, rbo_sorted(x))
@@ -25,26 +24,26 @@ assert (w**ecc_decimation) ** ecc == 1
 
 pntt_shift = []
 for i in range(size):
-    blk =  (i // ecc) * ecc
+    blk = (i // ecc) * ecc
     j = i - blk
     pntt_shift.append(w ** (j * rbo(size, blk)))
 
 
 def partial_ntt(buf):
     for i in range(ecc_decimation):
-        buf[i*ecc:(i+1)*ecc] = ntt(w ** ecc_decimation, buf[i*ecc:(i+1)*ecc])
+        buf[i * ecc : (i + 1) * ecc] = ntt(w**ecc_decimation, buf[i * ecc : (i + 1) * ecc])
 
     for i in range(size):
         buf[i] *= pntt_shift[i]
 
     for i in range(1, ecc_decimation):
-        buf[:ecc] = [a + b for a, b in zip(buf[0:ecc], buf[i*ecc:(i+1)*ecc])]
+        buf[:ecc] = [a + b for a, b in zip(buf[0:ecc], buf[i * ecc : (i + 1) * ecc])]
 
     return buf[:ecc]
 
 
 def partial_ntt_block(ecc, shift):
-    ecc = ntt(w ** ecc_decimation, ecc)
+    ecc = ntt(w**ecc_decimation, ecc)
     ecc = [e * w ** (shift * i) for i, e in enumerate(ecc)]
     return ecc
 
@@ -60,13 +59,13 @@ def test():
     b1 = b[:ecc] + [0] * (size - ecc)
     print("b1:", to_int_list(b1))
 
-    b2 = [0] * ecc + b[ecc:2*ecc] + [0] * (size - ecc * 2)
+    b2 = [0] * ecc + b[ecc : 2 * ecc] + [0] * (size - ecc * 2)
     print("b2:", to_int_list(b2))
 
-    b3 = [0] * ecc * 2 + b[2*ecc:3*ecc] + [0] * (size - ecc * 3)
+    b3 = [0] * ecc * 2 + b[2 * ecc : 3 * ecc] + [0] * (size - ecc * 3)
     print("b3:", to_int_list(b3))
 
-    b4 = [0] * ecc * 3 + b[3*ecc:]
+    b4 = [0] * ecc * 3 + b[3 * ecc :]
     print("b4:", to_int_list(b4))
 
     print()
@@ -76,15 +75,15 @@ def test():
     print("B1:", to_int_list(B1))
     print("B1:", to_int_list(B11))
     B2 = ntt(w, b2)
-    B21 = partial_ntt_block(b[ecc:2*ecc], shift=rbo(size, ecc))
+    B21 = partial_ntt_block(b[ecc : 2 * ecc], shift=rbo(size, ecc))
     print("B2:", to_int_list(B2))
     print("B2:", to_int_list(B21))
     B3 = ntt(w, b3)
-    B31 = partial_ntt_block(b[2*ecc:3*ecc], shift=rbo(size, 2*ecc))
+    B31 = partial_ntt_block(b[2 * ecc : 3 * ecc], shift=rbo(size, 2 * ecc))
     print("B3:", to_int_list(B3))
     print("B3:", to_int_list(B31))
     B4 = ntt(w, b4)
-    B41 = partial_ntt_block(b[3*ecc:], shift=rbo(size, 3*ecc))
+    B41 = partial_ntt_block(b[3 * ecc :], shift=rbo(size, 3 * ecc))
     print("B4:", to_int_list(B4))
     print("B4:", to_int_list(B41))
 

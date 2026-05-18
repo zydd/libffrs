@@ -1,4 +1,3 @@
-
 #  util.py
 #
 #  Copyright 2025 Gabriel Machado
@@ -46,7 +45,7 @@ def to_bytearray(v, sizeof=2, byteorder="little"):
     buf = bytearray(len(v) * sizeof)
     mask = 2 ** (8 * sizeof) - 1
     for i, v in enumerate(v):
-        buf[i * sizeof:(i + 1) * sizeof] = int.to_bytes(v & mask, sizeof, byteorder)
+        buf[i * sizeof : (i + 1) * sizeof] = int.to_bytes(v & mask, sizeof, byteorder)
     return buf
 
 
@@ -55,7 +54,7 @@ def to_int_list(v, sizeof=2, byteorder="little"):
         return list(map(int, v))
     else:
         assert sizeof, "Must specify sizeof for byte objects"
-        return [int.from_bytes(v[i:i+sizeof], byteorder) for i in range(0, len(v), sizeof)]
+        return [int.from_bytes(v[i : i + sizeof], byteorder) for i in range(0, len(v), sizeof)]
 
 
 def randbytes(n, start=0, stop=256):

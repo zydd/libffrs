@@ -20,6 +20,7 @@ def is_primitive(g, p):
     assert pow(g, order, p) == 1
     return True
 
+
 def find_primitive_elements(p, count=10):
     found = []
     for g in range(2, p):
@@ -29,8 +30,10 @@ def find_primitive_elements(p, count=10):
                 break
     return found
 
+
 if __name__ == "__main__":
     import sys
+
     p = int(sys.argv[1])
     primitives = find_primitive_elements(p, count=10)
     print("First 10 primitive elements:")

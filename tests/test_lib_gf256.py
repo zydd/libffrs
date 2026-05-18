@@ -1,4 +1,3 @@
-
 #  test_lib_gf256.py
 #
 #  Copyright 2024 Gabriel Machado
@@ -27,39 +26,51 @@ GF256 = ffrs.GF256()
 GF256_ref = ffrs.reference.GF(2, 8, GF256.primitive, GF256.poly1 | 0x100)
 
 
-@pytest.mark.parametrize('fn, id', [
-    (GF256.add, 0),
-    (GF256.sub, 0),
-    (GF256.mul, 1),
-    (GF256.div, 1),
-])
+@pytest.mark.parametrize(
+    "fn, id",
+    [
+        (GF256.add, 0),
+        (GF256.sub, 0),
+        (GF256.mul, 1),
+        (GF256.div, 1),
+    ],
+)
 def test_scalar_identity(fn, id):
     for a in range(256):
         assert fn(a, id) == a, a
 
 
-@pytest.mark.parametrize('fn1, fn2', [
-    (GF256.exp, GF256.log),
-])
+@pytest.mark.parametrize(
+    "fn1, fn2",
+    [
+        (GF256.exp, GF256.log),
+    ],
+)
 def test_scalar_inverse1(fn1, fn2):
     for a in range(1, 256):
         assert fn2(fn1(a)) == a, a
 
 
-@pytest.mark.parametrize('fn1, fn2', [
-    (GF256.add, GF256.sub),
-    (GF256.mul, GF256.div),
-])
+@pytest.mark.parametrize(
+    "fn1, fn2",
+    [
+        (GF256.add, GF256.sub),
+        (GF256.mul, GF256.div),
+    ],
+)
 def test_scalar_inverse2(fn1, fn2):
     for a, b in itertools.product(range(256), range(1, 256)):
         assert fn2(fn1(a, b), b) == a, (a, b)
 
 
-@pytest.mark.parametrize('fn', [
-    GF256.add,
-    GF256.sub,
-    GF256.mul,
-])
+@pytest.mark.parametrize(
+    "fn",
+    [
+        GF256.add,
+        GF256.sub,
+        GF256.mul,
+    ],
+)
 def test_scalar_commutativity(fn):
     for a, b in itertools.product(range(256), range(256)):
         assert fn(a, b) == fn(b, a)
@@ -94,10 +105,13 @@ def test_poly_add_identity():
         assert res == a
 
 
-@pytest.mark.parametrize('fn', [
-    GF256.poly_add,
-    GF256.poly_sub,
-])
+@pytest.mark.parametrize(
+    "fn",
+    [
+        GF256.poly_add,
+        GF256.poly_sub,
+    ],
+)
 def test_poly_different_sizes(fn):
     for size_a, size_b in itertools.product(range(32), range(32)):
         a = randbytes(size_a)
@@ -160,6 +174,7 @@ def test_poly_mod_x_n():
             res = GF256.poly_mod_x_n(a, b[1:])
 
             assert res_r == res
+
 
 def test_poly_eval():
     for size in range(1, 32):

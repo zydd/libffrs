@@ -4,9 +4,9 @@ from ffrs.reference.linalg import *
 
 GF2 = GF(2)
 
-m = P(GF2, 0xabcdef12)
+m = P(GF2, 0xABCDEF12)
 
-poly = P(GF2, 0x11d)
+poly = P(GF2, 0x11D)
 print("ref div", hex(GF.poly_to_int(2, m // poly)))
 print("ref rem", hex(GF.poly_to_int(2, m % poly)))
 
@@ -27,4 +27,4 @@ assert div == m // poly
 rem = m - div * poly
 print("rem", hex(GF.poly_to_int(2, rem)))
 assert rem == m % poly
-0xcddd2dae724d58eb50f9d5f0
+0xCDDD2DAE724D58EB50F9D5F0

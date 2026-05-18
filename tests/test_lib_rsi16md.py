@@ -1,4 +1,3 @@
-
 #  test_lib_rsi16md.py
 #
 #  Copyright 2026 Gabriel Machado
@@ -23,7 +22,6 @@ import ffrs.reference as ref
 import ffrs.reference.rs as ref_rs
 import ffrs.reference.ntt
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, randbytes
-
 
 ref_gf = ref.GF(65537, 1, 3)
 
@@ -61,7 +59,7 @@ class BaseTestRS:
         w = ref_gf(rs.root)
         buf_ntt = ref_ntt(w, to_int_list(buf + bytearray(rs.ntt_size - len(buf))))
 
-        ecc_mix = rs._mix_ecc(buf_ntt[:rs.ecc_len])
+        ecc_mix = rs._mix_ecc(buf_ntt[: rs.ecc_len])
 
         assert to_bytearray(ecc_mix) == res
 
@@ -72,7 +70,7 @@ class BaseTestRS:
         msg_err = list(msg_orig)
         ecc_err = list(ecc_orig)
 
-        msg_err, ecc_err, _error_positions = self.add_errors(msg_err, ecc_err, max(rs.ecc_len//2 - grace, 1))
+        msg_err, ecc_err, _error_positions = self.add_errors(msg_err, ecc_err, max(rs.ecc_len // 2 - grace, 1))
 
         assert msg_err + ecc_err != msg_orig + ecc_orig
 
@@ -143,8 +141,7 @@ class BaseTestRS:
     def test_encode_blocks_multiple(self, rs, count):
         buf = randbytes(rs.message_size * count)
 
-        buf_enc = [rs.encode(buf[i * rs.message_size:(i + 1) * rs.message_size])
-                        for i in range(count)]
+        buf_enc = [rs.encode(buf[i * rs.message_size : (i + 1) * rs.message_size]) for i in range(count)]
         buf_enc = b"".join(buf_enc)
         buf_enc_blk = rs.encode(buf)
 
@@ -157,8 +154,7 @@ class BaseTestRS:
         extra = (extra % rs.message_size) or 2
         buf = randbytes(rs.message_size * count + extra)
 
-        buf_enc = [rs.encode(buf[i * rs.message_size:(i + 1) * rs.message_size])
-                        for i in range(count)]
+        buf_enc = [rs.encode(buf[i * rs.message_size : (i + 1) * rs.message_size]) for i in range(count)]
 
         buf_enc += [rs.encode(buf[-extra:] + bytearray(rs.message_size - extra))]
         buf_enc = b"".join(buf_enc)
@@ -171,8 +167,12 @@ class BaseTestRS:
     def test_encode_interleaved(self, rs, interleave):
         assert rs.interleave == 1
         rsi = ffrs.RSi16md(
-            rs.block_len, rs.message_len, interleave=interleave,
-            simd_x4=rs.simd_x4, simd_x8=rs.simd_x8, simd_x16=rs.simd_x16
+            rs.block_len,
+            rs.message_len,
+            interleave=interleave,
+            simd_x4=rs.simd_x4,
+            simd_x8=rs.simd_x8,
+            simd_x16=rs.simd_x16,
         )
 
         data = list(range(interleave * rs.message_len))
@@ -199,8 +199,12 @@ class BaseTestRS:
 
         assert rs.interleave == 1
         rsi = ffrs.RSi16md(
-            rs.block_len, rs.message_len, interleave=interleave,
-            simd_x4=rs.simd_x4, simd_x8=rs.simd_x8, simd_x16=rs.simd_x16
+            rs.block_len,
+            rs.message_len,
+            interleave=interleave,
+            simd_x4=rs.simd_x4,
+            simd_x8=rs.simd_x8,
+            simd_x16=rs.simd_x16,
         )
 
         msg_orig = list(range(rsi.message_len))
@@ -215,7 +219,8 @@ class BaseTestRS:
         errors = []
         for i in range(interleave):
             msg_err[i::interleave], ecc_err[i::interleave], col_errs = self.add_errors(
-                msg_err[i::interleave], ecc_err[i::interleave], max(rs.ecc_len//2 - grace, 1))
+                msg_err[i::interleave], ecc_err[i::interleave], max(rs.ecc_len // 2 - grace, 1)
+            )
             errors.append(col_errs)
 
         print(errors)
@@ -242,8 +247,12 @@ class BaseTestRS:
 
         assert rs.interleave == 1
         rsi = ffrs.RSi16md(
-            rs.block_len, rs.message_len, interleave=interleave,
-            simd_x4=rs.simd_x4, simd_x8=rs.simd_x8, simd_x16=rs.simd_x16
+            rs.block_len,
+            rs.message_len,
+            interleave=interleave,
+            simd_x4=rs.simd_x4,
+            simd_x8=rs.simd_x8,
+            simd_x16=rs.simd_x16,
         )
 
         msg_orig = list(range(rsi.message_len))
@@ -257,7 +266,8 @@ class BaseTestRS:
 
         # Aligned errors
         msg_err[::interleave], ecc_err[::interleave], errors = self.add_errors(
-            msg_err[::interleave], ecc_err[::interleave], max(rs.ecc_len//2 - grace, 1))
+            msg_err[::interleave], ecc_err[::interleave], max(rs.ecc_len // 2 - grace, 1)
+        )
         for i in range(1, interleave):
             for pos, _err in errors.items():
                 if pos < rs.message_len:
@@ -281,48 +291,53 @@ class BaseTestRS:
         assert msg_buf_err + ecc_buf_err == msg_buf_orig + ecc_buf_orig
 
 
-@pytest.mark.parametrize("rs", [
-    ffrs.RSi16md(4, ecc_len=2),
-    ffrs.RSi16md(8, ecc_len=2),
-    ffrs.RSi16md(16, ecc_len=4),
-    ffrs.RSi16md(16, ecc_len=8),
-    ffrs.RSi16md(128, ecc_len=2),
-    ffrs.RSi16md(256, ecc_len=32),
-    # ffrs.RSi16md(1024, ecc_len=128),
-    # ffrs.RSi16md(4096, ecc_len=512),
-
-    ffrs.RSi16md(4, ecc_len=2, simd_x16=False),
-    ffrs.RSi16md(16, ecc_len=4, simd_x16=False),
-    ffrs.RSi16md(128, ecc_len=2, simd_x16=False),
-    ffrs.RSi16md(256, ecc_len=32, simd_x16=False),
-    # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False),
-    # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False),
-
-    ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False),
-    ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False),
-    ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False),
-    ffrs.RSi16md(256, ecc_len=32, simd_x16=False, simd_x8=False),
-    # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False),
-    # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False),
-
-    ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
-    ffrs.RSi16md(256, ecc_len=32, simd_x16=False, simd_x8=False, simd_x4=False),
-    # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
-    # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False, simd_x4=False),
-])
+@pytest.mark.parametrize(
+    "rs",
+    [
+        ffrs.RSi16md(4, ecc_len=2),
+        ffrs.RSi16md(8, ecc_len=2),
+        ffrs.RSi16md(16, ecc_len=4),
+        ffrs.RSi16md(16, ecc_len=8),
+        ffrs.RSi16md(128, ecc_len=2),
+        ffrs.RSi16md(256, ecc_len=32),
+        # ffrs.RSi16md(1024, ecc_len=128),
+        # ffrs.RSi16md(4096, ecc_len=512),
+        ffrs.RSi16md(4, ecc_len=2, simd_x16=False),
+        ffrs.RSi16md(16, ecc_len=4, simd_x16=False),
+        ffrs.RSi16md(128, ecc_len=2, simd_x16=False),
+        ffrs.RSi16md(256, ecc_len=32, simd_x16=False),
+        # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False),
+        # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False),
+        ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False),
+        ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False),
+        ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False),
+        ffrs.RSi16md(256, ecc_len=32, simd_x16=False, simd_x8=False),
+        # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False),
+        # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False),
+        ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
+        ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False, simd_x4=False),
+        ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
+        ffrs.RSi16md(256, ecc_len=32, simd_x16=False, simd_x8=False, simd_x4=False),
+        # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
+        # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False, simd_x4=False),
+    ],
+)
 class TestRSPower2(BaseTestRS):
     pass
 
 
-@pytest.mark.parametrize("rs", [
-    ffrs.RSi16md(16 * 13, ecc_len=8),
-    ffrs.RSi16md(256 * 3, ecc_len=8),
-])
+@pytest.mark.parametrize(
+    "rs",
+    [
+        ffrs.RSi16md(16 * 13, ecc_len=8),
+        ffrs.RSi16md(256 * 3, ecc_len=8),
+    ],
+)
 class TestRSMult(BaseTestRS):
     # Limited support for multiples of powers of 2
     # TODO: partial intt or switch to forney algo
     @pytest.mark.skip
-    def test_skip(self, rs): pass
+    def test_skip(self, rs):
+        pass
+
     test_repair = test_skip

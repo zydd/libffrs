@@ -1,4 +1,3 @@
-
 #  rsi16md.py
 #
 #  Copyright 2026 Gabriel Machado
@@ -19,7 +18,6 @@ import libffrs
 
 import ffrs.reference as ref
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted
-
 
 GF = ref.GF(65537, 1, 3)
 ntt = lambda w, x: to_int_list(ref.ntt.ntt(GF, w, rbo_sorted(x)))
@@ -43,7 +41,7 @@ class RSi16md(libffrs.RSi16md):
         w = GF(self.root)
 
         msg1_list = to_int_list(msg1, 2)
-        synds = ntt(w, msg1_list)[:self.ecc_len]
+        synds = ntt(w, msg1_list)[: self.ecc_len]
 
         if all(s == 0 for s in synds):
             return []
@@ -52,9 +50,9 @@ class RSi16md(libffrs.RSi16md):
         synds = GF(synds)
 
         for err_count in range(self.ecc_len // 2, 0, -1):
-            mat = [synds[i:i+err_count] for i in range(err_count)]
+            mat = [synds[i : i + err_count] for i in range(err_count)]
 
-            err_loc_coefs = ref.linalg.gaussian_elim(mat, [GF(0) - s for s in synds[err_count:2*err_count]])
+            err_loc_coefs = ref.linalg.gaussian_elim(mat, [GF(0) - s for s in synds[err_count : 2 * err_count]])
             lm = ref.P(GF, [1] + err_loc_coefs[::-1])
 
             err_pos_rbo = [i for i in range(self.codeword_len) if int(lm.eval(w.inv().pow(i))) == 0]

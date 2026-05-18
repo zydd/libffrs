@@ -4,7 +4,6 @@ import ffrs.reference as ref
 import ffrs.reference.ntt as ref_ntt
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted
 
-
 GF = ref.GF(0x10001, 1, 3)
 ntt = lambda w, x: rbo_sorted(ref_ntt.ntt(GF, w, x))
 intt = lambda w, x: rbo_sorted(ref_ntt.intt(GF, w, x))
@@ -23,6 +22,7 @@ ecc_decimation = size // ecc
 w = GF(roots_of_unity[round(math.log2(size))])
 assert w**size == 1
 
+
 def _mix_ecc(ecc_mix):
     # i = 1
     # i = size - ecc
@@ -33,8 +33,8 @@ def _mix_ecc(ecc_mix):
 
     # ecc_mix = [GF(s) * (-w**(-ecc_decimation * i * j)) for j, s in enumerate(ecc_mix)]
 
-    ecc_mix = ecc_mix # * ecc_decimation
-    ecc_mix = intt(w ** ecc_decimation, ecc_mix)
+    ecc_mix = ecc_mix  # * ecc_decimation
+    ecc_mix = intt(w**ecc_decimation, ecc_mix)
 
     # ecc_mix = [-s for s in ecc_mix]
     # print("ecc_mix:", ecc_mix)
@@ -44,6 +44,7 @@ def _mix_ecc(ecc_mix):
 
     return ecc_mix
 
+
 def _unmix_ecc(ecc_mix):
     ecc_unmix = ecc_mix
     # ecc_unmix = [0] * (size - ecc) + ecc_unmix
@@ -52,7 +53,7 @@ def _unmix_ecc(ecc_mix):
     # i = rbo(size, i)
     # ecc_unmix = [GF(s) * (w**(ecc_decimation * i * j)) for j, s in enumerate(ecc_unmix)]
 
-    ecc_unmix = ntt_rbo(w ** ecc_decimation, ecc_unmix)
+    ecc_unmix = ntt_rbo(w**ecc_decimation, ecc_unmix)
     ecc_unmix = ecc_unmix[:ecc]
     # ecc_unmix = rbo_sorted(ecc_unmix)
 
@@ -90,19 +91,18 @@ def find_errors(msg1):
 
     for err_count in range(ecc // 2, 0, -1):
         try:
-            mat = [synds[i:i+err_count] for i in range(err_count)]
+            mat = [synds[i : i + err_count] for i in range(err_count)]
 
-            err_loc_coefs = ref.linalg.gaussian_elim(mat, [-s for s in synds[err_count:2*err_count]])
+            err_loc_coefs = ref.linalg.gaussian_elim(mat, [-s for s in synds[err_count : 2 * err_count]])
             lm = ref.P(GF, [1] + err_loc_coefs[::-1])
 
-            err_pos = [i for i in range(size * 2) if int(lm.eval(w ** -i)) == 0]
+            err_pos = [i for i in range(size * 2) if int(lm.eval(w**-i)) == 0]
             if err_pos:
                 break
         except:
             continue
     else:
         raise RuntimeError("Decoding failed")
-
 
     err_ws = [[w ** (err_pos[i] * j) for i in range(err_count)] for j in range(err_count)]
     # err_pos = [rbo(size, i) for i in err_pos]

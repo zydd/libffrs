@@ -11,11 +11,13 @@ def _vec_mul(vec, i, v):
     else:
         vec[i] *= v
 
+
 def _clone_mat(mat):
     if type(mat) is list:
         return [_clone_mat(x) for x in mat]
     else:
         return mat
+
 
 def gaussian_elim(mat, vec):
     assert len(mat) == len(mat[0]) == len(vec)
@@ -26,7 +28,7 @@ def gaussian_elim(mat, vec):
 
     for k in range(len(mat)):
         row_max = k
-        while mat[row_max][k] == 0 and row_max < N-1:
+        while mat[row_max][k] == 0 and row_max < N - 1:
             row_max += 1
 
         if k != row_max:
@@ -45,7 +47,7 @@ def gaussian_elim(mat, vec):
             for col in range(k, N):
                 mat[row][col] -= mat[k][col] * factor
 
-        for row in range(k-1, -1, -1):
+        for row in range(k - 1, -1, -1):
             factor = mat[row][k]
             _vec_sub(vec, row, k, factor)
             for col in range(k, N):
@@ -66,6 +68,7 @@ def inverse(GF, mat):
 def transpose(mat):
     return [[mat[i][j] for i in range(len(mat))] for j in range(len(mat[0]))]
 
+
 def matmul(GF, a, b):
     assert len(a[0]) == len(b)
     vector = type(b[0]) is not list
@@ -82,7 +85,7 @@ def matmul(GF, a, b):
 
 
 def print_mat(mat):
-    assert(len(mat) >= 2)
+    assert len(mat) >= 2
 
     print(f"[{[int(x) for x in mat[0]]},")
     for row in mat[1:-1]:

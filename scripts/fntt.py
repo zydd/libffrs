@@ -3,7 +3,7 @@ import itertools
 import math
 import random
 
-import  ffrs.reference.ntt as ref_ntt
+import ffrs.reference.ntt as ref_ntt
 import ffrs.reference
 from ffrs.reference.util import *
 import ffrs.reference.ntt as ntt
@@ -25,9 +25,11 @@ def primes():
 
 def prime_root(n):
     for p in primes():
-        if p < n: continue
+        if p < n:
+            continue
         # print("p:", p, end='\r')
-        if p % n == 1: yield p
+        if p % n == 1:
+            yield p
 
 
 def naive_ntt(a, w, q):
@@ -47,7 +49,7 @@ def naive_intt(a, gen, modulus):
     omegas = [0] * size
     omegas[0] = 1
     for i in range(1, len(omegas)):
-        omegas[i] = omegas[i-1] * pow(gen, -1, modulus) % modulus
+        omegas[i] = omegas[i - 1] * pow(gen, -1, modulus) % modulus
 
     for i in range(size):
         for j in range(size):
@@ -99,9 +101,9 @@ def ct_ntt_iter(a, root, q, start_pos=None, end_pos=None):
 
                 # Cooley-Tukey butterfly.
                 a = res[i]
-                b = res[i+stride]
+                b = res[i + stride]
                 res[i] = (a + zp * b) % q
-                res[i+stride] = (a - zp * b) % q
+                res[i + stride] = (a - zp * b) % q
 
         # Grow the stride.
         stride <<= 1
@@ -140,9 +142,9 @@ def gs_ntt_iter(a, root, q, end_pos=None):
 
                 # Gentleman-Sande butterfly.
                 a = res[i]
-                b = res[i+stride]
+                b = res[i + stride]
                 res[i] = (a + b) % q
-                res[i+stride] = ((a - b) * zp) % q
+                res[i + stride] = ((a - b) * zp) % q
 
         # Grow the stride.
         stride >>= 1
@@ -210,11 +212,10 @@ print()
 
 
 assert a_ntt_naive == a_ntt_ref == a_ntt == a_ntt_v
-assert a == a_intt_naive == a_intt_ref ==  a_intt_ct == a_intt_v == a_intt_gs
+assert a == a_intt_naive == a_intt_ref == a_intt_ct == a_intt_v == a_intt_gs
 
 
-
-end = n//2
+end = n // 2
 gs_partial = gs_ntt_iter(a, w, q, end_pos=end)
 ct_partial = ct_ntt_iter(a, w, q)
 print("a:   ", gs_partial)

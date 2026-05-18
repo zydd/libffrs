@@ -326,7 +326,9 @@ def decode_throughput(args):
 
     rsi_ecc, rsi_block = parse_ratio(args.hash_ratio)
     rso_block = block_size // rsi_block
-    rs = ffrs.CIRC(rsi_block // 2, rsi_ecc // 2, rso_block, rso_block * ecc_ratio_num // ecc_ratio_den, args.outer_interleave)
+    rs = ffrs.CIRC(
+        rsi_block // 2, rsi_ecc // 2, rso_block, rso_block * ecc_ratio_num // ecc_ratio_den, args.outer_interleave
+    )
 
     assert rs.block_size == block_size * args.outer_interleave
 

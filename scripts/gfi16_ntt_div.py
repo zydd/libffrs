@@ -5,7 +5,6 @@ import ffrs.reference.ntt as ref_ntt
 import ffrs.reference.rs as ref_rs
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted
 
-
 GF = ref.GF(257, 1, 3)
 P = lambda x: ref.P(GF, x)
 
@@ -106,7 +105,6 @@ def test():
     print()
 
     assert rec_q == q, (q, rec_q)
-
 
 
 if __name__ == "__main__":

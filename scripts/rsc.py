@@ -13,6 +13,7 @@ arr = [GF256(x) for x in random.randbytes(n)]
 w = GF256(random.choice(pru[n]))
 print(f"w: {int(w)}  wi: {int(w.inv())}")
 
+
 def encode(message, ecc_len):
     message = list(message)
     codeword = [GF256(0)] * ecc_len
@@ -55,7 +56,7 @@ def decode_erasure(message, synd, ecc_len, err_pos):
 
     mat = [[xk.pow(i) for xk in Xs] for i in range(len(err_pos))]
 
-    Ys = gaussian_elim(mat, synd[:len(err_pos)])
+    Ys = gaussian_elim(mat, synd[: len(err_pos)])
     # print([[int(col) for col in row] for row in mat])
 
     print("Ys", [int(i) for i in Ys])
@@ -67,18 +68,17 @@ def decode_erasure(message, synd, ecc_len, err_pos):
 
 
 def find_errors(synd, n):
-    ne = len(synd)//2
+    ne = len(synd) // 2
 
-    mat = [synd[i:i+ne] for i in range(ne)]
+    mat = [synd[i : i + ne] for i in range(ne)]
 
     print_mat(mat)
 
-    err_loc_coefs = gaussian_elim(mat, synd[ne:2*ne])
+    err_loc_coefs = gaussian_elim(mat, synd[ne : 2 * ne])
     lm = P(GF256, [1] + err_loc_coefs[::-1])
 
     roots = [i for i in range(n) if int(lm.eval(GF256.a.pow(i).inv())) == 0]
     return roots
-
 
 
 ecc_len = 4
@@ -96,10 +96,10 @@ for _ in range(100):
 
     message_enc = encode(message, ecc_len)
     err_pos = set()
-    while len(err_pos) < ecc_len//2:
+    while len(err_pos) < ecc_len // 2:
         err_pos.add(random.randint(0, message_len + ecc_len - 1))
     err_mag = set()
-    while len(err_mag) < ecc_len//2:
+    while len(err_mag) < ecc_len // 2:
         err_mag.add(random.randint(1, 255))
     err_pos = list(err_pos)
     err_mag = list(err_mag)

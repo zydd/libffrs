@@ -13,8 +13,6 @@ n = 5
 arr = [GF256(x) for x in random.randbytes(n)]
 
 
-
-
 w = GF256(random.choice(pru[n]))
 print(f"w: {int(w)}  wi: {int(w.inv())}")
 
@@ -22,7 +20,7 @@ print(f"w: {int(w)}  wi: {int(w.inv())}")
 sru = [x for x in pru[n] if GF256(x).pow(2) == w]
 psi = GF256(next(iter(sru)))
 
-w_exp = [w.pow(i) for i in range(n+1)]
+w_exp = [w.pow(i) for i in range(n + 1)]
 c = circulant(w_exp)
 print_mat(c)
 ci = inverse(GF256, c)
@@ -41,4 +39,3 @@ print("log:")
 print_mat(c)
 
 quit()
-

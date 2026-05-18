@@ -45,4 +45,3 @@ print(f"wintt {[int(x) for x in arr_vwr]}")
 assert arr_vwr == arr
 assert arr_vr == arr
 assert arr_r == arr
-

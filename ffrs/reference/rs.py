@@ -5,7 +5,7 @@ from ffrs.reference.util import rbo
 def locator(GF, w, err_pos):
     poly = P(GF, [1])
     for pos in err_pos:
-        x = -w ** pos
+        x = -(w**pos)
         poly = poly * P(GF, [1, x])
     return poly
 
@@ -41,10 +41,9 @@ def forney(size, root, locator, evaluator):
 
     err_val = []
     for pos in err_pos:
-        err_val.append(- root**pos * evaluator.eval(root**-pos) // locator.deriv().eval(root**-pos))
+        err_val.append(-(root**pos) * evaluator.eval(root**-pos) // locator.deriv().eval(root**-pos))
 
     err_pos = [rbo(size, i) for i in err_pos]
     print("err_pos:", err_pos)
     print("err_val:", list(map(int, err_val)))
     return err_pos, err_val
-

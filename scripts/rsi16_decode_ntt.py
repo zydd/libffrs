@@ -5,7 +5,6 @@ import ffrs.reference.ntt as ref_ntt
 import ffrs.reference.rs as ref_rs
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted
 
-
 GF = ref.GF(0x10001, 1, 3)
 ntt = lambda w, x: ref_ntt.ntt(GF, w, x)
 intt = lambda w, x: ref_ntt.intt(GF, w, x)
@@ -78,7 +77,7 @@ def test():
     print()
 
     e = [GF(0) for i in range(size)]
-    err_pos = [random.randint(0, size-1) for _ in range(ecc//2)]
+    err_pos = [random.randint(0, size - 1) for _ in range(ecc // 2)]
     for pos in err_pos:
         e[pos] += GF(random.randint(0, 0x10000))
     print("e:", to_int_list(e))
@@ -107,7 +106,7 @@ def test():
     print()
 
     for j in range(ecc, size):
-        E[j] = -sum((l * e for l, e in zip(L.x[:0:-1], E[j - len(err_pos):j])), start=GF(0))
+        E[j] = -sum((l * e for l, e in zip(L.x[:0:-1], E[j - len(err_pos) : j])), start=GF(0))
 
     M2 = [R[j] - E[j] for j in range(size)]
     m2 = rbo_sorted(intt(w, M2))
@@ -115,7 +114,6 @@ def test():
     print("m2:", to_int_list(m2))
     print()
     assert t == m2
-
 
     e2 = rbo_sorted(intt(w, E))
 

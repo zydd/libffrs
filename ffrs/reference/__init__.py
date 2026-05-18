@@ -4,15 +4,15 @@ import itertools
 class F:
     def __init__(self, p, x):
         self.p = p
-        if (type(x) == F):
+        if type(x) == F:
             self.x = x.x % p
         elif type(x) == int:
             self.x = x % p
         else:
-            raise RuntimeError(f'F: unsupported type: {type(x)}')
+            raise RuntimeError(f"F: unsupported type: {type(x)}")
 
     def __add__(self, rhs):
-        assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
+        assert type(self) == type(rhs), f"incompatible types: {type(self)} and {type(rhs)}"
         v = (self.x + rhs.x) % self.p
         return F(self.p, v)
 
@@ -20,7 +20,7 @@ class F:
         return int(self) == int(rhs)
 
     def __sub__(self, rhs):
-        assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
+        assert type(self) == type(rhs), f"incompatible types: {type(self)} and {type(rhs)}"
         v = (self.x - rhs.x) % self.p
         return F(self.p, v)
 
@@ -28,7 +28,7 @@ class F:
         return F(self.p, self.p - self.x)
 
     def __mul__(self, rhs):
-        assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
+        assert type(self) == type(rhs), f"incompatible types: {type(self)} and {type(rhs)}"
         v = (self.x * rhs.x) % self.p
         return F(self.p, v)
 
@@ -36,7 +36,7 @@ class F:
         return self.__mul__(rhs)
 
     def __floordiv__(self, rhs):
-        assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
+        assert type(self) == type(rhs), f"incompatible types: {type(self)} and {type(rhs)}"
         return self.__mul__(rhs.inv())
 
     def __pow__(self, rhs):
@@ -46,15 +46,15 @@ class F:
             x = self.inv().x
             rhs = -rhs
 
-        v = (x ** rhs) % self.p
+        v = (x**rhs) % self.p
         return F(self.p, v)
 
     def pow(self, rhs):
-        v = (self.x ** rhs) % self.p
+        v = (self.x**rhs) % self.p
         return F(self.p, v)
 
     def __repr__(self):
-        return f'F{self.x}'
+        return f"F{self.x}"
 
     def __int__(self):
         return self.x
@@ -99,29 +99,28 @@ class P:
             assert element_size is not None
             if fixed_size is None:
                 fixed_size = True
-            self.x = [N(int.from_bytes(x[i:i+element_size], byteorder)) for i in range(0, len(x), element_size)]
+            self.x = [N(int.from_bytes(x[i : i + element_size], byteorder)) for i in range(0, len(x), element_size)]
         else:
             self.x = [N(a) for a in x]
 
         self._norm()
 
     def __add__(self, rhs):
-        assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
+        assert type(self) == type(rhs), f"incompatible types: {type(self)} and {type(rhs)}"
         assert not self.fixed_size or self.deg() == rhs.deg()
         return self.new(a + b for a, b in itertools.zip_longest(self.x, rhs.x, fillvalue=self.N(0)))
 
     def __eq__(self, rhs):
-        assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
-        return (len(self.x) == len(rhs.x) and
-            all(a == b for a, b in zip(self.x, rhs.x)))
+        assert type(self) == type(rhs), f"incompatible types: {type(self)} and {type(rhs)}"
+        return len(self.x) == len(rhs.x) and all(a == b for a, b in zip(self.x, rhs.x))
 
     def __sub__(self, rhs):
-        assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
+        assert type(self) == type(rhs), f"incompatible types: {type(self)} and {type(rhs)}"
         assert not self.fixed_size or self.deg() == rhs.deg()
         return self.new(a - b for a, b in itertools.zip_longest(self.x, rhs.x, fillvalue=self.N(0)))
 
     def elem_mul(self, rhs):
-        assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
+        assert type(self) == type(rhs), f"incompatible types: {type(self)} and {type(rhs)}"
         assert not self.fixed_size or self.deg() == rhs.deg()
         return self.new(a * b for a, b in itertools.zip_longest(self.x, rhs.x, fillvalue=self.N(0)))
 
@@ -132,7 +131,7 @@ class P:
         return self.new(-a for a in self.x)
 
     def __mul__(self, rhs):
-        assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
+        assert type(self) == type(rhs), f"incompatible types: {type(self)} and {type(rhs)}"
         v = [self.N(0)] * (len(self.x) + len(rhs.x) - 1)
 
         for i in range(len(self.x)):
@@ -142,7 +141,7 @@ class P:
         return self.new(v)
 
     def __pow__(self, exp):
-        assert type(exp) == int, f'incompatible types: {type(self)} and {type(exp)}'
+        assert type(exp) == int, f"incompatible types: {type(self)} and {type(exp)}"
         if exp < 0:
             return self.inv() ** (-exp)
 
@@ -152,7 +151,7 @@ class P:
         return v
 
     def __divmod__(self, rhs):
-        assert type(self) == type(rhs), f'incompatible types: {type(self)} and {type(rhs)}'
+        assert type(self) == type(rhs), f"incompatible types: {type(self)} and {type(rhs)}"
         q, r = self._ex_synth_div(self.x, rhs.x)
         return self.new(q), self.new(r)
 
@@ -222,35 +221,35 @@ class P:
 
         buf = bytearray(len(self.x) * element_size)
         for i, v in enumerate(self.x):
-            buf[i * element_size:(i + 1) * element_size] = int.to_bytes(v, element_size, byteorder)
+            buf[i * element_size : (i + 1) * element_size] = int.to_bytes(v, element_size, byteorder)
         return buf
 
     def __repr__(self):
         def enc_exp(n):
-            exp = '⁰¹²³⁴⁵⁶⁷⁸⁹'
-            r = ''
+            exp = "⁰¹²³⁴⁵⁶⁷⁸⁹"
+            r = ""
             while n:
                 r += exp[n % 10]
                 n //= 10
             return r[::-1]
 
         if len(self.x) == 0:
-            return '0'
+            return "0"
 
-        s = ''
+        s = ""
         for i, a in enumerate(self.x[::-1]):
             a = int(a)
             if a == 0:
                 continue
 
-            s += ' '
+            s += " "
 
             if a < 0:
-                s += '-'
+                s += "-"
                 if i > 0:
-                    s += ' '
+                    s += " "
             elif i > 0:
-                s += '+ '
+                s += "+ "
 
             a = abs(a)
             exp = len(self.x) - i - 1
@@ -259,7 +258,7 @@ class P:
                 s += str(a)
 
             if exp > 0:
-                s += '𝑥'
+                s += "𝑥"
 
             if exp > 1:
                 s += enc_exp(exp)
@@ -272,16 +271,16 @@ class P:
         normalizer = divisor[-1]
         # assert int(divisor[-1]) == 1
 
-        for i in range(len(dividend) -1, len(divisor)-1 -1, -1):
-            out[i] //= normalizer # work with non-monic polynomials
+        for i in range(len(dividend) - 1, len(divisor) - 1 - 1, -1):
+            out[i] //= normalizer  # work with non-monic polynomials
 
             coef = out[i]
             if int(coef) != 0:
-                for j in range(1, len(divisor)): # skip the first coefficient of the divisor
-                    out[i - j] -= divisor[len(divisor)-1- j] * coef
+                for j in range(1, len(divisor)):  # skip the first coefficient of the divisor
+                    out[i - j] -= divisor[len(divisor) - 1 - j] * coef
 
         sep = len(divisor) - 1
-        return out[sep:], out[:sep] # quotient, remainder
+        return out[sep:], out[:sep]  # quotient, remainder
 
     def _norm(self):
         if self.fixed_size:
@@ -289,7 +288,7 @@ class P:
 
         tailing = len(self.x)
         while tailing > 0:
-            if int(self.x[tailing-1]) != 0:
+            if int(self.x[tailing - 1]) != 0:
                 break
             tailing -= 1
 
@@ -308,7 +307,7 @@ class Fp:
             assert x.GF == self.GF
             x = x.x
         else:
-            raise RuntimeError(f'Fp: unexpected type: {type(x)}')
+            raise RuntimeError(f"Fp: unexpected type: {type(x)}")
 
         _, x = P._ex_synth_div(x, GF.poly.x)
 
@@ -326,7 +325,7 @@ class Fp:
         return Fp(self.GF, self.x - rhs.x)
 
     def __neg__(self):
-        return Fp(self.GF, - self.x)
+        return Fp(self.GF, -self.x)
 
     def __mul__(self, rhs):
         if int(self) == 0 or int(rhs) == 0:
@@ -367,7 +366,7 @@ class Fp:
         return Fp(self.GF, self._exp(self.log() + (len(self.GF.exp_table) - 1) - rhs.log()))
 
     def __repr__(self):
-        return f'Fp{self.x}'
+        return f"Fp{self.x}"
 
     def __int__(self):
         return self.x_i
@@ -393,13 +392,13 @@ class GF:
                 poly = self.poly_from_int(p, poly)
                 poly = P(lambda x: F(p, x), poly)
             else:
-                raise RuntimeError(f'unexpected type: {type(poly)}')
+                raise RuntimeError(f"unexpected type: {type(poly)}")
 
-        self.p = p # prime
-        self.k = k # power
-        self.poly = poly # irreducible polynomial
-        self.a = self(a) # primitive element
-        self.field_elements = p ** k
+        self.p = p  # prime
+        self.k = k  # power
+        self.poly = poly  # irreducible polynomial
+        self.a = self(a)  # primitive element
+        self.field_elements = p**k
 
         self._init_exp_log_tables()
 
@@ -409,7 +408,7 @@ class GF:
     def __call__(self, x):
         if type(x) in [F, Fp]:
             return x
-        elif hasattr(x, '__iter__'):
+        elif hasattr(x, "__iter__"):
             return list(map(self, x))
         elif self.k > 1:
             return Fp(self, x)
@@ -417,7 +416,7 @@ class GF:
             return F(self.p, x)
 
     def __repr__(self):
-        return f'GF{self.field_elements}({self.a}, {self.poly_to_int(self.p, self.poly)})'
+        return f"GF{self.field_elements}({self.a}, {self.poly_to_int(self.p, self.poly)})"
 
     def minimal_polynomials(self):
         for i in range(1, self.field_elements - 1):
@@ -462,11 +461,11 @@ class GF:
 
     @staticmethod
     def is_primitive(p, k, poly, prim):
-        seen = [False] * (p ** k)
+        seen = [False] * (p**k)
 
         x = P(lambda x: F(p, x), [1])
 
-        for _ in range(p ** k - 1):
+        for _ in range(p**k - 1):
             x = (x * prim) % poly
 
             n = GF.poly_to_int(p, x)
@@ -480,7 +479,7 @@ class GF:
     @staticmethod
     def primitives(p, k, poly):
         PN = lambda n: P(lambda x: F(p, x), GF.poly_from_int(p, n))
-        for i in range(1, p ** k):
+        for i in range(1, p**k):
             prim = PN(i)
 
             if GF.is_primitive(p, k, poly, prim):
@@ -489,7 +488,7 @@ class GF:
     @staticmethod
     def irr_polynomials(p, k, primitive=None):
         PN = lambda n: P(lambda x: F(p, x), GF.poly_from_int(p, n))
-        field_charac = p ** k
+        field_charac = p**k
 
         if primitive is None:
             for poly in range(field_charac, 2 * field_charac):

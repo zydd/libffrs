@@ -175,10 +175,10 @@ class TestRS:
                 assert len(ecc) == rs.ecc_size * (blocks + int(remainder > 0))
 
                 for i in range(data_size // rs.message_size):
-                    msg_i = msg[i * rs.message_size:][:rs.message_size]
+                    msg_i = msg[i * rs.message_size :][: rs.message_size]
                     ecc_i = rs.encode(msg_i)
 
-                    assert ecc_i == ecc[i * rs.ecc_size:][:rs.ecc_size]
+                    assert ecc_i == ecc[i * rs.ecc_size :][: rs.ecc_size]
 
                 tail_size = data_size % rs.message_size
                 if tail_size > 0:
