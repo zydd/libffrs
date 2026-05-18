@@ -1,7 +1,7 @@
 /**************************************************************************
  * pyffrs.cpp
  *
- * Copyright 2025 Gabriel Machado
+ * Copyright 2026 Gabriel Machado
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
