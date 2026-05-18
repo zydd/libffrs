@@ -88,16 +88,16 @@ public:
             throw std::runtime_error("Root of unity not found for block size");
 
         uint32_t root_i = gf.inv(root);
-        _roots_block.resize(block_len);
-        _roots_i_block.resize(block_len);
-        for (size_t i = 0; i < block_len; ++i) {
-            _roots_block[i] = gf.pow(root, i);
-            _roots_i_block[i] = gf.pow(root_i, i);
+        _roots_ntt.resize(ntt_len);
+        _roots_i_ntt.resize(ntt_len);
+        for (size_t i = 0; i < ntt_len; ++i) {
+            _roots_ntt[i] = gf.pow(root, i);
+            _roots_i_ntt[i] = gf.pow(root_i, i);
         }
 
         _ecc_mix.resize(ecc_len);
         _ecc_mix_i.resize(ecc_len);
-        auto ecc_mix_w = *reinterpret_cast<uint32_t *>(&_roots_block[rbo(block_len - ecc_len)]);
+        auto ecc_mix_w = *reinterpret_cast<uint32_t *>(&_roots_ntt[rbo(block_len - ecc_len)]);
         auto ecc_mix_w_i = gf.inv(ecc_mix_w);
         for (size_t i = 0; i < ecc_len; ++i) {
             _ecc_mix[i] = gf.neg(gf.div(gf.pow(ecc_mix_w_i, i), ecc_len));
@@ -212,8 +212,8 @@ protected:
     size_t pntt_blocks;
     uint32_t ntt_len_i;
     uint32_t ecc_len_i;
-    std::vector<uint32_t> _roots_block;
-    std::vector<uint32_t> _roots_i_block;
+    std::vector<uint32_t> _roots_ntt;
+    std::vector<uint32_t> _roots_i_ntt;
     std::vector<uint32_t> _roots_ecc;
     std::vector<uint32_t> _roots_i_ecc;
     std::vector<uint32_t> _ecc_mix;
@@ -419,8 +419,10 @@ protected:
         std::fill_n(&root_inv[0], ecc_len, GFT{0});
         GFT root_count = GFT{0};
         for (uint32_t i = 0; i < block_len; ++i) {
-            auto x = gf.pow(root, rbo(i));
-            auto x_inv = GFT{} + gf.inv(x);
+            // auto x = gf.pow(root, rbo(i));
+            auto i_rbo = rbo(i);
+            auto x = _roots_ntt[i_rbo];
+            auto x_inv = GFT{} + _roots_i_ntt[i_rbo];
             auto is_zero = (_eval(locator_poly, locator_poly_len, x_inv) == 0);
 
             if constexpr (std::is_integral_v<GFT>) {
@@ -587,11 +589,11 @@ protected:
     }
 
     inline void ntt(GFT block[]) const {
-        ct_butterfly(&_roots_block[0], &block[0], ntt_len);
+        ct_butterfly(&_roots_ntt[0], &block[0], ntt_len);
     }
 
     inline void intt(GFT block[]) const {
-        gs_butterfly(&_roots_i_block[0], &block[0], ntt_len, ntt_len);
+        gs_butterfly(&_roots_i_ntt[0], &block[0], ntt_len, ntt_len);
         for (size_t j = 0; j < ntt_len; ++j)
             block[j] = gf.mul(block[j], ntt_len_i);
     }
