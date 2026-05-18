@@ -44,8 +44,8 @@ template<>
 void RSi16vImpl<GFTx4>::add_masked(GFTx4 vec[], GFTx4 const& i, GFTx4 const& value, GFTx4 const& condition) const {
     for (int j = 0; j < 4; j++) {
         if (condition[j]) {
-            auto &prev = vec[i[j]][j];
-            prev = gf.add(prev, value[j]);
+            auto k = i[j];
+            vec[k][j] = gf.add(vec[k][j], value[j]);
         }
     }
 }

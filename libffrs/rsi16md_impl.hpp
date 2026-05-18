@@ -122,9 +122,8 @@ public:
         }
     }
 
-    inline void encode(uint32_t _block[]) const {
-        auto block = reinterpret_cast<GFT *>(_block);
-        pntt(&block[0]);
+    inline void encode(GFT block[]) const {
+        pntt_message(&block[0]);
         ecc_mix(&block[0]);
     }
 
@@ -142,9 +141,11 @@ public:
             ecc[j] = gf.mul(ecc[j], _ecc_mix_i[j]);
     }
 
+    /**
+     * partial NTT
+     * computes the first ecc_len symbols of the NTT
+     */
     inline void pntt(GFT block[]) const {
-        // partial ntt
-        // computes the first n symbols of the ntt of size m, given m is divisible by n
         {
             ct_butterfly(&_roots_ecc[0], &block[0], ecc_len);
 
@@ -153,6 +154,31 @@ public:
         }
 
         for (size_t i = 1; i < pntt_blocks; ++i) {
+            auto p = &block[i * ecc_len];
+            ct_butterfly(&_roots_ecc[0], &p[0], ecc_len);
+
+            for (size_t j = 0; j < ecc_len; ++j)
+                p[j] = gf.mul(p[j], _pntt_shift[i * ecc_len + j]);
+
+            for (size_t j = 0; j < ecc_len; ++j)
+                block[j] = gf.add(block[j], block[i * ecc_len + j]);
+        }
+    }
+
+    /**
+     * partial NTT
+     * computes the first `ecc_len` symbols of the NTT
+     * this version assumes the last `ecc_len` symbols of `block` are 0
+     */
+    inline void pntt_message(GFT block[]) const {
+        {
+            ct_butterfly(&_roots_ecc[0], &block[0], ecc_len);
+
+            for (size_t j = 0; j < ecc_len; ++j)
+                block[j] = gf.mul(block[j], _pntt_shift[j]);
+        }
+
+        for (size_t i = 1; i < pntt_blocks - 1; ++i) {
             auto p = &block[i * ecc_len];
             ct_butterfly(&_roots_ecc[0], &p[0], ecc_len);
 
@@ -183,8 +209,8 @@ public:
         auto error_locations_rbo = &temp1_ecc6[block_len + ecc_len * 3];
         auto error_locations_len = find_roots(&locator_poly[0], locator_poly_len, &error_locations[0], &error_locations_rbo[0]);
 
-        auto roots = &temp1_ecc6[0];
         // Requires block_len == ntt_len
+        // auto roots = &temp1_ecc6[0];
         // auto error_locations_len = find_roots_ntt(&locator_poly[0], locator_poly_len, roots, &error_locations[0], &error_locations_rbo[0]);
 
         locator_poly_len = _deriv(locator_poly, locator_poly_len);
@@ -667,7 +693,7 @@ RSi16v<W>::~RSi16v() {
 
 template <size_t W>
 void RSi16v<W>::encode(GFT block[]) const {
-    d->encode(reinterpret_cast<GFT *>(block));
+    d->encode(reinterpret_cast<simd_map_t<W> *>(block));
 }
 
 
