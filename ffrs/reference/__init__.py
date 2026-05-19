@@ -115,7 +115,8 @@ class P:
         return len(self.x) == len(rhs.x) and all(a == b for a, b in zip(self.x, rhs.x))
 
     def __sub__(self, rhs):
-        assert type(self) == type(rhs), f"incompatible types: {type(self)} and {type(rhs)}"
+        if type(self) != type(rhs):
+            rhs = self.new([rhs])
         assert not self.fixed_size or self.deg() == rhs.deg()
         return self.new(a - b for a, b in itertools.zip_longest(self.x, rhs.x, fillvalue=self.N(0)))
 
@@ -131,7 +132,8 @@ class P:
         return self.new(-a for a in self.x)
 
     def __mul__(self, rhs):
-        assert type(self) == type(rhs), f"incompatible types: {type(self)} and {type(rhs)}"
+        if type(self) != type(rhs):
+            rhs = self.new([rhs])
         v = [self.N(0)] * (len(self.x) + len(rhs.x) - 1)
 
         for i in range(len(self.x)):
@@ -185,6 +187,9 @@ class P:
             v += a * x0
             x0 *= x
         return v
+
+    def __call__(self, x):
+        return self.eval(x)
 
     def __getitem__(self, i):
         return self.x[i]
