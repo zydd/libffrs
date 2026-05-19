@@ -24,15 +24,15 @@ assert w**size == 1
 assert (w**ecc_decimation) ** ecc == 1
 
 
-pntt_shift = []
+pintt_shift = []
 for i in range(size):
     blk = (i // ecc) * ecc
     j = i - blk
-    pntt_shift.append(w ** (-j * rbo(size, blk)) // GF(size))
+    pintt_shift.append(w ** (-j * rbo(size, blk)) // GF(size))
 
 
 def partial_intt_block(block, shift):
-    block = [c * e for c, e in zip(pntt_shift[shift * ecc :], block)]
+    block = [c * e for c, e in zip(pintt_shift[shift * ecc:], block)]
     block = nttr(w**-ecc_decimation, block)
     return list((block))
 
@@ -43,7 +43,8 @@ def test():
     print(f"b(w**-8) =", b(w**-8))
     print(f"b(w**-10) =", b(w**-10))
 
-    b = b.x + [GF(0)] * (size - len(b.x))
+    b = b.x
+    b += [GF(0)] * (size - len(b))
     print("b:", to_int_list(b))
 
     B = intt(w, b)

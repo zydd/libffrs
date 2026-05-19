@@ -350,7 +350,7 @@ def decode_throughput(args):
     data = random_bytearray(rs.message_size)
 
     if args.errors_per_col is None:
-        args.errors_per_col = 4
+        args.errors_per_col = rs.outer_ecc_len // 2
 
     def add_errors(data):
         for col in range(rs.inner_message_len):

@@ -33,15 +33,16 @@
     do { inttr(v); print_vec(v); nttr(v); } while(0)
 #define print_VEC(v) \
     do { \
-        py::print("-- VEC " #v); \
-        for (size_t i = 0; i < v##_len; ++i){ \
+        py::print("-- VEC " #v " = ["); \
+        for (size_t i = 0; i < v##_len; ++i) { \
             for (size_t j = 0; j < sizeof(GFT)/sizeof(::GFT); ++j) { \
-                auto coeff = *(reinterpret_cast<const ::GFT *>(&error_locations[i]) + j); \
-                std::printf("%6d ", coeff); \
+                auto coeff = *(reinterpret_cast<const ::GFT *>(&v[i]) + j); \
+                std::printf("%6d, ", coeff); \
                 fflush(stdout); \
             } \
             py::print(); \
         } \
+        py::print("]"); \
     } while(0)
 
 #define vec_sub(a, b, r) r##_len = _vec_sub(a, a##_len, b, b##_len, r)
@@ -120,6 +121,13 @@ public:
             auto j = i - blk;
             _pntt_shift[i] = gf.pow(root, j * rbo(blk));
         }
+
+        _pintt_shift.resize(ntt_len);
+        for (size_t i = 0; i < ntt_len; ++i) {
+            auto blk = (i / ecc_len) * ecc_len;
+            auto j = i - blk;
+            _pintt_shift[i] = gf.div(gf.pow(root_i, j * rbo(blk)), ntt_len);
+        }
     }
 
     inline void encode(GFT block[]) const {
@@ -190,33 +198,47 @@ public:
         }
     }
 
-    inline void repair(GFT block[], GFT temp1_ecc6[]) const {
-        // temp1_ecc6 = max(block_len, ecc_len * 6)
+    /**
+     * partial iNTT
+     * computes the full iNTT from the first `ecc_len` symbols of `block`
+     */
+    inline void pintt_ecc(GFT ntt_block[]) const {
+        for (size_t i = 1; i < ntt_len / ecc_len; ++i) {
+            std::copy_n(&ntt_block[0], ecc_len, &ntt_block[i * ecc_len]);
+            for (size_t j = 0; j < ecc_len; ++j)
+                ntt_block[i * ecc_len + j] = gf.mul(ntt_block[i * ecc_len + j], _pintt_shift[i * ecc_len + j]);
+
+            gs_butterfly(&_roots_i_ecc[0], &ntt_block[i * ecc_len], ecc_len, ecc_len);
+        }
+
+
+        for (size_t j = 0; j < ecc_len; ++j)
+            ntt_block[j] = gf.mul(ntt_block[j], _pintt_shift[j]);
+
+        gs_butterfly(&_roots_i_ecc[0], &ntt_block[0], ecc_len, ecc_len);
+    }
+
+    inline void repair(GFT block[], GFT temp_ntt1_ecc6[]) const {
+        // temp_ntt1_ecc6 = ntt_len + ecc_len * 6
 
         // compute synds
-        std::copy_n(&block[0], block_len, &temp1_ecc6[0]);
-        pntt(&temp1_ecc6[0]);
+        std::copy_n(&block[0], block_len, &temp_ntt1_ecc6[0]);
+        pntt(&temp_ntt1_ecc6[0]);
 
         // init evaluator_poly with synds
-        auto evaluator_poly = &temp1_ecc6[block_len];
-        std::copy_n(&temp1_ecc6[0], ecc_len, &evaluator_poly[0]);
+        auto evaluator_poly = &temp_ntt1_ecc6[ecc_len * 0];
 
-        auto locator_poly = &temp1_ecc6[block_len + ecc_len];
-        auto locator_poly_len = sugiyama(&locator_poly[0], &evaluator_poly[0], &temp1_ecc6[block_len + ecc_len * 2]);
+        auto locator_poly = &temp_ntt1_ecc6[ecc_len * 1];
+        auto locator_poly_len = sugiyama(&locator_poly[0], &evaluator_poly[0], &temp_ntt1_ecc6[ecc_len * 2]);
         auto evaluator_poly_len = ecc_len - locator_poly_len + 1;
 
-        auto error_locations = &temp1_ecc6[block_len + ecc_len * 2];
-        auto error_locations_rbo = &temp1_ecc6[block_len + ecc_len * 3];
-        auto error_locations_len = find_roots(&locator_poly[0], locator_poly_len, &error_locations[0], &error_locations_rbo[0]);
+        auto error_locations = &temp_ntt1_ecc6[ecc_len * 2];
+        auto error_locations_rbo = &temp_ntt1_ecc6[ecc_len * 3];
 
-        // Requires block_len == ntt_len
-        // auto roots = &temp1_ecc6[0];
-        // auto error_locations_len = find_roots_ntt(&locator_poly[0], locator_poly_len, roots, &error_locations[0], &error_locations_rbo[0]);
+        auto roots = &temp_ntt1_ecc6[ecc_len * 4];
+        auto error_locations_len = find_roots_ntt(&locator_poly[0], locator_poly_len, roots, &error_locations[0], &error_locations_rbo[0]);
 
         locator_poly_len = _deriv(locator_poly, locator_poly_len);
-
-        // print_VEC(locator_poly);
-        // print_VEC(error_locations);
 
         forney(
             &block[0],
@@ -255,6 +277,7 @@ protected:
     std::vector<uint32_t> _ecc_mix;
     std::vector<uint32_t> _ecc_mix_i;
     std::vector<uint32_t> _pntt_shift;
+    std::vector<uint32_t> _pintt_shift;
 
     /**
      * RBO input, normal order output
@@ -449,9 +472,9 @@ protected:
     }
 
     inline size_t find_roots_ntt(const GFT locator_poly[], size_t locator_poly_len, GFT roots[], GFT root_location[], GFT root_inv[]) const {
-        std::fill_n(&roots[locator_poly_len], block_len - locator_poly_len, GFT{0});
+        std::fill_n(&roots[locator_poly_len], ecc_len - locator_poly_len, GFT{0});
         std::copy_n(&locator_poly[0], locator_poly_len, &roots[0]);
-        intt(roots);
+        pintt_ecc(roots);
 
         std::fill_n(&root_location[0], ecc_len, GFT{} | ~::GFT{0});
         std::fill_n(&root_inv[0], ecc_len, GFT{0});
@@ -464,38 +487,6 @@ protected:
             auto is_zero = (roots[i] == 0);
 
             if constexpr(std::is_integral_v<GFT>) {
-                if (is_zero) {
-                    root_location[root_count] = i;
-                    root_inv[root_count] = x;
-                    ++root_count;
-                }
-            } else {
-                for (uint32_t j = 0; j < sizeof(GFT) / sizeof(::GFT); ++j) {
-                    if (is_zero[j]) {
-                        root_location[root_count[j]][j] = i;
-                        root_inv[root_count[j]][j] = x;
-                        ++root_count[j];
-                    }
-                }
-            }
-        }
-        return *std::max_element(reinterpret_cast<::GFT *>(&root_count), reinterpret_cast<::GFT *>(&root_count + 1));
-    }
-
-    inline size_t find_roots(const GFT locator_poly[], size_t locator_poly_len, GFT root_location[], GFT root_inv[]) const {
-        // TODO: use NTT to find roots
-
-        std::fill_n(&root_location[0], ecc_len, GFT{} | ~::GFT{0});
-        std::fill_n(&root_inv[0], ecc_len, GFT{0});
-        GFT root_count = GFT{0};
-        for (uint32_t i = 0; i < block_len; ++i) {
-            // auto x = gf.pow(root, rbo(i));
-            auto i_rbo = rbo(i);
-            auto x = _roots_ntt[i_rbo];
-            auto x_inv = GFT{} + _roots_i_ntt[i_rbo];
-            auto is_zero = (_eval(locator_poly, locator_poly_len, x_inv) == 0);
-
-            if constexpr (std::is_integral_v<GFT>) {
                 if (is_zero) {
                     root_location[root_count] = i;
                     root_inv[root_count] = x;
