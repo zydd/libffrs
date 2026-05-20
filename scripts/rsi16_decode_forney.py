@@ -137,5 +137,11 @@ def test():
     assert all(e[pos] == forney_err_val[i] for i, pos in enumerate(forney_err_pos))
 
 
+    print()
+    print(64 * "-")
+    synd = [1146, 6518, 61464, 58383][::-1]
+    synd = list(map(GF, synd))
+    sugiyama(synd)
+
 if __name__ == "__main__":
     test()
