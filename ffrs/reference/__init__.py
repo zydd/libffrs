@@ -446,6 +446,15 @@ class GF:
         self.exp_table = exp
         self.log_table = log
 
+    def exp(self, a):
+        return self(self.exp_table[int(a)])
+
+    def log(self, b, a=None):
+        if a is None:
+            return self(self.log_table[int(b)])
+        else:
+            return self(self.log_table[int(a)]) // self(self.log_table[int(b)])
+
     @staticmethod
     def poly_from_int(base, x):
         poly = []

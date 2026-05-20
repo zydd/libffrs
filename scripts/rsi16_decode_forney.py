@@ -31,18 +31,31 @@ def sugiyama(synds):
     A1 = ref.P(GF, [1])
     while R1.deg() >= len(synds) // 2:
         Q = R2 // R1
-        print("Q = R2 // R1")
-        print("R1:", R1.x)
-        print("R2:", R2.x)
-        print("Q:", Q.x)
+
+        print("Q:", list(map(int, Q.x[::-1])))
+        print("---")
+        print("R1:", list(map(int, R1.x[::-1])))
+        print("R1 * Q:", list(map(int, (Q*R1).x[::-1])))
+        print("A1:", list(map(int, A1.x[::-1])))
+        print("A1 * Q:", list(map(int, (Q*A1).x[::-1])))
+        print("---")
 
         t = A2 - Q * A1
+        print("A2:", list(map(int, A2.x[::-1])))
+        print("A2 - A1 * Q:", list(map(int, t.x[::-1])))
         A2 = A1
         A1 = t
 
         t = R2 - Q * R1
+        print("R2:", list(map(int, R2.x[::-1])))
+        print("R2 - R1 * Q:", list(map(int, t.x[::-1])))
         R2 = R1
         R1 = t
+
+    print("R2:", list(map(int, R2.x[::-1])))
+    print("R1:", list(map(int, R1.x[::-1])))
+    print("A2:", list(map(int, A2.x[::-1])))
+    print("A1:", list(map(int, A1.x[::-1])))
 
     locator = ref.P(GF, [a // GF(A1.x[0]) for a in A1.x])
     evaluator = ref.P(GF, [a // GF(A1.x[0]) for a in R1.x])

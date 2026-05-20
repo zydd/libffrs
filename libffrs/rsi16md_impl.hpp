@@ -27,10 +27,13 @@
 #include "rsi16md.h"
 
 
+#include <pybind11/stl.h>
+
+
 #define print_vec(v) \
-    py::print(#v ":", v##_len, std::vector(&(v)[0], &(v)[v##_len]));
+    if constexpr(std::is_integral_v<GFT>) py::print(#v ":", v##_len, std::vector(&v[0], &v[ecc_len]))
 #define print_Vec(v) \
-    do { inttr(v); print_vec(v); nttr(v); } while(0)
+    do { if constexpr(std::is_integral_v<GFT>) { inttr(v); print_vec(v); nttr(v); } } while(0)
 #define print_VEC(v) \
     do { \
         py::print("-- VEC " #v " = ["); \
@@ -45,7 +48,10 @@
         py::print("]"); \
     } while(0)
 
+#define vec_rev(v) std::reverse(&v[0], &v[v##_len])
 #define vec_sub(a, b, r) r##_len = _vec_sub(a, a##_len, b, b##_len, r)
+#define vec_sub_rev(a, b, r) r##_len = _vec_sub_rev(a, a##_len, b, b##_len, r)
+#define vec_sub_rev_ntt(a, b, r) r##_len = _vec_sub_rev_ntt(a, a##_len, b, b##_len, r)
 #define vec_mul(a, b, r) r##_len = _vec_mul(a, a##_len, b, b##_len, r)
 #define vec_div(a, b, r) r##_len = _vec_div(a, a##_len, b, b##_len, r)
 #define vec_copy(a, b) \
@@ -380,24 +386,48 @@ protected:
             r1_len = _norm_size(r1, r1_len + 1);
             a1_len = _norm_size(a1, a1_len);
 
+            vec_rev(a1);
             nttr(a1);
-            // nttr(r1); // div ntt elision
-            // nttr(r2); // div ntt elision
+            vec_rev(r1);
+            vec_rev(r2);
         }
 
         for (size_t i = 1; i < ecc_len / 2 && r1_len > ecc_len / 2; ++i) {
+            // r1, r2 time
+
             // q = r2 // r1
             vec_div(r2, r1, q);
+
+            // r2, q time / r1 freq
+            nttr(r2);
+            nttr(q);
 
             // t = q * a1
             vec_mul(q, a1, t);
             // q = q * r1
             vec_mul(q, r1, q);
 
+            // py::print("------");
+            // print_Vec(r1);
+            // py::print("R1 * Q");
+            // print_Vec(q);
+            // print_Vec(a1);
+            // py::print("A1 * Q");
+            // print_Vec(t);
+            // py::print("------");
+
             // t = a2 - q * a1
-            vec_sub(a2, t, t);
-            // t = r2 - q * r1
-            vec_sub(r2, q, q);
+            vec_sub_rev_ntt(a2, t, t);
+            // q = r2 - q * r1
+            vec_sub_rev_ntt(r2, q, q);
+
+            // print_Vec(a2);
+            // py::print("A2 - A1 * Q");
+            // print_Vec(t);
+            // print_Vec(r2);
+            // py::print("R2 - R1 * Q");
+            // print_Vec(q);
+            // py::print("\n");
 
             // a2 = a1
             vec_copy(a1, a2);
@@ -411,15 +441,18 @@ protected:
 
             inttr(a1);
             inttr(r1);
-            inttr(r2); // div ntt elision
-            r1_len = _norm_size(r1, r1_len);
-            a1_len = _norm_size(a1, a1_len);
+            inttr(r2);
+            a1_len = _norm_size_rev(a1, a1_len);
+            r1_len = _norm_size_rev(r1, r1_len);
             nttr(a1);
-            // nttr(r1); // div ntt elision
         }
+        inttr(a1);
+
+        // normal
+        vec_rev(a1);
+        vec_rev(r1);
 
         // locator = ref.P(GF, [a // GF(A1.x[0]) for a in A1.x])
-        inttr(a1);
         GFT a1_0_inv = gf.inv(a1[0]);
         for (size_t i = 0; i < a1_len; ++i)
             a1[i] = gf.mul(a1[i], a1_0_inv);
@@ -533,15 +566,88 @@ protected:
         return std::max(a_len, b_len);
     }
 
+    inline size_t _vec_shift(const GFT a[], size_t a_len, size_t shift, GFT r[]) const {
+        // ecc_len is always a power of 2
+        auto ecc_len_mask = ecc_len - 1;
+        // uint32_t ecc_root = gf.pow(root, ntt_len / ecc_len);
+
+        for (size_t i = 0; i < ecc_len; ++i)
+            // TODO: lut for ecc root rbo?
+            // r[i] = gf.mul(a[i], gf.pow(ecc_root, shift * rbo(i * ntt_len / ecc_len) & ecc_len_mask));
+            r[i] = gf.mul(a[i], _roots_ecc[shift * rbo(i * ntt_len / ecc_len) & ecc_len_mask]);
+
+        return a_len + shift;
+    }
+
+    inline size_t _vec_sub_rev_ntt(const GFT a[], size_t a_len, GFT b[], size_t b_len, GFT r[]) const {
+        ssize_t shift = a_len - b_len;
+        if (shift < 0)
+            shift += ecc_len;
+
+        _vec_shift(b, b_len, shift, r);
+
+        for (size_t i = 0; i < ecc_len; ++i)
+            r[i] = gf.sub(a[i], r[i]);
+
+        return a_len;
+    }
+
+    inline size_t _vec_sub_rev(const GFT a[], size_t a_len, const GFT b[], size_t b_len, GFT r[]) const {
+        auto r_len = std::max(a_len, b_len);
+        auto i = r_len;
+
+        while (a_len && b_len)
+            r[--i] = gf.sub(a[--a_len], b[--b_len]);
+
+        while (a_len)
+            r[--i] = a[--a_len];
+
+        while (b_len)
+            r[--i] = gf.neg(b[--b_len]);
+
+        return r_len;
+    }
+
     inline size_t _vec_mul(const GFT a[], size_t a_len, const GFT b[], size_t b_len, GFT r[]) const {
         for (size_t i = 0; i < ecc_len; ++i)
             r[i] = gf.mul(a[i], b[i]);
         return a_len + b_len - 1;
     }
 
+    inline size_t _norm_size_rev(GFT r[], size_t r_len) const {
+        r_len = r_len & (ecc_len - 1);
+        if constexpr (std::is_integral_v<GFT>) {
+            size_t start = r_len;
+            while (start < ecc_len && r[start] == GFT{0})
+                ++start;
+
+            if (start == ecc_len) {
+                start = 0;
+                while (start < r_len && r[start] == GFT{0})
+                    ++start;
+            }
+
+            std::rotate(&r[0], &r[start], &r[ecc_len]);
+            return (r_len - start) & (ecc_len - 1);
+        } else {
+            size_t start = r_len;
+            while (start < ecc_len && std::all_of(&r[start][0], &r[start + 1][0], [](auto v) { return v == 0; }))
+                ++start;
+
+            if (start == ecc_len) {
+                start = 0;
+                while (start < r_len && std::all_of(&r[start][0], &r[start + 1][0], [](auto v) { return v == 0; }))
+                    ++start;
+            }
+
+            std::rotate(&r[0], &r[start], &r[ecc_len]);
+            return (r_len - start) & (ecc_len - 1);
+        }
+    }
+
     inline size_t _norm_size(const GFT r[], size_t r_len) const {
         if constexpr (std::is_integral_v<GFT>) {
-             while (r_len > 0 && r[r_len - 1] == GFT{0})
+            while (r_len > 0 && r[r_len - 1] == GFT{0})
                 --r_len;
         } else {
             while (r_len > 0) {
@@ -603,17 +709,12 @@ protected:
 
         size_t q_len = f_len - g_len + 1;
 
-        // rev_f = P(f.x[::-1])
-        // rev_g = P(g.x[::-1])
-        // inttr(f); // div ntt elision
-        std::reverse(&f[0], &f[f_len]);
+        // avoid aliasing
         GFT f_n = f[f_len - 1];
         if (f_len > q_len)
             f[f_len - 1] = GFT{0};
         nttr(f);
 
-        // inttr(g); // div ntt elision
-        std::reverse(&g[0], &g[g_len]);
         auto g0 = g[0];
         nttr(g);
 
@@ -624,17 +725,10 @@ protected:
         _vec_mul(f, f_len, q, q_len, q);
         inttr(q);
         std::fill_n(&q[q_len], ecc_len - q_len, GFT{0});
-        std::reverse(&q[0], &q[q_len]);
-        nttr(q);
+
 
         inttr(f);
         f[f_len - 1] = f_n;
-        std::reverse(&f[0], &f[f_len]);
-        nttr(f);
-
-        inttr(g);
-        std::reverse(&g[0], &g[g_len]);
-        nttr(g);
 
         return q_len;
     }
@@ -729,7 +823,9 @@ void RSi16v<W>::repair(GFT block[], GFT temp1_ecc6[]) const {
 #undef print_vec
 #undef print_Vec
 #undef print_VEC
+#undef vec_rev
 #undef vec_sub
+#undef vec_sub_rev
 #undef vec_mul
 #undef vec_div
 #undef vec_copy
