@@ -21,6 +21,7 @@
 
 #include "rsi16md_impl.hpp"
 
+
 template class RSi16v<16>;
 
 
@@ -53,4 +54,16 @@ void RSi16vImpl<GFTx16>::add_masked(GFTx16 vec[], GFTx16 const& i, GFTx16 const&
         (__m512i) gf.add(prev_value, value),
         4
     );
+}
+
+
+template<>
+simd_mask_t RSi16vImpl<GFTx16>::is_zero(GFTx16 const& vec) {
+    // return std::all_of(
+    //     reinterpret_cast<const uint32_t *>(&vec),
+    //     reinterpret_cast<const uint32_t *>(&vec) + 16,
+    //     [](auto v) { return v == 0; }
+    // );
+    // return (_mm512_cmpeq_epi32_mask((__m512i) vec, __m512i{0}) == 0xffff);
+    return _mm512_test_epi32_mask((__m512i) vec, (__m512i) vec) == 0;
 }

@@ -50,17 +50,15 @@
 
 #define vec_rev(v) std::reverse(&v[0], &v[v##_len])
 #define vec_sub(a, b, r) r##_len = _vec_sub(a, a##_len, b, b##_len, r)
-#define vec_sub_rev(a, b, r) r##_len = _vec_sub_rev(a, a##_len, b, b##_len, r)
-#define vec_sub_rev_ntt(a, b, r) r##_len = _vec_sub_rev_ntt(a, a##_len, b, b##_len, r)
 #define vec_mul(a, b, r) r##_len = _vec_mul(a, a##_len, b, b##_len, r)
 #define vec_div(a, b, b0, r) r##_len = _vec_div(a, a##_len, b, b##_len, b0, r)
 #define vec_copy(a, b) \
     do { std::copy_n(a, ecc_len, b); b##_len = a##_len; } while(0)
 
 
-typedef uint32_t GFTx4 __attribute__((vector_size(4 * sizeof(uint32_t))));
-typedef uint32_t GFTx8 __attribute__((vector_size(8 * sizeof(uint32_t))));
-typedef uint32_t GFTx16 __attribute__((vector_size(16 * sizeof(uint32_t))));
+typedef GFT GFTx4 __attribute__((vector_size(4 * sizeof(GFT))));
+typedef GFT GFTx8 __attribute__((vector_size(8 * sizeof(GFT))));
+typedef GFT GFTx16 __attribute__((vector_size(16 * sizeof(GFT))));
 
 
 template<int N>
@@ -71,11 +69,12 @@ using simd_map_t =
     std::conditional_t<N == 16, GFTx16,
     void>>>>;
 
+using simd_mask_t = int;
 
 template<typename GFT>
 class RSi16vImpl {
 public:
-    uint32_t root;
+    ::GFT root;
     size_t ntt_len;
 
     inline RSi16vImpl(GFi16 const& gf, size_t block_len, size_t ecc_len):
@@ -94,7 +93,7 @@ public:
         if (gf.pow(root, ntt_len) != 1)
             throw std::runtime_error("Root of unity not found for block size");
 
-        uint32_t root_i = gf.inv(root);
+        ::GFT root_i = gf.inv(root);
         _roots_ntt.resize(ntt_len);
         _roots_i_ntt.resize(ntt_len);
         for (size_t i = 0; i < ntt_len; ++i) {
@@ -102,18 +101,23 @@ public:
             _roots_i_ntt[i] = gf.pow(root_i, i);
         }
 
+        _rbo_ecc.resize(ecc_len);
+        for (size_t i = 0; i < ecc_len; ++i) {
+            _rbo_ecc[i] = rbo(i * (ntt_len / ecc_len));
+        }
+
         _ecc_mix.resize(ecc_len);
         _ecc_mix_i.resize(ecc_len);
-        auto ecc_mix_w = *reinterpret_cast<uint32_t *>(&_roots_ntt[rbo(block_len - ecc_len)]);
+        auto ecc_mix_w = *reinterpret_cast<::GFT *>(&_roots_ntt[rbo(block_len - ecc_len)]);
         auto ecc_mix_w_i = gf.inv(ecc_mix_w);
         for (size_t i = 0; i < ecc_len; ++i) {
             _ecc_mix[i] = gf.neg(gf.div(gf.pow(ecc_mix_w_i, i), ecc_len));
             _ecc_mix_i[i] = gf.neg(gf.pow(ecc_mix_w, i));
         }
 
-        uint32_t ecc_root = gf.pow(root, ntt_len / ecc_len);
-        // uint32_t ecc_root = gf.exp(gf.div(gf.log(1), ecc_len));
-        uint32_t ecc_root_i = gf.inv(ecc_root);
+        ::GFT ecc_root = gf.pow(root, ntt_len / ecc_len);
+        // ::GFT ecc_root = gf.exp(gf.div(gf.log(1), ecc_len));
+        ::GFT ecc_root_i = gf.inv(ecc_root);
         _roots_ecc.resize(ecc_len);
         _roots_i_ecc.resize(ecc_len);
         for (size_t i = 0; i < ecc_len; ++i) {
@@ -274,21 +278,22 @@ protected:
     size_t block_len;
     size_t ecc_len;
     size_t pntt_blocks;
-    uint32_t ntt_len_i;
-    uint32_t ecc_len_i;
-    std::vector<uint32_t> _roots_ntt;
-    std::vector<uint32_t> _roots_i_ntt;
-    std::vector<uint32_t> _roots_ecc;
-    std::vector<uint32_t> _roots_i_ecc;
-    std::vector<uint32_t> _ecc_mix;
-    std::vector<uint32_t> _ecc_mix_i;
-    std::vector<uint32_t> _pntt_shift;
-    std::vector<uint32_t> _pintt_shift;
+    ::GFT ntt_len_i;
+    ::GFT ecc_len_i;
+    std::vector<::GFT> _roots_ntt;
+    std::vector<::GFT> _roots_i_ntt;
+    std::vector<::GFT> _roots_ecc;
+    std::vector<::GFT> _roots_i_ecc;
+    std::vector<::GFT> _ecc_mix;
+    std::vector<::GFT> _ecc_mix_i;
+    std::vector<::GFT> _pntt_shift;
+    std::vector<::GFT> _pintt_shift;
+    std::vector<::GFT> _rbo_ecc;
 
     /**
      * RBO input, normal order output
      */
-    inline void ct_butterfly(const uint32_t roots[], GFT block[], size_t ntt_len) const {
+    inline void ct_butterfly(const ::GFT roots[], GFT block[], size_t ntt_len) const {
         for (size_t stride = 1, exp_f = ntt_len >> 1; stride < ntt_len; stride *= 2, exp_f >>= 1) {
             for (size_t start = 0; start < ntt_len /*input_size*/; start += stride * 2) {
                 {
@@ -316,7 +321,7 @@ protected:
     /**
      * Normal order input, RBO output
      */
-    inline void gs_butterfly(const uint32_t roots[], GFT block[], size_t ntt_len, size_t end) const {
+    inline void gs_butterfly(const ::GFT roots[], GFT block[], size_t ntt_len, size_t end) const {
         for (size_t stride = ntt_len / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
             for (size_t start = 0; start < end; start += stride * 2) {
                 {
@@ -400,7 +405,7 @@ protected:
             // avoid aliasing
             // t[r2_len - 1] = GFT{0};
             for (size_t j = 0; j < ecc_len; ++j) {
-                auto w_shift_j = _roots_ecc[(r2_len - 1) * rbo(j * ntt_len / ecc_len) & ecc_len_mask];
+                auto w_shift_j = _roots_ecc[(r2_len - 1) * _rbo_ecc[j] & ecc_len_mask];
                 t[j] = gf.sub(t[j], gf.mul(r1l, w_shift_j));
             }
 
@@ -427,9 +432,9 @@ protected:
             // py::print("------");
 
             // t = a2 - q * a1
-            vec_sub_rev_ntt(a2, t, t);
+            vec_sub(a2, t, t);
             // q = r2 - q * r1
-            vec_sub_rev_ntt(r2, q, q);
+            vec_sub(r2, q, q);
 
             // print_Vec(a2);
             // py::print("A2 - A1 * Q");
@@ -516,7 +521,7 @@ protected:
         std::fill_n(&root_inv[0], ecc_len, GFT{0});
         GFT root_count = GFT{0};
 
-        for (uint32_t i = 0; i < block_len; ++i) {
+        for (::GFT i = 0; i < block_len; ++i) {
             // auto x = gf.pow(root, rbo(i));
             auto i_rbo = rbo(i);
             auto x = _roots_ntt[i_rbo];
@@ -529,7 +534,7 @@ protected:
                     ++root_count;
                 }
             } else {
-                for (uint32_t j = 0; j < sizeof(GFT) / sizeof(::GFT); ++j) {
+                for (::GFT j = 0; j < sizeof(GFT) / sizeof(::GFT); ++j) {
                     if (is_zero[j]) {
                         root_location[root_count[j]][j] = i;
                         root_inv[root_count[j]][j] = x;
@@ -563,26 +568,20 @@ protected:
         // }
     }
 
-    inline size_t _vec_sub(const GFT a[], size_t a_len, const GFT b[], size_t b_len, GFT r[]) const {
-        for (size_t i = 0; i < ecc_len; ++i)
-            r[i] = gf.sub(a[i], b[i]);
-        return std::max(a_len, b_len);
-    }
-
     inline size_t _vec_shift(const GFT a[], size_t a_len, size_t shift, GFT r[]) const {
         // ecc_len is always a power of 2
         auto ecc_len_mask = ecc_len - 1;
-        // uint32_t ecc_root = gf.pow(root, ntt_len / ecc_len);
+        // ::GFT ecc_root = gf.pow(root, ntt_len / ecc_len);
 
         for (size_t i = 0; i < ecc_len; ++i)
             // TODO: lut for ecc root rbo?
-            // r[i] = gf.mul(a[i], gf.pow(ecc_root, shift * rbo(i * ntt_len / ecc_len) & ecc_len_mask));
-            r[i] = gf.mul(a[i], _roots_ecc[shift * rbo(i * ntt_len / ecc_len) & ecc_len_mask]);
+            // r[i] = gf.mul(a[i], gf.pow(ecc_root, shift * _rbo_ecc[i] & ecc_len_mask));
+            r[i] = gf.mul(a[i], _roots_ecc[shift * _rbo_ecc[i] & ecc_len_mask]);
 
         return a_len + shift;
     }
 
-    inline size_t _vec_sub_rev_ntt(const GFT a[], size_t a_len, GFT b[], size_t b_len, GFT r[]) const {
+    inline size_t _vec_sub(const GFT a[], size_t a_len, GFT b[], size_t b_len, GFT r[]) const {
         ssize_t shift = a_len - b_len;
         if (shift < 0)
             shift += ecc_len;
@@ -595,22 +594,6 @@ protected:
         return a_len;
     }
 
-    inline size_t _vec_sub_rev(const GFT a[], size_t a_len, const GFT b[], size_t b_len, GFT r[]) const {
-        auto r_len = std::max(a_len, b_len);
-        auto i = r_len;
-
-        while (a_len && b_len)
-            r[--i] = gf.sub(a[--a_len], b[--b_len]);
-
-        while (a_len)
-            r[--i] = a[--a_len];
-
-        while (b_len)
-            r[--i] = gf.neg(b[--b_len]);
-
-        return r_len;
-    }
-
     inline size_t _vec_mul(const GFT a[], size_t a_len, const GFT b[], size_t b_len, GFT r[]) const {
         for (size_t i = 0; i < ecc_len; ++i)
             r[i] = gf.mul(a[i], b[i]);
@@ -618,42 +601,25 @@ protected:
     }
 
     inline size_t _norm_size_rev(GFT r[], size_t r_len) const {
-        py_assert(r_len <= ecc_len);
+        // py_assert(r_len <= ecc_len);
+        size_t start = r_len;
+        while (start < ecc_len && is_zero(r[start]))
+            ++start;
 
-        if constexpr (std::is_integral_v<GFT>) {
-            size_t start = r_len;
-            while (start < ecc_len && r[start] == GFT{0})
+        if (start == ecc_len) {
+            start = 0;
+            while (start < r_len && is_zero(r[start]))
                 ++start;
-
-            if (start == ecc_len) {
-                start = 0;
-                while (start < r_len && r[start] == GFT{0})
-                    ++start;
-            }
-
-            std::rotate(&r[0], &r[start], &r[ecc_len]);
-            if (r_len == ecc_len && start == 0)
-                return r_len;
-            else
-                return (r_len - start) & (ecc_len - 1);
-        } else {
-            size_t start = r_len;
-            while (start < ecc_len && std::all_of(reinterpret_cast<::GFT *>(&r[start]), reinterpret_cast<::GFT *>(&r[start]) + sizeof(GFT)/sizeof(::GFT), [](auto v) { return v == 0; }))
-                ++start;
-
-            if (start == ecc_len) {
-                start = 0;
-                while (start < r_len && std::all_of(reinterpret_cast<::GFT *>(&r[start]), reinterpret_cast<::GFT *>(&r[start]) + sizeof(GFT)/sizeof(::GFT), [](auto v) { return v == 0; }))
-                    ++start;
-            }
-
-            std::rotate(&r[0], &r[start], &r[ecc_len]);
-            if (r_len == ecc_len && start == 0)
-                return r_len;
-            else
-                return (r_len - start) & (ecc_len - 1);
         }
+
+        std::rotate(&r[0], &r[start], &r[ecc_len]);
+        if (r_len == ecc_len && start == 0)
+            return r_len;
+        else
+            return (r_len - start) & (ecc_len - 1);
     }
+
+    static simd_mask_t is_zero(GFT const& vec);
 
     inline size_t _norm_size(const GFT r[], size_t r_len) const {
         if constexpr (std::is_integral_v<GFT>) {
@@ -661,7 +627,7 @@ protected:
                 --r_len;
         } else {
             while (r_len > 0) {
-                for (size_t j = 0; j < sizeof(GFT) / sizeof(uint32_t); ++j) {
+                for (size_t j = 0; j < sizeof(GFT) / sizeof(::GFT); ++j) {
                     if (r[r_len - 1][j] != 0)
                         return r_len;
                 }
@@ -672,7 +638,7 @@ protected:
     }
 
     inline size_t _deriv(GFT r[], size_t r_len) const {
-        for (uint32_t i = 0; i < r_len - 1; ++i)
+        for (::GFT i = 0; i < r_len - 1; ++i)
             r[i] = gf.mul(r[i + 1], i + 1);
         r[r_len - 1] = GFT{0};
         return r_len - 1;
@@ -818,7 +784,6 @@ void RSi16v<W>::repair(GFT block[], GFT temp1_ecc6[]) const {
 #undef print_VEC
 #undef vec_rev
 #undef vec_sub
-#undef vec_sub_rev
 #undef vec_mul
 #undef vec_div
 #undef vec_copy

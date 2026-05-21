@@ -19,11 +19,8 @@
 #include <cstdint>
 #include <immintrin.h>
 
-
-#include "galois.hpp"
-
-
 #include "rsi16md_impl.hpp"
+
 
 template class RSi16v<8>;
 
@@ -54,4 +51,15 @@ void RSi16vImpl<GFTx8>::add_masked(GFTx8 vec[], GFTx8 const& i, GFTx8 const& val
     for (int j = 0; j < 8; j++)
         if (condition[j])
             vec[i[j]][j] = sum[j];
+}
+
+
+template<>
+simd_mask_t RSi16vImpl<GFTx8>::is_zero(GFTx8 const& vec) {
+    // return std::all_of(
+    //     reinterpret_cast<const uint32_t *>(&vec),
+    //     reinterpret_cast<const uint32_t *>(&vec) + 8,
+    //     [](auto v) { return v == 0; }
+    // );
+    return _mm256_testz_si256((__m256i) vec, (__m256i) vec);
 }

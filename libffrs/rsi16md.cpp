@@ -21,4 +21,11 @@
 
 #include "rsi16md_impl.hpp"
 
+
 template class RSi16v<1>;
+
+
+template<>
+simd_mask_t RSi16vImpl<GFT>::is_zero(GFT const& vec) {
+    return (vec == 0);
+}

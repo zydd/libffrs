@@ -24,7 +24,7 @@
 
 #include "pygfi16.hpp"
 
-typedef uint32_t GFT;
+using GFT = uint32_t;
 
 
 template<size_t W>

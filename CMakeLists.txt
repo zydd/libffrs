@@ -57,7 +57,6 @@ endif()
 
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-
     target_compile_options(pyffrs PRIVATE
         -g
         -O0

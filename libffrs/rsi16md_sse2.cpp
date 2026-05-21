@@ -21,6 +21,7 @@
 
 #include "rsi16md_impl.hpp"
 
+
 template class RSi16v<4>;
 
 
@@ -40,6 +41,7 @@ GFTx4 ffrs::simd_gather_base::gather(const uint32_t vec[], GFTx4 const& i) {
     };
 }
 
+
 template<>
 void RSi16vImpl<GFTx4>::add_masked(GFTx4 vec[], GFTx4 const& i, GFTx4 const& value, GFTx4 const& condition) const {
     for (int j = 0; j < 4; j++) {
@@ -48,4 +50,11 @@ void RSi16vImpl<GFTx4>::add_masked(GFTx4 vec[], GFTx4 const& i, GFTx4 const& val
             vec[k][j] = gf.add(vec[k][j], value[j]);
         }
     }
+}
+
+
+template<>
+simd_mask_t RSi16vImpl<GFTx4>::is_zero(GFTx4 const& vec) {
+    // return !(vec[0] || vec[1] || vec[2] || vec[3]);
+    return _mm_movemask_epi8(_mm_cmpeq_epi32((__m128i) vec, _mm_setzero_si128())) == 0xffff;
 }
