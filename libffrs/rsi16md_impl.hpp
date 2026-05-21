@@ -53,7 +53,7 @@
 #define vec_sub_rev(a, b, r) r##_len = _vec_sub_rev(a, a##_len, b, b##_len, r)
 #define vec_sub_rev_ntt(a, b, r) r##_len = _vec_sub_rev_ntt(a, a##_len, b, b##_len, r)
 #define vec_mul(a, b, r) r##_len = _vec_mul(a, a##_len, b, b##_len, r)
-#define vec_div(a, b, r, t) r##_len = _vec_div(a, a##_len, b, b##_len, r, t)
+#define vec_div(a, b, b0, r) r##_len = _vec_div(a, a##_len, b, b##_len, b0, r)
 #define vec_copy(a, b) \
     do { std::copy_n(a, ecc_len, b); b##_len = a##_len; } while(0)
 
@@ -367,6 +367,7 @@ protected:
         size_t r2_len = ecc_len;
         // std::copy_n(&r1[0], ecc_len, &r2[0]);
         std::reverse_copy(&r1[0], &r1[ecc_len], &r2[0]);
+        auto r1l = r2[r2_len - 1];
 
         {
             // Q = R2 // R1
@@ -387,19 +388,29 @@ protected:
             r1_len = _norm_size(r1, r1_len + 1);
 
             nttr(a1);
+            nttr(r2);
             vec_rev(r1);
         }
 
+        auto ecc_len_mask = ecc_len - 1;
+
         for (size_t i = 1; i < ecc_len / 2 && r1_len > ecc_len / 2; ++i) {
-            // r1, r2 time
+            vec_copy(r2, t);
+
+            // avoid aliasing
+            // t[r2_len - 1] = GFT{0};
+            for (size_t j = 0; j < ecc_len; ++j) {
+                auto w_shift_j = _roots_ecc[(r2_len - 1) * rbo(j * ntt_len / ecc_len) & ecc_len_mask];
+                t[j] = gf.sub(t[j], gf.mul(r1l, w_shift_j));
+            }
+
+            auto r10 = r1[0];
+            r1l = r1[r1_len - 1];
+            nttr(r1);
 
             // q = r2 // r1
-            vec_div(r2, r1, q, t);
+            vec_div(t, r1, r10, q);
             // print_vec(q);
-
-            // r2, q time / r1 freq
-            nttr(r2);
-            nttr(q);
 
             // t = q * a1
             vec_mul(q, a1, t);
@@ -439,17 +450,11 @@ protected:
                 vec_copy(q, r1);
 
             inttr(r1);
-            inttr(r2);
             r1_len = _norm_size_rev(r1, r1_len);
-
-            // inttr(a1);
-            // a1_len = _norm_size_rev(a1, a1_len);
-            // nttr(a1);
         }
         inttr(a1);
         a1_len = _norm_size_rev(a1, a1_len);
 
-        // normal
         vec_rev(a1);
         vec_rev(r1);
 
@@ -458,10 +463,7 @@ protected:
         for (size_t i = 0; i < a1_len; ++i)
             a1[i] = gf.mul(a1[i], a1_0_inv);
 
-        // std::reverse(&a1[0], &a1[a1_len]);
-
         // evaluator = ref.P(GF, [a // GF(A1.x[0]) for a in R1.x])
-        // inttr(r1); // div ntt elision
         for (size_t i = 0; i < r1_len; ++i)
             r1[i] = gf.mul(r1[i], a1_0_inv);
 
@@ -709,22 +711,8 @@ protected:
         return n;
     }
 
-    inline size_t _vec_div(const GFT f[], size_t f_len, GFT g[], size_t g_len, GFT q[], GFT t[]) const {
-        if (f_len < g_len) {
-            std::fill_n(q, ecc_len, GFT{0});
-            return 0;
-        }
-
+    inline size_t _vec_div(const GFT t[], size_t f_len, GFT g[], size_t g_len, GFT g0, GFT q[]) const {
         size_t q_len = f_len - g_len + 1;
-
-        // avoid aliasing
-        std::copy_n(&f[0], ecc_len, &t[0]);
-        if (f_len > q_len)
-            t[f_len - 1] = GFT{0};
-        nttr(t);
-
-        auto g0 = g[0];
-        nttr(g);
 
         // rev_g_i = inverse_modulo(rev_g, mod.deg())
         _vec_inv_mod_xn(g, g0, q_len, q);
@@ -733,6 +721,7 @@ protected:
         _vec_mul(t, f_len, q, q_len, q);
         inttr(q);
         std::fill_n(&q[q_len], ecc_len - q_len, GFT{0});
+        nttr(q);
 
         return q_len;
     }
