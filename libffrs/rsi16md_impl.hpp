@@ -574,7 +574,6 @@ protected:
         // ::GFT ecc_root = gf.pow(root, ntt_len / ecc_len);
 
         for (size_t i = 0; i < ecc_len; ++i)
-            // TODO: lut for ecc root rbo?
             // r[i] = gf.mul(a[i], gf.pow(ecc_root, shift * _rbo_ecc[i] & ecc_len_mask));
             r[i] = gf.mul(a[i], _roots_ecc[shift * _rbo_ecc[i] & ecc_len_mask]);
 

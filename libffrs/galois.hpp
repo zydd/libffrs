@@ -250,19 +250,24 @@ public:
 };
 
 
+/***********
+ * GF(65537)
+ ***********/
+
+
 template<typename GFT, typename GF>
 class gf_add_i16_shift {
 public:
     template<typename T>
     inline T add(T const& lhs, T const& rhs) const {
         if constexpr (std::is_integral_v<T>) {
-            uint32_t res = lhs + rhs;
+            GFT res = lhs + rhs;
             if (res >= 0x10001)
                 res -= 0x10001;
             // res -= (res >= 0x10001) * 0x10001;
             return res;
         } else {
-            auto res = lhs + rhs;
+            T res = lhs + rhs;
             res -= (res >= 0x10001) & 0x10001;
             return res;
         }
@@ -271,13 +276,13 @@ public:
     template<typename T>
     inline T sub(T const& lhs, T const& rhs) const {
         if constexpr (std::is_integral_v<T>) {
-            uint32_t res = lhs - rhs;
-            if (int32_t(res) < 0)
+            GFT res = lhs - rhs;
+            if (res >= 0x80000000)
                 res += 0x10001;
             // res += (res >= 0x80000000) * 0x10001;
             return res;
         } else {
-            auto res = lhs - rhs;
+            T res = lhs - rhs;
             res += (res >= 0x80000000) & 0x10001;
             return res;
         }
@@ -290,7 +295,7 @@ public:
                 return a;
             return 0x10001 - a;
         } else {
-            auto res = -a;
+            T res = -a;
             res += (res >= 0x80000000) & 0x10001;
             return res;
         }
@@ -304,28 +309,70 @@ public:
     template<typename T, typename U>
     inline T mul(T const& lhs, U const& rhs) const {
         if constexpr (std::is_integral_v<T>) {
-            uint32_t res = lhs * rhs;
+            GFT res = lhs * rhs;
             if (res == 0 && lhs && rhs) [[unlikely]]
                 return 1;
 
-            // uint32_t overflow = (res == 0 && lhs && rhs) * 0xffffffff;
+            // GFT overflow = (res == 0 && lhs && rhs) * 0xffffffff;
             // res = (res & ~overflow) + (1 & overflow);
 
-            // uint32_t res;
+            // GFT res;
             // if (__builtin_mul_overflow(lhs, rhs, &res))
             //     res = 1;
 
             res = (res & 0xffff) - (res >> 16);
 
-            if (int32_t(res) < 0)
+            if (res >= 0x80000000)
                 res += 0x10001;
 
             return res;
         } else {
-            auto res = lhs * rhs;
-            auto overflow = (res == 0 && lhs != 0 && rhs != 0);
-            res = (res & !overflow) + (1 & overflow);
+            T res = lhs * rhs;
+            T overflow = (res == 0 && (lhs & rhs) != 0);
+            res = (res & 0xffff) - (res >> 16) + (1 & overflow);
+            res += (res >= 0x80000000) & 0x10001;
+            return res;
+        }
+    }
+
+    template<typename T, typename U>
+    inline T mul_residue(T const& lhs, U const& rhs) const {
+        if constexpr (std::is_integral_v<T>) {
+            GFT res = lhs * rhs;
+            if (res == 0 && lhs && rhs) [[unlikely]]
+                return 1;
+
+            // GFT overflow = (res == 0 && lhs && rhs) * 0xffffffff;
+            // res = (res & ~overflow) + (1 & overflow);
+
+            // GFT res;
+            // if (__builtin_mul_overflow(lhs, rhs, &res))
+            //     res = 1;
+
             res = (res & 0xffff) - (res >> 16);
+
+            // if (res >= 0x80000000)
+            //     res += 0x10001;
+
+            return res;
+        } else {
+            T res = lhs * rhs;
+            T overflow = (res == 0 && (lhs & rhs) != 0);
+            res = (res & 0xffff) - (res >> 16) + (1 & overflow);
+            // res += (res >= 0x80000000) & 0x10001;
+            return res;
+        }
+    }
+
+    template<typename T>
+    inline T mod_p(T res) const {
+        if constexpr (std::is_integral_v<T>) {
+            res = (res & 0xffff) - (res >> 16) - (res >> 31);
+            if (res >= 0x80000000)
+                res += 0x10001;
+            return res;
+        } else {
+            res = (res & 0xffff) - (res >> 16) - (res >> 31);
             res += (res >= 0x80000000) & 0x10001;
             return res;
         }
@@ -334,7 +381,7 @@ public:
 
 
 /*************
- * Prime Field
+ * Polynomials
  *************/
 
 
