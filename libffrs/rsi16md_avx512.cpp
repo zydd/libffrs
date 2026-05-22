@@ -58,6 +58,39 @@ void RSi16vImpl<GFTx16>::add_masked(GFTx16 vec[], GFTx16 const& i, GFTx16 const&
 
 
 template<>
+void RSi16vImpl<GFTx16>::assign_masked(GFTx16& vec, GFTx16 const& value, GFTx16 const& condition) const {
+    for (int j = 0; j < 16; j++)
+        if (condition[j] || true)
+            vec[j] = value[j];
+
+    // auto mask = _mm512_movepi32_mask((__m512i) condition);
+    // vec = (GFTx16) _mm512_mask_mov_epi32(
+    //     (__m512i) vec,
+    //     mask,
+    //     (__m512i) value
+    // );
+}
+
+
+template<>
+void RSi16vImpl<GFTx16>::copy_n_masked(const GFTx16 src[], size_t n, GFTx16 dst[], GFTx16 const& condition) const {
+    // for (size_t i = 0; i < n; i++) {
+    //     for (int j = 0; j < 16; j++)
+    //         if (condition[j])
+    //             dst[i][j] = src[i][j];
+    // }
+    auto mask = _mm512_movepi32_mask((__m512i) condition);
+    for (size_t i = 0; i < n; i++) {
+        dst[i] = (GFTx16) _mm512_mask_mov_epi32(
+            (__m512i) dst[i],
+            mask,
+            (__m512i) src[i]
+        );
+    }
+}
+
+
+template<>
 simd_mask_t RSi16vImpl<GFTx16>::is_zero(GFTx16 const& vec) {
     // return std::all_of(
     //     reinterpret_cast<const uint32_t *>(&vec),

@@ -5,7 +5,7 @@ import ffrs.reference.ntt as ref_ntt
 import ffrs.reference.rs as ref_rs
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted
 
-GF = ref.GF(257, 1, 3)
+GF = ref.GF(65537, 1, 3)
 P = lambda x: ref.P(GF, x)
 
 
@@ -71,40 +71,44 @@ def ntt_mul(g, q):
 
 
 def ntt_div(f, g):
-    rev_f = P(f.x[::-1])
     rev_g = P(g.x[::-1])
 
-    mod = x ** (f.deg() - g.deg() + 1)
-    rev_g_i = inverse_modulo(rev_g, mod.deg())
-    rev_q = rev_f * rev_g_i % mod
+    mod = f.deg() - g.deg() + 1
+    print("rev_g", rev_g.x)
+    rev_g_i = inverse_modulo(rev_g, mod)
+    print("rev_g_i", rev_g_i.x)
+    rev_rev_g_i = P(rev_g_i.x[::-1])
+    print("rev_rev_g_i", rev_rev_g_i.x)
+    q = f * rev_rev_g_i
+    print("f * rev_rev_g_i", q.x)
+    q = P(q.x[-mod:])
 
-    q = P(rev_q.x[::-1]) * x ** (mod.deg() - rev_q.deg() - 1)
     return q
 
 
 def test():
-    g = P([13, 22, 66, 9, 13])
-    q = P([0, 44, 28])
-    r = P([11])
-    f = g * q + r
+    f = P([0, 6060, 33473, 26687, 21043, 24906, 25854])
+    g = P([24149, 19479, 27850, 16075, 46741, 34444])
+    q = f // g
+    r = f % g
 
     assert g * q == ntt_mul(g, q), (g * q, ntt_mul(g, q))
 
-    print(f"g = {g}")
-    print(f"q = {q}")
-    print(f"r = {r}")
-    print(f"f = gq+r = {f}")
+    print(f"f = gq+r = {f.x}")
+    print(f"g = {g.x}")
+    print(f"q = {q.x}")
+    print(f"r = {r.x}")
 
     # coef = g.x[-1]
     # g = P([a // coef for a in g.x])
     # f = P([a // coef for a in f.x])
     rec_q = ntt_div(f, g)
 
-    print(f"f/g = {rec_q}")
+    print(f"f/g = {rec_q.x}")
     # print(f"f%g = {(f - rec_q * g) * P([coef])}")
     print()
 
-    assert rec_q == q, (q, rec_q)
+    assert q == rec_q, (q, rec_q)
 
 
 if __name__ == "__main__":

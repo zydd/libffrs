@@ -54,6 +54,24 @@ void RSi16vImpl<GFTx4>::add_masked(GFTx4 vec[], GFTx4 const& i, GFTx4 const& val
 
 
 template<>
+void RSi16vImpl<GFTx4>::assign_masked(GFTx4& vec, GFTx4 const& value, GFTx4 const& condition) const {
+    for (int j = 0; j < 4; j++)
+        if (condition[j])
+            vec[j] = value[j];
+}
+
+
+template<>
+void RSi16vImpl<GFTx4>::copy_n_masked(const GFTx4 src[], size_t n, GFTx4 dst[], GFTx4 const& condition) const {
+    for (size_t i = 0; i < n; i++) {
+        for (int j = 0; j < 4; j++)
+            if (condition[j])
+                dst[i][j] = src[i][j];
+    }
+}
+
+
+template<>
 simd_mask_t RSi16vImpl<GFTx4>::is_zero(GFTx4 const& vec) {
     // return !(vec[0] || vec[1] || vec[2] || vec[3]);
     return _mm_movemask_epi8(_mm_cmpeq_epi32((__m128i) vec, _mm_setzero_si128())) == 0xffff;

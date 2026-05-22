@@ -32,30 +32,30 @@ def sugiyama(synds):
     while R1.deg() >= len(synds) // 2:
         Q = R2 // R1
 
-        print("Q:", list(map(int, Q.x[::-1])))
+        print("Q:", list(map(int, Q.x)))
         print("---")
-        print("R1:", list(map(int, R1.x[::-1])))
-        print("R1 * Q:", list(map(int, (Q*R1).x[::-1])))
-        print("A1:", list(map(int, A1.x[::-1])))
-        print("A1 * Q:", list(map(int, (Q*A1).x[::-1])))
+        print("R1:", list(map(int, R1.x)))
+        print("R1 * Q:", list(map(int, (Q*R1).x)))
+        print("A1:", list(map(int, A1.x)))
+        print("A1 * Q:", list(map(int, (Q*A1).x)))
         print("---")
 
         t = A2 - Q * A1
-        print("A2:", list(map(int, A2.x[::-1])))
-        print("A2 - A1 * Q:", list(map(int, t.x[::-1])))
+        print("A2:", list(map(int, A2.x)))
+        print("A2 - A1 * Q:", list(map(int, t.x)))
         A2 = A1
         A1 = t
 
         t = R2 - Q * R1
-        print("R2:", list(map(int, R2.x[::-1])))
-        print("R2 - R1 * Q:", list(map(int, t.x[::-1])))
+        print("R2:", list(map(int, R2.x)))
+        print("R2 - R1 * Q:", list(map(int, t.x)))
         R2 = R1
         R1 = t
 
-    print("R2:", list(map(int, R2.x[::-1])))
-    print("R1:", list(map(int, R1.x[::-1])))
-    print("A2:", list(map(int, A2.x[::-1])))
-    print("A1:", list(map(int, A1.x[::-1])))
+    print("R2:", list(map(int, R2.x)))
+    print("R1:", list(map(int, R1.x)))
+    print("A2:", list(map(int, A2.x)))
+    print("A1:", list(map(int, A1.x)))
 
     locator = ref.P(GF, [a // GF(A1.x[0]) for a in A1.x])
     evaluator = ref.P(GF, [a // GF(A1.x[0]) for a in R1.x])
@@ -139,7 +139,7 @@ def test():
 
     print()
     print(64 * "-")
-    synd = [1146, 6518, 61464, 58383][::-1]
+    synd = [63796, 41923, 61425, 48099, 57088, 16860, 61457, 55869]
     synd = list(map(GF, synd))
     sugiyama(synd)
 

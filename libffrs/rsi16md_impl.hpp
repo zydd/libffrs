@@ -51,7 +51,7 @@
 #define vec_rev(v) std::reverse(&v[0], &v[v##_len])
 #define vec_sub(a, b, r) r##_len = _vec_sub(a, a##_len, b, b##_len, r)
 #define vec_mul(a, b, r) r##_len = _vec_mul(a, a##_len, b, b##_len, r)
-#define vec_div(a, b, b0, r) r##_len = _vec_div(a, a##_len, b, b##_len, b0, r)
+#define vec_div(a, a0, b, b0, t, r) r##_len = _vec_div(a, a##_len, b, b##_len, a0, b0, t, r)
 #define vec_copy(a, b) \
     do { std::copy_n(a, ecc_len, b); b##_len = a##_len; } while(0)
 
@@ -81,6 +81,7 @@ public:
         gf(gf),
         block_len(block_len),
         ecc_len(ecc_len),
+        ecc_len_mask(ecc_len - 1),
         pntt_blocks(block_len / ecc_len)
     {
         ntt_len = 1 << ffrs::detail::ilog2_ceil(block_len);
@@ -310,6 +311,7 @@ protected:
     uint16_t _rbo_shift;
     size_t block_len;
     size_t ecc_len;
+    size_t ecc_len_mask;
     size_t pntt_blocks;
     ::GFT ntt_len_i;
     ::GFT ecc_len_i;
@@ -432,9 +434,6 @@ protected:
         size_t a1_len;
         std::fill_n(a1, ecc_len, GFT{0});
 
-        // TODO test when second-to-last synd is 0
-        size_t r1_len = _norm_size(r1, ecc_len - 1);
-
         size_t q_len = 0;
         auto q = &temp_ecc4[ecc_len * 0];
 
@@ -449,9 +448,8 @@ protected:
 
         auto r2 = &temp_ecc4[ecc_len * 3];
         size_t r2_len = ecc_len;
-        // std::copy_n(&r1[0], ecc_len, &r2[0]);
-        std::reverse_copy(&r1[0], &r1[ecc_len], &r2[0]);
-        auto r1l = r2[r2_len - 1];
+        std::copy_n(&r1[0], ecc_len, &r2[0]);
+        auto r2l = r2[0];
 
         {
             // Q = R2 // R1
@@ -459,96 +457,96 @@ protected:
             // a2 = 0
             // a1 = 1
             // A1 = -Q
-            a1[0] = gf.neg(gf.inv(r1[ecc_len - 1]));
-            a1[1] = gf.mul(r1[ecc_len - 2], gf.mul(a1[0], a1[0]));
+            a1[1] = gf.neg(gf.inv(r1[ecc_len - 1]));
+            a1[0] = gf.mul(r1[ecc_len - 2], gf.mul(a1[1], a1[1]));
             a1_len = 2;
 
-            std::fill_n(&r1[r1_len], ecc_len - r1_len, GFT{0});
-            for (size_t i = 0; i < r1_len; ++i)
-                r1[i] = gf.mul(a1[1], r1[i]);
-            for (size_t i = 1; i < r1_len; ++i)
-                r1[i] = gf.add(r1[i], gf.mul(a1[0], r2[ecc_len - i]));
-
-            r1_len = _norm_size(r1, r1_len + 1);
+            for (size_t i = 0; i < ecc_len; ++i)
+                r1[i] = gf.mul(a1[0], r1[i]);
+            for (size_t i = 1; i < ecc_len; ++i)
+                r1[i] = gf.add(r1[i], gf.mul(a1[1], r2[i - 1]));
 
             nttr(a1);
             nttr(r2);
-            vec_rev(r1);
         }
 
-        auto ecc_len_mask = ecc_len - 1;
+        // TODO test when second-to-last synd is 0
+        auto r1_len = _norm_size(r1, ecc_len - 1);
 
-        for (size_t i = 1; i < ecc_len / 2 && r1_len > ecc_len / 2; ++i) {
-            vec_copy(r2, t);
+        if (r1_len > ecc_len / 2) {
+            for (size_t i = 1; i < ecc_len / 2; ++i) {
+                // auto r1h = r1[r1_len - 1];
+                auto r1h = r1[r1_len - 1];
+                auto r1l = r1[0];
+                nttr(r1);
 
-            // avoid aliasing
-            // t[r2_len - 1] = GFT{0};
-            for (size_t j = 0; j < ecc_len; ++j) {
-                auto w_shift_j = _roots_ecc[(r2_len - 1) * _rbo_ecc[j] & ecc_len_mask];
-                t[j] = gf.sub(t[j], gf.mul(r1l, w_shift_j));
+                // q = r2 // r1
+                vec_div(r2, r2l, r1, r1h, t, q);
+
+                // print_Vec(q);
+
+                // t = q * a1
+                vec_mul(q, a1, t);
+                // q = q * r1
+                vec_mul(q, r1, q);
+
+                // py::print("------");
+                // print_Vec(r1);
+                // py::print("R1 * Q");
+                // print_Vec(q);
+                // print_Vec(a1);
+                // py::print("A1 * Q");
+                // print_Vec(t);
+                // py::print("------");
+
+                // t = a2 - q * a1
+                vec_sub(a2, t, t);
+                // q = r2 - q * r1
+                vec_sub(r2, q, q);
+
+                // print_Vec(a2);
+                // py::print("A2 - A1 * Q");
+                // print_Vec(t);
+                // print_Vec(r2);
+                // py::print("R2 - R1 * Q");
+                // print_Vec(q);
+                // py::print("\n");
+
+                // a2 = a1
+                vec_copy(a1, a2);
+                // r2 = r1
+                vec_copy(r1, r2);
+                r2l = r1l;
+
+                // a1 = t;
+                // r1 = q;
+                {
+                    // vec_copy(t, a1);
+                    // vec_copy(q, r1);
+                    GFT cond = GFT{} + ::GFT(r1_len) > ::GFT(ecc_len / 2);
+                    copy_n_masked(&t[0], ecc_len, &a1[0], cond);
+                    copy_n_masked(&q[0], ecc_len, &r1[0], cond);
+                    a1_len = t_len;
+                    r1_len = q_len;
+                }
+
+                inttr(r1);
+                r1_len = _norm_size(r1, r1_len);
             }
-
-            auto r10 = r1[0];
-            r1l = r1[r1_len - 1];
-            nttr(r1);
-
-            // q = r2 // r1
-            vec_div(t, r1, r10, q);
-            // print_vec(q);
-
-            // t = q * a1
-            vec_mul(q, a1, t);
-            // q = q * r1
-            vec_mul(q, r1, q);
-
-            // py::print("------");
-            // print_Vec(r1);
-            // py::print("R1 * Q");
-            // print_Vec(q);
-            // print_Vec(a1);
-            // py::print("A1 * Q");
-            // print_Vec(t);
-            // py::print("------");
-
-            // t = a2 - q * a1
-            vec_sub(a2, t, t);
-            // q = r2 - q * r1
-            vec_sub(r2, q, q);
-
-            // print_Vec(a2);
-            // py::print("A2 - A1 * Q");
-            // print_Vec(t);
-            // print_Vec(r2);
-            // py::print("R2 - R1 * Q");
-            // print_Vec(q);
-            // py::print("\n");
-
-            // a2 = a1
-            vec_copy(a1, a2);
-            // r2 = r1
-            vec_copy(r1, r2);
-
-            // TODO: adapt to work with simd
-            // if (r1_len > ecc_len)
-                vec_copy(t, a1);
-                vec_copy(q, r1);
-
-            inttr(r1);
-            r1_len = _norm_size_rev(r1, r1_len);
         }
-        inttr(a1);
-        a1_len = _norm_size_rev(a1, a1_len);
 
-        vec_rev(a1);
-        vec_rev(r1);
+        inttr(a1);
+        a1_len = _norm_size(a1, a1_len);
 
         // locator = ref.P(GF, [a // GF(A1.x[0]) for a in A1.x])
         GFT a1_0_inv = gf.inv(a1[0]);
-        for (size_t i = 0; i < a1_len; ++i)
+        // TODO: ecc_len -> max(r1_len)
+        for (size_t i = 0; i < ecc_len; ++i)
             a1[i] = gf.mul(a1[i], a1_0_inv);
 
         // evaluator = ref.P(GF, [a // GF(A1.x[0]) for a in R1.x])
-        for (size_t i = 0; i < r1_len; ++i)
+        // TODO: ecc_len -> max(r1_len)
+        for (size_t i = 0; i < ecc_len; ++i)
             r1[i] = gf.mul(r1[i], a1_0_inv);
 
         return a1_len;
@@ -576,6 +574,8 @@ protected:
     }
 
     void add_masked(GFT vec[], GFT const& i, GFT const& value, GFT const& condition) const;
+    void assign_masked(GFT& vec, GFT const& value, GFT const& condition) const;
+    void copy_n_masked(const GFT src[], size_t n, GFT dst[], GFT const& condition) const;
 
     inline void error_locator(const size_t error_pos_rbo[], size_t error_count, GFT locator_poly[]) const {
         std::fill_n(&locator_poly[0], ecc_len, GFT{0});
@@ -648,8 +648,6 @@ protected:
     }
 
     inline size_t _vec_shift(const GFT a[], size_t a_len, size_t shift, GFT r[]) const {
-        // ecc_len is always a power of 2
-        auto ecc_len_mask = ecc_len - 1;
         // ::GFT ecc_root = gf.pow(root, ntt_len / ecc_len);
 
         for (size_t i = 0; i < ecc_len; ++i)
@@ -660,16 +658,16 @@ protected:
     }
 
     inline size_t _vec_sub(const GFT a[], size_t a_len, GFT b[], size_t b_len, GFT r[]) const {
-        ssize_t shift = a_len - b_len;
-        if (shift < 0)
-            shift += ecc_len;
+        // ssize_t shift = a_len - b_len;
+        // if (shift < 0)
+        //     shift += ecc_len;
 
-        _vec_shift(b, b_len, shift, r);
+        // _vec_shift(b, b_len, shift, r);
 
         for (size_t i = 0; i < ecc_len; ++i)
-            r[i] = gf.sub(a[i], r[i]);
+            r[i] = gf.sub(a[i], b[i]);
 
-        return a_len;
+        return std::max(a_len, b_len);
     }
 
     inline size_t _vec_mul(const GFT a[], size_t a_len, const GFT b[], size_t b_len, GFT r[]) const {
@@ -694,7 +692,7 @@ protected:
         if (r_len == ecc_len && start == 0)
             return r_len;
         else
-            return (r_len - start) & (ecc_len - 1);
+            return (r_len - start) & ecc_len_mask;
     }
 
     static simd_mask_t is_zero(GFT const& vec);
@@ -715,6 +713,25 @@ protected:
         return r_len;
     }
 
+    inline GFT _norm_size_vec(const GFT r[], size_t r_len) const {
+        GFT len = r_len;
+
+        if constexpr (std::is_integral_v<GFT>) {
+            while (r_len > 0 && is_zero(r[r_len - 1]))
+                --r_len;
+            return r_len;
+        } else {
+            GFT searching = GFT{} - 1;
+            while (r_len < ecc_len) {
+                searching &= (r[r_len - 1] != 0);
+                len += searching;
+                --r_len;
+            }
+        }
+
+        return len;
+    }
+
     inline size_t _deriv(GFT r[], size_t r_len) const {
         for (::GFT i = 0; i < r_len - 1; ++i)
             r[i] = gf.mul(r[i + 1], i + 1);
@@ -730,13 +747,13 @@ protected:
         return sum;
     }
 
-    inline size_t _vec_inv_mod_xn(GFT h[], GFT h0, size_t n, GFT a[]) const {
+    inline size_t _vec_inv_mod_xn(GFT h[], GFT h0, size_t a_len, GFT a[]) const {
         size_t l = 1;
 
         // a = P([h.x[0].inv()])
         std::fill_n(&a[0], ecc_len, gf.inv(h0));
 
-        while (l < n) {
+        while (l < a_len) {
             // A = [a * (GF(2) - a * h) for a, h in zip(A, H)]
             for (size_t i = 0; i < ecc_len; ++i) {
                 GFT a_i = a[i];
@@ -744,26 +761,51 @@ protected:
                 a[i] = gf.mul(a_i, gf.sub(GFT{} + 2, ah));
             }
 
-            // A = A % x**n
             inttr(a);
-            std::fill_n(&a[n], ecc_len - n, GFT{0});
+            // A = A % x**a_len
+            std::fill_n(&a[a_len], ecc_len - a_len, GFT{0});
+
+            // Reverse result in last iteration
+            if (l * 2 >= a_len)
+                std::reverse(&a[0], &a[a_len]);
             nttr(a);
 
             l *= 2;
         }
 
-        return n;
+        return a_len;
     }
 
-    inline size_t _vec_div(const GFT t[], size_t f_len, GFT g[], size_t g_len, GFT g0, GFT q[]) const {
+    inline void _reverse_ntt(GFT vec[], size_t shift) const {
+        for (size_t i = 1; i < ecc_len; ++i) {
+            // rbo(ecc_len - rbo(i))
+            auto j = _rbo_ecc[i];
+            auto k = _rbo_ecc[ecc_len - j];
+            if (i < k)
+                std::swap(vec[i], vec[k]);
+            vec[i] = gf.mul(vec[i], _roots_i_ecc[j]);
+            vec[i] = gf.mul(vec[i], _roots_ecc[shift * j & ecc_len_mask]);
+        }
+    }
+
+    inline size_t _vec_div(const GFT f[], size_t f_len, const GFT g[], size_t g_len, GFT f0, GFT g0, GFT t[], GFT q[]) const {
         size_t q_len = f_len - g_len + 1;
 
-        // rev_g_i = inverse_modulo(rev_g, mod.deg())
-        _vec_inv_mod_xn(g, g0, q_len, q);
+        std::copy_n(&g[0], ecc_len, &t[0]);
+        _reverse_ntt(t, g_len);
+        _vec_inv_mod_xn(t, g0, q_len, q);
 
-        // rev_q = rev_f * rev_g_i % mod
+        // avoid aliasing: f[0] = 0
+        std::copy_n(&f[0], ecc_len, &t[0]);
+        for (size_t j = 0; j < ecc_len; ++j)
+            t[j] = gf.sub(t[j], f0);
+
+        // q = f * rev_rev_g_i (shifted) % mod
         _vec_mul(t, f_len, q, q_len, q);
+
         inttr(q);
+
+        std::rotate(&q[0], &q[g_len], &q[ecc_len]);
         std::fill_n(&q[q_len], ecc_len - q_len, GFT{0});
         nttr(q);
 

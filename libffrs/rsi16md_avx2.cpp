@@ -55,6 +55,25 @@ void RSi16vImpl<GFTx8>::add_masked(GFTx8 vec[], GFTx8 const& i, GFTx8 const& val
 
 
 template<>
+void RSi16vImpl<GFTx8>::assign_masked(GFTx8& vec, GFTx8 const& value, GFTx8 const& condition) const {
+    for (int j = 0; j < 8; j++)
+        if (condition[j])
+            vec[j] = value[j];
+}
+
+
+template<>
+void RSi16vImpl<GFTx8>::copy_n_masked(const GFTx8 src[], size_t n, GFTx8 dst[], GFTx8 const& condition) const {
+    // TODO: test if copying columns perform better
+    for (size_t i = 0; i < n; i++) {
+        for (int j = 0; j < 8; j++)
+            if (condition[j])
+                dst[i][j] = src[i][j];
+    }
+}
+
+
+template<>
 simd_mask_t RSi16vImpl<GFTx8>::is_zero(GFTx8 const& vec) {
     // return std::all_of(
     //     reinterpret_cast<const uint32_t *>(&vec),
