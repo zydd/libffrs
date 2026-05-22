@@ -141,8 +141,10 @@ public:
     }
 
     inline void encode(GFT block[]) const {
-        pntt_message(&block[0]);
-        ecc_mix(&block[0]);
+        // pntt_message(&block[0]);
+        // ecc_mix(&block[0]);
+        pntt_message_residue(&block[0]);
+        ecc_mix_residue(&block[0]);
     }
 
     inline void ecc_mix(GFT ecc[]) const {
@@ -150,6 +152,18 @@ public:
             ecc[j] = gf.mul(ecc[j], _ecc_mix[j]);
 
         gs_butterfly(&_roots_i_ecc[0], &ecc[0], ecc_len, ecc_len);
+    }
+
+    inline void ecc_mix_residue(GFT ecc[]) const {
+        for (size_t j = 0; j < ecc_len; ++j)
+            ecc[j] = gf.mul(gf.mod_p(ecc[j]), _ecc_mix[j]);
+            // ecc[j] = gf.mul_residue(gf.mod_p(ecc[j]), _ecc_mix[j]);
+
+        gs_butterfly(&_roots_i_ecc[0], &ecc[0], ecc_len, ecc_len);
+        // gs_butterfly_residue(&_roots_i_ecc[0], &ecc[0], ecc_len, ecc_len);
+
+        // for (size_t j = 0; j < ecc_len; ++j)
+        //     ecc[j] = gf.mod_p(ecc[j]);
     }
 
     inline void ecc_unmix(GFT ecc[]) const {
@@ -205,6 +219,25 @@ public:
 
             for (size_t j = 0; j < ecc_len; ++j)
                 block[j] = gf.add(block[j], block[i * ecc_len + j]);
+        }
+    }
+    inline void pntt_message_residue(GFT block[]) const {
+        {
+            ct_butterfly_residue(&_roots_ecc[0], &block[0], ecc_len);
+
+            for (size_t j = 0; j < ecc_len; ++j)
+                block[j] = gf.mul_residue(gf.mod_p(block[j]), _pntt_shift[j]);
+        }
+
+        for (size_t i = 1; i < pntt_blocks - 1; ++i) {
+            auto p = &block[i * ecc_len];
+            ct_butterfly_residue(&_roots_ecc[0], &p[0], ecc_len);
+
+            for (size_t j = 0; j < ecc_len; ++j)
+                p[j] = gf.mul_residue(gf.mod_p(p[j]), _pntt_shift[i * ecc_len + j]);
+
+            for (size_t j = 0; j < ecc_len; ++j)
+                block[j] = gf.add_residue(block[j], block[i * ecc_len + j]);
         }
     }
 
@@ -317,6 +350,30 @@ protected:
             }
         }
     }
+    inline void ct_butterfly_residue(const ::GFT roots[], GFT block[], size_t ntt_len) const {
+        for (size_t stride = 1, exp_f = ntt_len >> 1; stride < ntt_len; stride *= 2, exp_f >>= 1) {
+            for (size_t start = 0; start < ntt_len /*input_size*/; start += stride * 2) {
+                {
+                    // Cooley-Tukey butterfly
+                    auto a = block[start];
+                    auto b = block[start + stride];
+                    block[start] = gf.add_residue(a, b);
+                    block[start + stride] = gf.sub_residue(a, b);
+                }
+                for (size_t i = start + 1; i < start + stride; ++i) {
+                    // j = i - start
+                    auto w = roots[exp_f * (i - start)];
+
+                    // Cooley-Tukey butterfly
+                    auto a = block[i];
+                    auto b = block[i + stride];
+                    auto m = gf.mul_residue(gf.mod_p(b), w);
+                    block[i] = gf.add_residue(a, m);
+                    block[i + stride] = gf.sub_residue(a, m);
+                }
+            }
+        }
+    }
 
     /**
      * Normal order input, RBO output
@@ -339,6 +396,28 @@ protected:
                     auto b = block[i + stride];
                     block[i] = gf.add(a, b);
                     block[i + stride] = gf.mul(gf.sub(a, b), w);
+                }
+            }
+        }
+    }
+    inline void gs_butterfly_residue(const ::GFT roots[], GFT block[], size_t ntt_len, size_t end) const {
+        for (size_t stride = ntt_len / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
+            for (size_t start = 0; start < end; start += stride * 2) {
+                {
+                    // Gentleman-Sande butterfly
+                    auto a = block[start];
+                    auto b = block[start + stride];
+                    block[start] = gf.add_residue(a, b);
+                    block[start + stride] = gf.sub_residue(a, b);
+                }
+                for (size_t i = start + 1; i < start + stride; ++i) {
+                    // Gentleman-Sande butterfly
+                    auto w = roots[(i - start) << exp_f];
+
+                    auto a = block[i];
+                    auto b = block[i + stride];
+                    block[i] = gf.add_residue(a, b);
+                    block[i + stride] = gf.mul_residue(gf.mod_p(gf.sub_residue(a, b)), w);
                 }
             }
         }

@@ -282,8 +282,7 @@ public:
             // res += (res >= 0x80000000) * 0x10001;
             return res;
         } else {
-            T res = lhs - rhs;
-            res += (res >= 0x80000000) & 0x10001;
+            T res = lhs - rhs + ((rhs > lhs) & 0x10001);
             return res;
         }
     }
@@ -299,6 +298,16 @@ public:
             res += (res >= 0x80000000) & 0x10001;
             return res;
         }
+    }
+
+    template<typename T>
+    inline T add_residue(T const& lhs, T const& rhs) const {
+        return lhs + rhs;
+    }
+
+    template<typename T>
+    inline T sub_residue(T const& lhs, T const& rhs) const {
+        return lhs - rhs;
     }
 };
 
@@ -329,8 +338,9 @@ public:
         } else {
             T res = lhs * rhs;
             T overflow = (res == 0 && (lhs & rhs) != 0);
-            res = (res & 0xffff) - (res >> 16) + (1 & overflow);
-            res += (res >= 0x80000000) & 0x10001;
+            T lo = res & 0xffff;
+            T hi = res >> 16;
+            res = lo - hi + (overflow & 1) + ((hi > lo) & 0x10001);
             return res;
         }
     }
@@ -372,8 +382,13 @@ public:
                 res += 0x10001;
             return res;
         } else {
-            res = (res & 0xffff) - (res >> 16) - (res >> 31);
-            res += (res >= 0x80000000) & 0x10001;
+            // res = (res & 0xffff) - (res >> 16) - (res >> 31);
+            // res += (res >= 0x80000000) & 0x10001;
+
+            T lo = res & 0xffff;
+            T hi = res >> 16;
+            res = lo - hi - (res >> 31) + ((hi >= lo) & 0x10001);
+
             return res;
         }
     }
