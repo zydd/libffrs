@@ -24,6 +24,7 @@ import time
 import timeit
 
 import ffrs
+import ffrs.reference.util
 
 import matplotlib.pyplot as plt
 
@@ -46,20 +47,6 @@ def get_system_info():
     if cpu:
         info = "\n".join([info, cpu])
     return info
-
-
-def random_bytearray(size):
-    chunk_size = 2**20
-    if size <= chunk_size:
-        data = bytearray(random.randbytes(size))
-    else:
-        data = bytearray(size)
-        for i in range(0, size, chunk_size):
-            data[i : i + chunk_size] = random.randbytes(min(chunk_size, size - i))
-        remaining = size % chunk_size
-        if remaining:
-            data[-remaining:] = random.randbytes(remaining)
-    return data
 
 
 def benchmark_throughput(
@@ -313,7 +300,7 @@ def cmd_throughput(args):
     rs = parse_algo(args.algo)
     print(get_system_info())
     print(rs.message_size / 2**20, rs.ecc_size / 2**20, rs.ecc_size / rs.message_size)
-    data = random_bytearray(rs.message_size)
+    data = ffrs.reference.util.randbytes(rs.message_size)
     benchmark_throughput(f"rs.encode(data)", dict(rs=rs, data=data), input_size=rs.message_size)
 
 
@@ -347,7 +334,7 @@ def decode_throughput(args):
     print(rs)
     print(rs.message_size / 2**20, rs.ecc_size / 2**20, rs.ecc_size / rs.message_size)
 
-    data = random_bytearray(rs.message_size)
+    data = ffrs.reference.util.randbytes(rs.message_size)
 
     if args.errors_per_col is None:
         args.errors_per_col = rs.outer_ecc_len // 2

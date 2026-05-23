@@ -88,7 +88,7 @@ def test_gf256():
 
         g *= P(GF256, [i, 1])
         i *= GF256(2)
-    assert str(g) == "𝑥⁴ + 15𝑥³ + 54𝑥² + 120𝑥 + 64"
+    assert str(g) == "64 + 120𝑥 + 54𝑥² + 15𝑥³ + 𝑥⁴"
 
     for i in range(4):
         assert int(g.eval(GF256.gen(i))) == 0, i

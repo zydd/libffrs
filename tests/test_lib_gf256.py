@@ -178,7 +178,7 @@ def test_poly_mod_x_n():
 
 def test_poly_eval():
     for size in range(1, 32):
-        roots = randbytes(size, start=1)
+        roots = [random.randrange(1, 256) for _ in range(size)]
 
         # Construct a polynomial with roots r_i: ∏(1 - x/r_i)
         a = bytearray([1])

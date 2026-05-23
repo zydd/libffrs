@@ -242,7 +242,7 @@ class P:
             return "0"
 
         s = ""
-        for i, a in enumerate(self.x[::-1]):
+        for i, a in enumerate(self.x):
             a = int(a)
             if a == 0:
                 continue
@@ -257,7 +257,7 @@ class P:
                 s += "+ "
 
             a = abs(a)
-            exp = len(self.x) - i - 1
+            exp = i
 
             if a != 1 or exp == 0:
                 s += str(a)

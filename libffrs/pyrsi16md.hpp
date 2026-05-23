@@ -78,6 +78,16 @@ private:
             vec_align = 4 * sizeof(GFT);
         else
             vec_align = sizeof(GFT);
+
+        py_assert(
+            ecc_len >= 2 && (ecc_len & (ecc_len - 1)) == 0,
+            "ecc_len must be a power of 2: " + std::to_string(ecc_len)
+        );
+        py_assert(
+            block_len % ecc_len == 0,
+            "block_len must be a multiple of ecc_len. block_len: "
+            + std::to_string(block_len) + " ecc_len: " + std::to_string(ecc_len)
+        );
     }
 
 public:
@@ -91,9 +101,8 @@ public:
     size_t vec_align;
 
     inline PyRSi16md(
-            std::optional<size_t> block_len,
-            std::optional<uint16_t> message_len,
-            std::optional<uint16_t> ecc_len,
+            size_t block_len,
+            uint16_t ecc_len,
             uint32_t primitive,
             size_t interleave,
             std::optional<bool> simd_x4,
@@ -101,7 +110,7 @@ public:
             std::optional<bool> simd_x16
     ):
         PyRSi16md(
-            _get_args(block_len, message_len, ecc_len),
+            rs_data(block_len, ecc_len),
             primitive,
             interleave,
             simd_x4.value_or(__builtin_cpu_supports("sse2")),
@@ -231,9 +240,8 @@ public:
             )
 
             .def(py::init<
-                    std::optional<size_t>,    // block_size
-                    std::optional<uint16_t>,  // message_size
-                    std::optional<uint16_t>,  // ecc_size
+                    size_t,    // block_len
+                    uint16_t,  // ecc_len
                     uint32_t,  // primitive
                     size_t,    // interleave
                     std::optional<bool>,
@@ -241,10 +249,9 @@ public:
                     std::optional<bool>
                 >(),
                 R"(Instantiate a Reed-Solomon encoder with the given configuration)",
-                "block_len"_a = py::none(),
-                "message_len"_a = py::none(),
+                "block_len"_a,
+                "ecc_len"_a,
                 py::kw_only(),
-                "ecc_len"_a = py::none(),
                 "primitive"_a = 3,
                 "interleave"_a = 1,
                 "simd_x4"_a = py::none(),
@@ -273,40 +280,6 @@ public:
     }
 
 private:
-    inline rs_data _get_args(
-            std::optional<size_t> block_len,
-            std::optional<uint16_t> message_len,
-            std::optional<uint16_t> ecc_len) {
-
-        size_t block, message, ecc;
-        if (ecc_len && block_len) {
-            ecc = *ecc_len;
-            block = *block_len;
-            message = block - ecc;
-
-            if (message_len and *message_len != block - ecc)
-                throw py::value_error("block_len = message_len + ecc_len");
-        } else if (message_len && block_len) {
-            if (*message_len >= *block_len)
-                throw py::value_error("block_len must be greater than message_len");
-
-            block = *block_len;
-            message = *message_len;
-            ecc = block - message;
-        } else if (message_len && ecc_len) {
-            message = *message_len;
-            ecc = *ecc_len;
-            block = message + ecc;
-        } else {
-            throw py::value_error("Could not determine block_len and ecc_len");
-        }
-
-        if (ecc % 2 != 0)
-            throw py::value_error("ecc_len must be a multiple of 2: " + std::to_string(ecc));
-
-        return {block, ecc};
-    }
-
     template<typename Src, typename Dst>
     inline void copy_transposed(const Src src[], size_t src_cols, Dst dst[], size_t dst_cols) const {
         for (size_t j = 0; j < src_cols; ++j)

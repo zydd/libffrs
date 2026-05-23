@@ -29,12 +29,16 @@ def inverse_modulo(h, deg):
     H = ntt_poly(h)
     A = ntt_poly(a)
 
-    while l < deg:
+    while l < max(deg, 4):
+        print("inverse_modulo", l)
+
         a = a * (P([2]) - a * h)
         A = [a * (GF(2) - a * h) for a, h in zip(A, H)]
 
         # a = a % x**deg
         a.x = a.x[:deg]
+
+        print(a)
 
         l *= 2
         a = a
@@ -87,9 +91,9 @@ def ntt_div(f, g):
 
 
 def test():
-    f = P([0, 6060, 33473, 26687, 21043, 24906, 25854])
-    g = P([24149, 19479, 27850, 16075, 46741, 34444])
-    q = f // g
+    f = P([256, 32897, 0, 32896])
+    g = P([0, 255, 256])
+    q = f // g  # 65281, 32897
     r = f % g
 
     assert g * q == ntt_mul(g, q), (g * q, ntt_mul(g, q))

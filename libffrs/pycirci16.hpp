@@ -52,8 +52,8 @@ public:
         std::optional<bool> simd_x8,
         std::optional<bool> simd_x16
     ):
-        rsi(inner_block_len, {}, inner_ecc_len, 3, 1, simd_x4, simd_x8, simd_x16),
-        rso(outer_block_len, {}, outer_ecc_len, 3, rsi.message_len * outer_interleave, simd_x4, simd_x8, simd_x16),
+        rsi(inner_block_len, inner_ecc_len, 3, 1, simd_x4, simd_x8, simd_x16),
+        rso(outer_block_len, outer_ecc_len, 3, rsi.message_len * outer_interleave, simd_x4, simd_x8, simd_x16),
         block_len(inner_block_len * outer_block_len * outer_interleave),
         message_len(rso.interleaved_message_len),
         rsi_interleaved_ecc_len(rsi.ecc_len * rso.message_len * outer_interleave),

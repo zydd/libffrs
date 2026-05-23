@@ -60,10 +60,27 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_options(pyffrs PRIVATE
         -g
         -O0
-        -D_FORTIFY_SOURCE=2
+
+        # -fhardened  # GCC 14
+        # https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
+        # equivalent to:
+        -D_FORTIFY_SOURCE=3
+        -D_GLIBCXX_ASSERTIONS
+        -ftrivial-auto-var-init=zero
+        -fstack-protector-strong
+        -fstack-clash-protection
+        -fcf-protection=full
+
+        -ftrivial-auto-var-init=pattern
         -D_GLIBCXX_DEBUG
         -D_GLIBCXX_DEBUG_PEDANTIC
         # -save-temps -fverbose-asm
+    )
+    target_link_options(pyffrs PRIVATE
+        -Wl,-z,relro,-z,now
+        -fstack-protector-strong
+        -fstack-clash-protection
+        -fcf-protection=full
     )
 else()
     target_compile_options(pyffrs PRIVATE

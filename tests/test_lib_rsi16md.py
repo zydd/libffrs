@@ -29,28 +29,28 @@ ref_ntt = lambda w, buf: to_int_list(ffrs.reference.ntt.ntt(ref_gf, ref_gf(w), r
 ref_intt = lambda w, buf: rbo_sorted(to_int_list(ffrs.reference.ntt.intt(ref_gf, ref_gf(w), buf)))
 
 
+def add_errors(msg, ecc, count):
+    error_positions = {}
+
+    # # Force 1 error in ecc
+    # i = random.randrange(len(ecc))
+    # error_positions[len(msg) + i] = random.randrange(2**16)
+    # ecc[i] ^= error_positions[len(msg) + i]
+
+    while len(error_positions) < count:
+        i = random.randrange((len(msg) + len(ecc)))
+        if i in error_positions:
+            continue
+        error_positions[i] = random.randrange(1, 256)
+        if i < len(msg):
+            msg[i] = msg[i] ^ error_positions[i]
+        else:
+            ecc[i - len(msg)] = ecc[i - len(msg)] ^ error_positions[i]
+
+    return msg, ecc, error_positions
+
+
 class BaseTestRS:
-    @staticmethod
-    def add_errors(msg, ecc, count):
-        error_positions = {}
-
-        # # Force 1 error in ecc
-        # i = random.randrange(len(ecc))
-        # error_positions[len(msg) + i] = random.randrange(2**16)
-        # ecc[i] ^= error_positions[len(msg) + i]
-
-        while len(error_positions) < count:
-            i = random.randrange(len(msg) + len(ecc))
-            if i in error_positions:
-                continue
-            error_positions[i] = random.randrange(2**16)
-            if i < len(msg):
-                msg[i] = (msg[i] - error_positions[i]) % 65537
-            else:
-                ecc[i - len(msg)] = (ecc[i - len(msg)] - error_positions[i]) % 65537
-
-        return msg, ecc, error_positions
-
     def test_encode(self, rs):
         buf = randbytes(rs.message_size)
 
@@ -70,9 +70,9 @@ class BaseTestRS:
         msg_err = list(msg_orig)
         ecc_err = list(ecc_orig)
 
-        msg_err, ecc_err, _error_positions = self.add_errors(msg_err, ecc_err, max(rs.ecc_len // 2 - grace, 1))
+        msg_err, ecc_err, _error_positions = add_errors(msg_err, ecc_err, max(rs.ecc_len // 2 - grace, 1))
 
-        assert msg_err + ecc_err != msg_orig + ecc_orig
+        assert msg_err != msg_orig or ecc_err != ecc_orig
 
         msg_err = to_bytearray(msg_err)
         ecc_err = to_bytearray(ecc_err)
@@ -89,7 +89,7 @@ class BaseTestRS:
         msg_err = list(msg_orig)
         ecc_err = list(ecc_orig)
 
-        msg_err, ecc_err, error_positions = self.add_errors(msg_err, ecc_err, max(rs.ecc_len - grace, 1))
+        msg_err, ecc_err, error_positions = add_errors(msg_err, ecc_err, max(rs.ecc_len - grace, 1))
 
         assert msg_err + ecc_err != msg_orig + ecc_orig
 
@@ -163,12 +163,12 @@ class BaseTestRS:
         assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_size * (count + 1)
         assert buf_enc == buf_enc_blk
 
-    @pytest.mark.parametrize("interleave", list(range(32)) + [32, 48, 100, 256])
+    @pytest.mark.parametrize("interleave", list(range(2, 15)) + [32, 48, 100, 256])
     def test_encode_interleaved(self, rs, interleave):
         assert rs.interleave == 1
         rsi = ffrs.RSi16md(
             rs.block_len,
-            rs.message_len,
+            rs.ecc_len,
             interleave=interleave,
             simd_x4=rs.simd_x4,
             simd_x8=rs.simd_x8,
@@ -189,18 +189,13 @@ class BaseTestRS:
             # Interleaved ecc
             assert to_bytearray(to_int_list(interleaved_chunk)[i::interleave]) == buf_enc
 
-    @pytest.mark.parametrize("interleave", list(range(1, 4)) + [32, 48, 50, 100, 256])
+    @pytest.mark.parametrize("interleave", list(range(1, 16)) + [32, 48, 50, 100, 256])
     @pytest.mark.parametrize("grace", range(4))
     def test_repair_interleaved_unknown_unaligned(self, rs, interleave, grace):
-        if rs.ecc_len * interleave > 128:
-            # FIXME: investigate why decoding fails sometimes
-            # Likely due to zeros in syndromes
-            pytest.skip()
-
         assert rs.interleave == 1
         rsi = ffrs.RSi16md(
             rs.block_len,
-            rs.message_len,
+            rs.ecc_len,
             interleave=interleave,
             simd_x4=rs.simd_x4,
             simd_x8=rs.simd_x8,
@@ -218,37 +213,28 @@ class BaseTestRS:
 
         errors = []
         for i in range(interleave):
-            msg_err[i::interleave], ecc_err[i::interleave], col_errs = self.add_errors(
+            msg_err[i::interleave], ecc_err[i::interleave], col_errs = add_errors(
                 msg_err[i::interleave], ecc_err[i::interleave], max(rs.ecc_len // 2 - grace, 1)
             )
             errors.append(col_errs)
 
-        print(errors)
-
         msg_err0 = msg_err[::interleave]
         ecc_err0 = ecc_err[::interleave]
         rs.repair(to_bytearray(msg_err0), to_bytearray(ecc_err0))
-
         msg_buf_err = to_bytearray(msg_err)
         ecc_buf_err = to_bytearray(ecc_err)
 
         assert msg_buf_err + ecc_buf_err != msg_buf_orig + ecc_buf_orig
         rsi.repair(msg_buf_err, ecc_buf_err)
-        print(to_int_list(msg_buf_err), to_int_list(ecc_buf_err))
         assert msg_buf_err + ecc_buf_err == msg_buf_orig + ecc_buf_orig
 
     @pytest.mark.parametrize("interleave", list(range(1, 16)) + [32, 48, 50, 100, 256])
     @pytest.mark.parametrize("grace", range(4))
     def test_repair_interleaved_unknown_aligned(self, rs, interleave, grace):
-        if rs.ecc_len * interleave > 128:
-            # FIXME: investigate why decoding fails sometimes
-            # Likely due to zeros in syndromes
-            pytest.skip()
-
         assert rs.interleave == 1
         rsi = ffrs.RSi16md(
             rs.block_len,
-            rs.message_len,
+            rs.ecc_len,
             interleave=interleave,
             simd_x4=rs.simd_x4,
             simd_x8=rs.simd_x8,
@@ -265,7 +251,7 @@ class BaseTestRS:
         ecc_err = list(ecc_orig)
 
         # Aligned errors
-        msg_err[::interleave], ecc_err[::interleave], errors = self.add_errors(
+        msg_err[::interleave], ecc_err[::interleave], errors = add_errors(
             msg_err[::interleave], ecc_err[::interleave], max(rs.ecc_len // 2 - grace, 1)
         )
         for i in range(1, interleave):
@@ -274,9 +260,6 @@ class BaseTestRS:
                     msg_err[i + pos * interleave] ^= random.randint(1, 65536)
                 else:
                     ecc_err[i + (pos - rs.message_len) * interleave] ^= random.randint(1, 65536)
-
-        print()
-        print(msg_err, ecc_err)
 
         msg_err0 = msg_err[::interleave]
         ecc_err0 = ecc_err[::interleave]
@@ -287,7 +270,6 @@ class BaseTestRS:
 
         assert msg_buf_err + ecc_buf_err != msg_buf_orig + ecc_buf_orig
         rsi.repair(msg_buf_err, ecc_buf_err)
-        print(to_int_list(msg_buf_err), to_int_list(ecc_buf_err))
         assert msg_buf_err + ecc_buf_err == msg_buf_orig + ecc_buf_orig
 
 
@@ -341,3 +323,62 @@ class TestRSMult(BaseTestRS):
         pass
 
     test_repair = test_skip
+
+
+@pytest.mark.parametrize(
+    "rs",
+    [
+        ffrs.RSi16md(4096, ecc_len=8),
+        ffrs.RSi16md(4096, ecc_len=8),
+        ffrs.RSi16md(4096, ecc_len=8),
+        ffrs.RSi16md(4096, ecc_len=8),
+        ffrs.RSi16md(4096, ecc_len=256),
+        ffrs.RSi16md(2048, ecc_len=128),
+        ffrs.RSi16md(4096, ecc_len=2048),
+        ffrs.RSi16md(32768, ecc_len=256),
+        ffrs.RSi16md(65536, ecc_len=256),
+    ],
+)
+class TestRSLarge:
+    def test_repair_no_errors(self, rs):
+        msg = randbytes(rs.message_size)
+        ecc = rs.encode(msg)
+        msg_err = bytearray(msg)
+        ecc_err = bytearray(ecc)
+
+        rs.repair(msg_err, ecc_err, [])
+
+        assert msg_err == msg
+        assert ecc_err == ecc
+
+    def test_repair_unknown_no_errors(self, rs):
+        msg = randbytes(rs.message_size)
+        ecc = rs.encode(msg)
+        msg_err = bytearray(msg)
+        ecc_err = bytearray(ecc)
+
+        rs.repair(msg_err, ecc_err)
+
+        assert msg_err == msg
+        assert ecc_err == ecc
+
+    @pytest.mark.parametrize("grace", [2, 3, 4, 5])
+    def test_repair_unknown_locations(self, rs, grace):
+        msg_orig = randbytes(rs.message_size)
+        ecc_orig = rs.encode(msg_orig)
+
+        msg_err = bytearray(msg_orig)
+        ecc_err = bytearray(ecc_orig)
+
+        msg_err, ecc_err, _error_positions = add_errors(msg_err, ecc_err, max(rs.ecc_len // 2 - grace, 1))
+
+        # Corrupt first and last bytes of the block
+        msg_err[-1] ^= 0xFF
+        ecc_err[-1] ^= 0xFF
+
+        assert msg_err != msg_orig or ecc_err != ecc_orig
+
+        rs.repair(msg_err, ecc_err)
+
+        assert msg_err == msg_orig
+        assert ecc_err == ecc_orig

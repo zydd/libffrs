@@ -57,8 +57,18 @@ def to_int_list(v, sizeof=2, byteorder="little"):
         return [int.from_bytes(v[i : i + sizeof], byteorder) for i in range(0, len(v), sizeof)]
 
 
-def randbytes(n, start=0, stop=256):
-    return bytearray(random.randrange(start=start, stop=stop) for _ in range(n))
+def randbytes(size):
+    chunk_size = 2**20  # 2 MiB
+    if size <= chunk_size:
+        data = bytearray(random.randbytes(size))
+    else:
+        data = bytearray(size)
+        for i in range(0, size, chunk_size):
+            data[i : i + chunk_size] = random.randbytes(min(chunk_size, size - i))
+        remaining = size % chunk_size
+        if remaining:
+            data[-remaining:] = random.randbytes(remaining)
+    return data
 
 
 def rbo(max, i):

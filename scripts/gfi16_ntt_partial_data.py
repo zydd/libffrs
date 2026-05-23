@@ -32,7 +32,7 @@ for i in range(size):
 
 
 def partial_intt_block(block, shift):
-    block = [c * e for c, e in zip(pintt_shift[shift * ecc:], block)]
+    block = [c * e for c, e in zip(pintt_shift[shift * ecc :], block)]
     block = nttr(w**-ecc_decimation, block)
     return list((block))
 
