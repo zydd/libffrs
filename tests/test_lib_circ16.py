@@ -24,11 +24,11 @@ from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, rand
 
 class BaseTestCIRC:
     @staticmethod
-    def _rsi_ecc_size(rs):
+    def _rsi_ecc_size(rs: ffrs.CIRC):
         return rs.outer_message_len * rs.inner_ecc_size * rs.outer_interleave
 
     @staticmethod
-    def _rso_ecc_size(rs):
+    def _rso_ecc_size(rs: ffrs.CIRC):
         return rs.inner_message_size * rs.outer_ecc_len * rs.outer_interleave
 
     @staticmethod
@@ -48,11 +48,11 @@ class BaseTestCIRC:
 
         return count
 
-    def test_properties(self, rs):
+    def test_properties(self, rs: ffrs.CIRC):
         assert rs.ecc_len == rs.inner_block_len * rs.outer_block_len * rs.outer_interleave - rs.message_len
         assert rs.block_len == rs.message_len + rs.ecc_len
 
-    def test_circ_encode(self, rs):
+    def test_circ_encode(self, rs: ffrs.CIRC):
         buf = randbytes(rs.message_size)
         res = rs.encode(buf)
         assert len(res) == rs.ecc_size
@@ -73,7 +73,7 @@ class BaseTestCIRC:
         if rs.inner_message_len < 64:
             assert res[-len(res_io) :] == res_io
 
-    def test_circ_repair(self, rs):
+    def test_circ_repair(self, rs: ffrs.CIRC):
         buf = randbytes(rs.message_size)
         ecc = rs.encode(buf)
         assert len(ecc) == rs.ecc_size
@@ -104,7 +104,7 @@ class BaseTestCIRC:
         assert ecc == ecc_orig
 
     @pytest.mark.skip
-    def test_circ_repair_zeroes(self, rs):
+    def test_circ_repair_zeroes(self, rs: ffrs.CIRC):
         buf = randbytes(rs.message_size)
         ecc = rs.encode(buf)
         assert len(ecc) == rs.ecc_size
@@ -140,7 +140,7 @@ class BaseTestCIRC:
         assert buf == msg_orig
         assert ecc == ecc_orig
 
-    def test_repair_fallback(self, rs):
+    def test_repair_fallback(self, rs: ffrs.CIRC):
         buf = randbytes(rs.message_size)
         ecc = rs.encode(buf)
         assert len(ecc) == rs.ecc_size
@@ -163,7 +163,7 @@ class BaseTestCIRC:
         assert buf == msg_orig
         assert ecc == ecc_orig
 
-    def test_repair_no_errors(self, rs):
+    def test_repair_no_errors(self, rs: ffrs.CIRC):
         buf = bytearray(randbytes(rs.message_size))
         ecc = rs.encode(buf)
 
@@ -241,7 +241,7 @@ class TestCircMult(BaseTestCIRC):
     # Limited support for multiples of powers of 2
     # TODO: partial intt or switch to forney algo
     @pytest.mark.skip
-    def test_skip(self, rs):
+    def test_skip(self, rs: ffrs.CIRC):
         pass
 
     test_circ_repair = test_skip

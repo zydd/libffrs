@@ -25,6 +25,14 @@ target_compile_definitions(pyffrs PRIVATE VERSION_INFO="0.1.0")
 target_compile_options(pyffrs PRIVATE -Wall -Wextra -Wpedantic)
 
 
+add_custom_command(TARGET pyffrs POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E env
+        PYTHONPATH=$<TARGET_FILE_DIR:pyffrs>
+        python3 ${CMAKE_SOURCE_DIR}/scripts/gen-stubs.py "${CMAKE_SOURCE_DIR}/libffrs/"
+    VERBATIM
+)
+
+
 if(SANITIZE_ADDRESS STREQUAL "ON")
     # To run with -fsanitize=address
     # LD_PRELOAD=$(clang -print-file-name=libclang_rt.asan-x86_64.so)
