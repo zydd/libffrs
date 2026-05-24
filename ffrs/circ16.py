@@ -18,7 +18,7 @@ import libffrs
 from . import rsi16
 
 
-class CIRC(libffrs.CIRCi16):
+class CIRC16(libffrs.CIRC16):
     def check(self, data, ecc, synd=None):
         synd = synd or bytearray(self.ecc_size)
 

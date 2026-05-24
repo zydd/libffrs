@@ -258,7 +258,7 @@ def circ(args):
     # TODO: validate RSi16 with 64k block
     while block_size % (hash_ratio_den * ecc_ratio_den) == 0 and ecc_ratio_den <= 32768:
         outer_interleave = block_size // (hash_ratio_den * ecc_ratio_den)
-        rs = ffrs.CIRC(hash_ratio_den // 2, hash_ratio_num // 2, ecc_ratio_den, ecc_ratio_num, outer_interleave)
+        rs = ffrs.CIRC16(hash_ratio_den // 2, hash_ratio_num // 2, ecc_ratio_den, ecc_ratio_num, outer_interleave)
         print(rs)
         assert rs.block_size == block_size, rs.block_size
 
@@ -321,7 +321,7 @@ def decode_throughput(args):
 
     rsi_ecc, rsi_block = parse_ratio(args.hash_ratio)
     rso_block = block_size // rsi_block
-    rs = ffrs.CIRC(
+    rs = ffrs.CIRC16(
         rsi_block // 2,
         rsi_ecc // 2,
         rso_block,

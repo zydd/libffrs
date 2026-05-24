@@ -24,7 +24,7 @@
 #include "pygfi16.hpp"
 #include "pyrs256.hpp"
 #include "pyrsi16.hpp"
-#include "pycirci16.hpp"
+#include "pycirc16.hpp"
 
 
 PYBIND11_MODULE(libffrs, m) {
@@ -49,5 +49,5 @@ PYBIND11_MODULE(libffrs, m) {
     PyRS256::register_class(m);
     PyGFi16::register_class(m);
     PyRSi16::register_class(m);
-    PyCIRCi16::register_class(m);
+    PyCIRC16::register_class(m);
 }

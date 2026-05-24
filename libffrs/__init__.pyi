@@ -50,15 +50,15 @@ class RSi16:
         ...
 
 
-class CIRCi16:
-    def __init__(self: libffrs.CIRCi16, inner_block_len: typing.SupportsInt | typing.SupportsIndex, inner_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_block_len: typing.SupportsInt | typing.SupportsIndex, outer_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
+class CIRC16:
+    def __init__(self: libffrs.CIRC16, inner_block_len: typing.SupportsInt | typing.SupportsIndex, inner_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_block_len: typing.SupportsInt | typing.SupportsIndex, outer_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
         """Cross-interleaved Reed-Solomon coder"""
         ...
     block_len: int
     block_size: int
     ecc_len: int
     ecc_size: int
-    def encode(self: libffrs.CIRCi16, buffer: collections.abc.Buffer) -> bytearray:
+    def encode(self: libffrs.CIRC16, buffer: collections.abc.Buffer) -> bytearray:
         """Encode data"""
         ...
     inner_block_len: int
@@ -73,7 +73,7 @@ class CIRCi16:
     outer_ecc_len: int
     outer_interleave: Any
     outer_message_len: int
-    def repair(self: libffrs.CIRCi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bool:
+    def repair(self: libffrs.CIRC16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bool:
         """Repair data"""
         ...
     rsi: Any

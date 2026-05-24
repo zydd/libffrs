@@ -1,5 +1,5 @@
 /**************************************************************************
- * pycirci16.hpp
+ * pyCIRC16.hpp
  *
  * Copyright 2026 Gabriel Machado
  *
@@ -29,7 +29,7 @@
 namespace py = pybind11;
 
 
-class PyCIRCi16 {
+class PyCIRC16 {
 private:
     PyRSi16 rsi;
     PyRSi16 rso;
@@ -42,7 +42,7 @@ public:
     const size_t ecc_len;
     const size_t outer_interleave;
 
-    inline PyCIRCi16(
+    inline PyCIRC16(
         size_t inner_block_len,
         size_t inner_ecc_len,
         size_t outer_block_len,
@@ -66,7 +66,7 @@ public:
     static inline void register_class(py::module &m) {
         using namespace pybind11::literals;
 
-        py::class_<PyCIRCi16>(m, "CIRCi16")
+        py::class_<PyCIRC16>(m, "CIRC16")
             .def(py::init<
                     size_t,  // inner_block_len
                     size_t,  // inner_ecc_len
@@ -91,28 +91,28 @@ public:
                 "simd_x16"_a = py::none()
             )
 
-            .def_property_readonly("rsi", [](PyCIRCi16& self) -> auto const& { return self.rsi; })
-            .def_property_readonly("rso", [](PyCIRCi16& self) -> auto const& { return self.rso; })
+            .def_property_readonly("rsi", [](PyCIRC16& self) -> auto const& { return self.rsi; })
+            .def_property_readonly("rso", [](PyCIRC16& self) -> auto const& { return self.rso; })
 
-            .def_property_readonly("block_len", [](PyCIRCi16& self) { return self.block_len; })
-            .def_property_readonly("block_size", [](PyCIRCi16& self) { return self.block_len * sizeof(uint16_t); })
-            .def_property_readonly("message_len", [](PyCIRCi16& self) { return self.message_len; })
-            .def_property_readonly("message_size", [](PyCIRCi16& self) { return self.message_len * sizeof(uint16_t); })
-            .def_property_readonly("ecc_len", [](PyCIRCi16& self) { return self.ecc_len; })
-            .def_property_readonly("ecc_size", [](PyCIRCi16& self) { return self.ecc_len * sizeof(uint16_t); })
-            .def_property_readonly("inner_block_len", [](PyCIRCi16& self) { return self.rsi.block_len; })
-            .def_property_readonly("inner_block_size", [](PyCIRCi16& self) { return self.rsi.block_len * sizeof(uint16_t); })
-            .def_property_readonly("inner_message_len", [](PyCIRCi16& self) { return self.rsi.message_len; })
-            .def_property_readonly("inner_message_size", [](PyCIRCi16& self) { return self.rsi.message_len * sizeof(uint16_t); })
-            .def_property_readonly("inner_ecc_len", [](PyCIRCi16& self) { return self.rsi.ecc_len; })
-            .def_property_readonly("inner_ecc_size", [](PyCIRCi16& self) { return self.rsi.ecc_len * sizeof(uint16_t); })
-            .def_property_readonly("outer_block_len", [](PyCIRCi16& self) { return self.rso.block_len; })
-            .def_property_readonly("outer_message_len", [](PyCIRCi16& self) { return self.rso.message_len; })
-            .def_property_readonly("outer_ecc_len", [](PyCIRCi16& self) { return self.rso.ecc_len; })
-            .def_property_readonly("outer_interleave", [](PyCIRCi16& self) { return self.outer_interleave; })
+            .def_property_readonly("block_len", [](PyCIRC16& self) { return self.block_len; })
+            .def_property_readonly("block_size", [](PyCIRC16& self) { return self.block_len * sizeof(uint16_t); })
+            .def_property_readonly("message_len", [](PyCIRC16& self) { return self.message_len; })
+            .def_property_readonly("message_size", [](PyCIRC16& self) { return self.message_len * sizeof(uint16_t); })
+            .def_property_readonly("ecc_len", [](PyCIRC16& self) { return self.ecc_len; })
+            .def_property_readonly("ecc_size", [](PyCIRC16& self) { return self.ecc_len * sizeof(uint16_t); })
+            .def_property_readonly("inner_block_len", [](PyCIRC16& self) { return self.rsi.block_len; })
+            .def_property_readonly("inner_block_size", [](PyCIRC16& self) { return self.rsi.block_len * sizeof(uint16_t); })
+            .def_property_readonly("inner_message_len", [](PyCIRC16& self) { return self.rsi.message_len; })
+            .def_property_readonly("inner_message_size", [](PyCIRC16& self) { return self.rsi.message_len * sizeof(uint16_t); })
+            .def_property_readonly("inner_ecc_len", [](PyCIRC16& self) { return self.rsi.ecc_len; })
+            .def_property_readonly("inner_ecc_size", [](PyCIRC16& self) { return self.rsi.ecc_len * sizeof(uint16_t); })
+            .def_property_readonly("outer_block_len", [](PyCIRC16& self) { return self.rso.block_len; })
+            .def_property_readonly("outer_message_len", [](PyCIRC16& self) { return self.rso.message_len; })
+            .def_property_readonly("outer_ecc_len", [](PyCIRC16& self) { return self.rso.ecc_len; })
+            .def_property_readonly("outer_interleave", [](PyCIRC16& self) { return self.outer_interleave; })
 
-            .def("encode", cast_args(&PyCIRCi16::py_encode), R"(Encode data)", "buffer"_a)
-            .def("repair", cast_args(&PyCIRCi16::py_repair), R"(Repair data)", "message"_a, "ecc"_a);
+            .def("encode", cast_args(&PyCIRC16::py_encode), R"(Encode data)", "buffer"_a)
+            .def("repair", cast_args(&PyCIRC16::py_repair), R"(Repair data)", "message"_a, "ecc"_a);
     }
 
 private:
