@@ -5,14 +5,14 @@
         Creates an encoder for 32 bytes of parity,
         capable of correcting up to 16 errors in a 255-byte block.
 
-    - ``RS256(6, 4)``
+    - ``RS256(8, 6)``
         ::
 
-                block_len
-             ╭──────┴──────╮
-             🟦🟦🟦🟦🟨🟨
-             ╰────┬───╯╰─┬─╯
-            message_len ecc_len
+                 block_len
+             ╭───────┴───────╮
+             🟦🟦🟦🟦🟦🟦🟨🟨
+             ╰─────┬────╯╰─┬─╯
+            message_len  ecc_len
 
 :Parameters:
     - block_len

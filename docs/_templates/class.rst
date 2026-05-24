@@ -1,6 +1,10 @@
 {{fullname | escape | underline}}
 
 
+{% if exists("extra/" ~ module ~ "." ~ objname ~ ".rst") %}
+.. include:: ../extra/{{module}}.{{objname}}.rst
+{% endif %}
+
 .. currentmodule:: {{module}}
 
 .. autoclass:: {{objname}}
@@ -33,6 +37,7 @@
 {% for item in methods %}
     .. automethod:: {{name}}.{{item}}
 
+        {% if exists("extra/" ~ module ~ "." ~ name ~ "." ~ item ~ ".rst") %}
         .. include:: ../extra/{{module}}.{{name}}.{{item}}.rst
-
+        {% endif %}
 {%- endfor %}
