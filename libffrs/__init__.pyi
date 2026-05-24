@@ -12,6 +12,9 @@ FFRS main module
 
 
 class RSi16:
+    def __init__(self: libffrs.RSi16, block_len: typing.SupportsInt | typing.SupportsIndex, ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
+        """Instantiate a Reed-Solomon encoder with the given configuration"""
+        ...
     block_len: int
     block_size: int
     ecc_len: int
@@ -48,6 +51,9 @@ class RSi16:
 
 
 class CIRCi16:
+    def __init__(self: libffrs.CIRCi16, inner_block_len: typing.SupportsInt | typing.SupportsIndex, inner_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_block_len: typing.SupportsInt | typing.SupportsIndex, outer_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
+        """Cross-interleaved Reed-Solomon coder"""
+        ...
     block_len: int
     block_size: int
     ecc_len: int
@@ -75,6 +81,15 @@ class CIRCi16:
 
 
 class GF256:
+    def __init__(self: libffrs.GF256, primitive: typing.SupportsInt | typing.SupportsIndex = 2, poly1: typing.SupportsInt | typing.SupportsIndex = 285) -> None:
+        """
+        Instantiate type for operations over :math:`GF(p^n)/P`
+
+                        Args:
+                            primitive : :math:`a` -- primitive value used to generate the field
+                            polynomial : :math:`P` -- irreducible polynomial used to generate the field
+        """
+        ...
     def add(self: libffrs.GF256, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
         """Addition: :math:`\text{lhs} + \text{rhs}`"""
         ...
@@ -148,6 +163,14 @@ class GF256:
 
 
 class GFi16:
+    def __init__(self: libffrs.GFi16, primitive: typing.SupportsInt | typing.SupportsIndex) -> None:
+        """
+        Instantiate type for operations over :math:`GF(65537)`
+
+                        Args:
+                            primitive : :math:`a` -- primitive value used to generate the field
+        """
+        ...
     def add(self: libffrs.GFi16, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
         """Addition: :math:`\text{lhs} + \text{rhs}`"""
         ...
@@ -183,6 +206,9 @@ class GFi16:
 
 
 class RS256:
+    def __init__(self: libffrs.RS256, block_len: typing.SupportsInt | typing.SupportsIndex | None = None, message_len: typing.SupportsInt | typing.SupportsIndex | None = None, ecc_len: typing.SupportsInt | typing.SupportsIndex | None = None, primitive: typing.SupportsInt | typing.SupportsIndex = 2, polynomial: typing.SupportsInt | typing.SupportsIndex = 285) -> None:
+        """Instantiate a Reed-Solomon encoder with the given configuration"""
+        ...
     def _synds(self: libffrs.RS256, buffer: collections.abc.Buffer) -> bytearray:
         """Compute syndromes"""
         ...

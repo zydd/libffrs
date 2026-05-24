@@ -30,7 +30,7 @@ def generate_stub(cls, overrides=None, property_types=None) -> str:
     count = False
 
     for name, member in members:
-        if name.startswith("__") or name.startswith("_pybind11"):
+        if (name.startswith("__") and name != "__init__") or name.startswith("_pybind11"):
             continue
 
         elif callable(member):
