@@ -48,12 +48,13 @@ public:
         size_t outer_block_len,
         size_t outer_ecc_len,
         size_t outer_interleave,
+        size_t primitive,
         std::optional<bool> simd_x4,
         std::optional<bool> simd_x8,
         std::optional<bool> simd_x16
     ):
-        rsi(inner_block_len, inner_ecc_len, 3, 1, simd_x4, simd_x8, simd_x16),
-        rso(outer_block_len, outer_ecc_len, 3, rsi.message_len * outer_interleave, simd_x4, simd_x8, simd_x16),
+        rsi(inner_block_len, inner_ecc_len, 1, primitive, simd_x4, simd_x8, simd_x16),
+        rso(outer_block_len, outer_ecc_len, rsi.message_len * outer_interleave, primitive, simd_x4, simd_x8, simd_x16),
         block_len(inner_block_len * outer_block_len * outer_interleave),
         message_len(rso.interleaved_message_len),
         rsi_interleaved_ecc_len(rsi.ecc_len * rso.message_len * outer_interleave),
@@ -72,6 +73,7 @@ public:
                     size_t,  // outer_block_len
                     size_t,  // outer_ecc_len
                     size_t,  // outer_interleave
+                    GFT,  // primitive
                     std::optional<bool>,  // simd_x4
                     std::optional<bool>,  // simd_x8
                     std::optional<bool>   // simd_x16
@@ -83,6 +85,7 @@ public:
                 "outer_ecc_len"_a,
                 "outer_interleave"_a = 1,
                 py::kw_only(),
+                "primitive"_a = 3,
                 "simd_x4"_a = py::none(),
                 "simd_x8"_a = py::none(),
                 "simd_x16"_a = py::none()

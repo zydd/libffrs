@@ -42,7 +42,12 @@ class PyGFi16 : public GFi16 {
 public:
     inline PyGFi16(uint32_t primitive):
         GFi16(gf_data(0x10001, 1, primitive, 0))
-    { }
+    {
+        py_assert(
+            pow(primitive, 32768) == 65536 && pow(primitive, 65536) == 1,
+            std::to_string(primitive) + " is not a primitive element of GF(" + std::to_string(prime) + ")"
+        );
+    }
 
     static inline void register_class(py::module &m) {
         using namespace pybind11::literals;

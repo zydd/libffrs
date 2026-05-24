@@ -140,10 +140,10 @@ public:
         ntt_len_i = gf.inv(ntt_len);
         ecc_len_i = gf.inv(ecc_len);
 
-        root = gf.exp(gf.div(gf.log(1), ntt_len));
-
-        if (gf.pow(root, ntt_len) != 1)
-            throw std::runtime_error("Root of unity not found for block size");
+        // root = gf.exp(gf.div(gf.log(1), ntt_len));
+        root = gf.pow(gf.primitive, 65536 / ntt_len);
+        py_assert(gf.pow(root, ntt_len) == 1, "ntt root of unity sanity check failed");
+        py_assert(gf.pow(root, ntt_len / 2) == 65536, "ntt root of unity sanity check failed");
 
         ::GFT root_i = gf.inv(root);
         _roots_ntt.resize(ntt_len);
@@ -167,8 +167,11 @@ public:
             _ecc_mix_i[i] = gf.neg(gf.pow(ecc_mix_w, i));
         }
 
-        ::GFT ecc_root = gf.pow(root, ntt_len / ecc_len);
         // ::GFT ecc_root = gf.exp(gf.div(gf.log(1), ecc_len));
+        // ::GFT ecc_root = gf.pow(root, ntt_len / ecc_len);
+        ::GFT ecc_root = gf.pow(gf.primitive, 65536 / ecc_len);
+        py_assert(gf.pow(ecc_root, ecc_len) == 1, "ntt root of unity sanity check failed");
+        py_assert(gf.pow(ecc_root, ecc_len / 2) == 65536, "ntt root of unity sanity check failed");
         ::GFT ecc_root_i = gf.inv(ecc_root);
         _roots_ecc.resize(ecc_len);
         _roots_i_ecc.resize(ecc_len);

@@ -48,8 +48,8 @@ private:
 
     inline PyRSi16(
         rs_data&& args,
-        uint32_t primitive,
         size_t interleave,
+        uint32_t primitive,
         bool simd_x4,
         bool simd_x8,
         bool simd_x16
@@ -103,16 +103,16 @@ public:
     inline PyRSi16(
             size_t block_len,
             uint16_t ecc_len,
-            uint32_t primitive,
             size_t interleave,
+            uint32_t primitive,
             std::optional<bool> simd_x4,
             std::optional<bool> simd_x8,
             std::optional<bool> simd_x16
     ):
         PyRSi16(
             rs_data(block_len, ecc_len),
-            primitive,
             interleave,
+            primitive,
             simd_x4.value_or(__builtin_cpu_supports("sse2")),
             simd_x8.value_or(__builtin_cpu_supports("avx2")),
             simd_x16.value_or(__builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512dq"))
@@ -242,8 +242,8 @@ public:
             .def(py::init<
                     size_t,    // block_len
                     uint16_t,  // ecc_len
-                    uint32_t,  // primitive
                     size_t,    // interleave
+                    uint32_t,  // primitive
                     std::optional<bool>,
                     std::optional<bool>,
                     std::optional<bool>
@@ -251,9 +251,9 @@ public:
                 R"(Instantiate a Reed-Solomon encoder with the given configuration)",
                 "block_len"_a,
                 "ecc_len"_a,
+                "interleave"_a = 1,
                 py::kw_only(),
                 "primitive"_a = 3,
-                "interleave"_a = 1,
                 "simd_x4"_a = py::none(),
                 "simd_x8"_a = py::none(),
                 "simd_x16"_a = py::none()
