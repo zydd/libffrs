@@ -75,7 +75,7 @@ import libffrs
 """
 
 class_stubs = {
-    "RSi16md": {"cls": libffrs.RSi16md, "property_types": dict(root="int", interleave="int", gf="libffrs.GFi16")},
+    "RSi16": {"cls": libffrs.RSi16, "property_types": dict(root="int", interleave="int", gf="libffrs.GFi16")},
 }
 for cls in dir(libffrs):
     if cls.startswith("_") or not inspect.isclass(getattr(libffrs, cls)) or cls in class_stubs:

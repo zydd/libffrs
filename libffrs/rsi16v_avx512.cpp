@@ -1,5 +1,5 @@
 /**************************************************************************
- * rsi16md_avx512.cpp
+ * rsi16v_avx512.cpp
  *
  * Copyright 2026 Gabriel Machado
  *
@@ -19,7 +19,7 @@
 #include <cstdint>
 #include <immintrin.h>
 
-#include "rsi16md_impl.hpp"
+#include "rsi16v_impl.hpp"
 
 
 template class RSi16v<16>;

@@ -181,7 +181,7 @@ class BaseTestCIRC:
     [
         ffrs.CIRC(4, 2, 4, 2),
         ffrs.CIRC(8, 2, 8, 2),
-        # ffrs.CIRC(8, 2, 65536, 2),  # TODO: validate RSi16md with 64k block
+        # ffrs.CIRC(8, 2, 65536, 2),  # TODO: validate RSi16 with 64k block
         ffrs.CIRC(16, 4, 16, 4),
         ffrs.CIRC(32, 16, 4, 2),
         ffrs.CIRC(128, 8, 128, 128 // 16),

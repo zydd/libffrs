@@ -1,4 +1,4 @@
-#  test_lib_rsi16md.py
+#  test_lib_rsi16.py
 #
 #  Copyright 2026 Gabriel Machado
 #
@@ -51,7 +51,7 @@ def add_errors(msg, ecc, count):
 
 
 class BaseTestRS:
-    def test_encode(self, rs: ffrs.RSi16md):
+    def test_encode(self, rs: ffrs.RSi16):
         buf = randbytes(rs.message_size)
 
         res = rs.encode(buf)
@@ -64,7 +64,7 @@ class BaseTestRS:
         assert to_bytearray(ecc_mix) == res
 
     @pytest.mark.parametrize("grace", [0, 1, 2, 3, 4])
-    def test_repair_unknown_locations(self, rs: ffrs.RSi16md, grace):
+    def test_repair_unknown_locations(self, rs: ffrs.RSi16, grace):
         msg_orig = [random.randrange(0, 2**16) for _ in range(rs.message_len)]
         ecc_orig = to_int_list(rs.encode(to_bytearray(msg_orig)))
         msg_err = list(msg_orig)
@@ -83,7 +83,7 @@ class BaseTestRS:
         assert msg_err + ecc_err == msg_orig + ecc_orig
 
     @pytest.mark.parametrize("grace", [0, 1, 2, 3, 4])
-    def test_repair(self, rs: ffrs.RSi16md, grace):
+    def test_repair(self, rs: ffrs.RSi16, grace):
         msg_orig = [random.randrange(0, 2**16) for _ in range(rs.message_len)]
         ecc_orig = to_int_list(rs.encode(to_bytearray(msg_orig)))
         msg_err = list(msg_orig)
@@ -101,7 +101,7 @@ class BaseTestRS:
 
         assert msg_err + ecc_err == msg_orig + ecc_orig
 
-    def test_repair_no_errors(self, rs: ffrs.RSi16md):
+    def test_repair_no_errors(self, rs: ffrs.RSi16):
         orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
         msg = to_bytearray(orig)
         ecc = rs.encode(msg)
@@ -113,7 +113,7 @@ class BaseTestRS:
         assert msg_err == msg
         assert ecc_err == ecc
 
-    def test_repair_unknown_no_errors(self, rs: ffrs.RSi16md):
+    def test_repair_unknown_no_errors(self, rs: ffrs.RSi16):
         orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
         msg = to_bytearray(orig)
         ecc = rs.encode(msg)
@@ -125,10 +125,10 @@ class BaseTestRS:
         assert msg_err == msg
         assert ecc_err == ecc
 
-    def test_encode_blocks_empty(self, rs: ffrs.RSi16md):
+    def test_encode_blocks_empty(self, rs: ffrs.RSi16):
         assert bytearray() == rs.encode(bytearray())
 
-    def test_encode_blocks_single(self, rs: ffrs.RSi16md):
+    def test_encode_blocks_single(self, rs: ffrs.RSi16):
         buf = randbytes(rs.message_size)
 
         buf_enc = rs.encode(buf)
@@ -138,7 +138,7 @@ class BaseTestRS:
         assert buf_enc == buf_enc_blk
 
     @pytest.mark.parametrize("count", [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 16, 100])
-    def test_encode_blocks_multiple(self, rs: ffrs.RSi16md, count):
+    def test_encode_blocks_multiple(self, rs: ffrs.RSi16, count):
         buf = randbytes(rs.message_size * count)
 
         buf_enc = [rs.encode(buf[i * rs.message_size : (i + 1) * rs.message_size]) for i in range(count)]
@@ -149,7 +149,7 @@ class BaseTestRS:
         assert buf_enc == buf_enc_blk
 
     @pytest.mark.parametrize("extra", [2, 4, 6, 8, 10, 12, 14, 128, 1500])
-    def test_encode_blocks_remainder(self, rs: ffrs.RSi16md, extra):
+    def test_encode_blocks_remainder(self, rs: ffrs.RSi16, extra):
         count = 16 + extra // rs.message_size
         extra = (extra % rs.message_size) or 2
         buf = randbytes(rs.message_size * count + extra)
@@ -164,9 +164,9 @@ class BaseTestRS:
         assert buf_enc == buf_enc_blk
 
     @pytest.mark.parametrize("interleave", list(range(2, 15)) + [32, 48, 100, 256])
-    def test_encode_interleaved(self, rs: ffrs.RSi16md, interleave):
+    def test_encode_interleaved(self, rs: ffrs.RSi16, interleave):
         assert rs.interleave == 1
-        rsi = ffrs.RSi16md(
+        rsi = ffrs.RSi16(
             rs.block_len,
             rs.ecc_len,
             interleave=interleave,
@@ -191,9 +191,9 @@ class BaseTestRS:
 
     @pytest.mark.parametrize("interleave", list(range(1, 16)) + [32, 48, 50, 100, 256])
     @pytest.mark.parametrize("grace", range(4))
-    def test_repair_interleaved_unknown_unaligned(self, rs: ffrs.RSi16md, interleave, grace):
+    def test_repair_interleaved_unknown_unaligned(self, rs: ffrs.RSi16, interleave, grace):
         assert rs.interleave == 1
-        rsi = ffrs.RSi16md(
+        rsi = ffrs.RSi16(
             rs.block_len,
             rs.ecc_len,
             interleave=interleave,
@@ -230,9 +230,9 @@ class BaseTestRS:
 
     @pytest.mark.parametrize("interleave", list(range(1, 16)) + [32, 48, 50, 100, 256])
     @pytest.mark.parametrize("grace", range(4))
-    def test_repair_interleaved_unknown_aligned(self, rs: ffrs.RSi16md, interleave, grace):
+    def test_repair_interleaved_unknown_aligned(self, rs: ffrs.RSi16, interleave, grace):
         assert rs.interleave == 1
-        rsi = ffrs.RSi16md(
+        rsi = ffrs.RSi16(
             rs.block_len,
             rs.ecc_len,
             interleave=interleave,
@@ -276,32 +276,32 @@ class BaseTestRS:
 @pytest.mark.parametrize(
     "rs",
     [
-        ffrs.RSi16md(4, ecc_len=2),
-        ffrs.RSi16md(8, ecc_len=2),
-        ffrs.RSi16md(16, ecc_len=4),
-        ffrs.RSi16md(16, ecc_len=8),
-        ffrs.RSi16md(128, ecc_len=2),
-        ffrs.RSi16md(256, ecc_len=32),
-        # ffrs.RSi16md(1024, ecc_len=128),
-        # ffrs.RSi16md(4096, ecc_len=512),
-        ffrs.RSi16md(4, ecc_len=2, simd_x16=False),
-        ffrs.RSi16md(16, ecc_len=4, simd_x16=False),
-        ffrs.RSi16md(128, ecc_len=2, simd_x16=False),
-        ffrs.RSi16md(256, ecc_len=32, simd_x16=False),
-        # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False),
-        # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False),
-        ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False),
-        ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False),
-        ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False),
-        ffrs.RSi16md(256, ecc_len=32, simd_x16=False, simd_x8=False),
-        # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False),
-        # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False),
-        ffrs.RSi16md(4, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
-        ffrs.RSi16md(16, ecc_len=4, simd_x16=False, simd_x8=False, simd_x4=False),
-        ffrs.RSi16md(128, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
-        ffrs.RSi16md(256, ecc_len=32, simd_x16=False, simd_x8=False, simd_x4=False),
-        # ffrs.RSi16md(1024, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
-        # ffrs.RSi16md(4096, ecc_len=512, simd_x16=False, simd_x8=False, simd_x4=False),
+        ffrs.RSi16(4, ecc_len=2),
+        ffrs.RSi16(8, ecc_len=2),
+        ffrs.RSi16(16, ecc_len=4),
+        ffrs.RSi16(16, ecc_len=8),
+        ffrs.RSi16(128, ecc_len=2),
+        ffrs.RSi16(256, ecc_len=32),
+        # ffrs.RSi16(1024, ecc_len=128),
+        # ffrs.RSi16(4096, ecc_len=512),
+        ffrs.RSi16(4, ecc_len=2, simd_x16=False),
+        ffrs.RSi16(16, ecc_len=4, simd_x16=False),
+        ffrs.RSi16(128, ecc_len=2, simd_x16=False),
+        ffrs.RSi16(256, ecc_len=32, simd_x16=False),
+        # ffrs.RSi16(1024, ecc_len=128, simd_x16=False),
+        # ffrs.RSi16(4096, ecc_len=512, simd_x16=False),
+        ffrs.RSi16(4, ecc_len=2, simd_x16=False, simd_x8=False),
+        ffrs.RSi16(16, ecc_len=4, simd_x16=False, simd_x8=False),
+        ffrs.RSi16(128, ecc_len=2, simd_x16=False, simd_x8=False),
+        ffrs.RSi16(256, ecc_len=32, simd_x16=False, simd_x8=False),
+        # ffrs.RSi16(1024, ecc_len=128, simd_x16=False, simd_x8=False),
+        # ffrs.RSi16(4096, ecc_len=512, simd_x16=False, simd_x8=False),
+        ffrs.RSi16(4, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
+        ffrs.RSi16(16, ecc_len=4, simd_x16=False, simd_x8=False, simd_x4=False),
+        ffrs.RSi16(128, ecc_len=2, simd_x16=False, simd_x8=False, simd_x4=False),
+        ffrs.RSi16(256, ecc_len=32, simd_x16=False, simd_x8=False, simd_x4=False),
+        # ffrs.RSi16(1024, ecc_len=128, simd_x16=False, simd_x8=False, simd_x4=False),
+        # ffrs.RSi16(4096, ecc_len=512, simd_x16=False, simd_x8=False, simd_x4=False),
     ],
 )
 class TestRSPower2(BaseTestRS):
@@ -311,15 +311,15 @@ class TestRSPower2(BaseTestRS):
 @pytest.mark.parametrize(
     "rs",
     [
-        ffrs.RSi16md(16 * 13, ecc_len=8),
-        ffrs.RSi16md(256 * 3, ecc_len=8),
+        ffrs.RSi16(16 * 13, ecc_len=8),
+        ffrs.RSi16(256 * 3, ecc_len=8),
     ],
 )
 class TestRSMult(BaseTestRS):
     # Limited support for multiples of powers of 2
     # TODO: partial intt or switch to forney algo
     @pytest.mark.skip
-    def test_skip(self, rs: ffrs.RSi16md):
+    def test_skip(self, rs: ffrs.RSi16):
         pass
 
     test_repair = test_skip
@@ -328,19 +328,19 @@ class TestRSMult(BaseTestRS):
 @pytest.mark.parametrize(
     "rs",
     [
-        ffrs.RSi16md(4096, ecc_len=8),
-        ffrs.RSi16md(4096, ecc_len=8),
-        ffrs.RSi16md(4096, ecc_len=8),
-        ffrs.RSi16md(4096, ecc_len=8),
-        ffrs.RSi16md(4096, ecc_len=256),
-        ffrs.RSi16md(2048, ecc_len=128),
-        ffrs.RSi16md(4096, ecc_len=2048),
-        ffrs.RSi16md(32768, ecc_len=256),
-        ffrs.RSi16md(65536, ecc_len=256),
+        ffrs.RSi16(4096, ecc_len=8),
+        ffrs.RSi16(4096, ecc_len=8),
+        ffrs.RSi16(4096, ecc_len=8),
+        ffrs.RSi16(4096, ecc_len=8),
+        ffrs.RSi16(4096, ecc_len=256),
+        ffrs.RSi16(2048, ecc_len=128),
+        ffrs.RSi16(4096, ecc_len=2048),
+        ffrs.RSi16(32768, ecc_len=256),
+        ffrs.RSi16(65536, ecc_len=256),
     ],
 )
 class TestRSLarge:
-    def test_repair_no_errors(self, rs: ffrs.RSi16md):
+    def test_repair_no_errors(self, rs: ffrs.RSi16):
         msg = randbytes(rs.message_size)
         ecc = rs.encode(msg)
         msg_err = bytearray(msg)
@@ -351,7 +351,7 @@ class TestRSLarge:
         assert msg_err == msg
         assert ecc_err == ecc
 
-    def test_repair_unknown_no_errors(self, rs: ffrs.RSi16md):
+    def test_repair_unknown_no_errors(self, rs: ffrs.RSi16):
         msg = randbytes(rs.message_size)
         ecc = rs.encode(msg)
         msg_err = bytearray(msg)
@@ -363,7 +363,7 @@ class TestRSLarge:
         assert ecc_err == ecc
 
     @pytest.mark.parametrize("grace", [2, 3, 4, 5])
-    def test_repair_unknown_locations(self, rs: ffrs.RSi16md, grace):
+    def test_repair_unknown_locations(self, rs: ffrs.RSi16, grace):
         msg_orig = randbytes(rs.message_size)
         ecc_orig = rs.encode(msg_orig)
 

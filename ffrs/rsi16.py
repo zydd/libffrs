@@ -1,4 +1,4 @@
-#  rsi16md.py
+#  rsi16.py
 #
 #  Copyright 2026 Gabriel Machado
 #
@@ -24,7 +24,7 @@ ntt = lambda w, x: to_int_list(ref.ntt.ntt(GF, w, rbo_sorted(x)))
 intt = lambda w, x: rbo_sorted(to_int_list(ref.ntt.intt(GF, w, x)))
 
 
-class RSi16md(libffrs.RSi16md):
+class RSi16(libffrs.RSi16):
     def _mix_ecc(self, ecc):
         i = rbo(self.block_len, self.block_len - self.ecc_len)
         w_i = self.gf.pow(self.gf.inv(self.root), i)
@@ -64,4 +64,4 @@ class RSi16md(libffrs.RSi16md):
         return [rbo(self.codeword_len, pos) for pos in err_pos_rbo]
 
     def __repr__(self):
-        return f"RSi16md({self.rs_block_len}, ecc_len={self.rs_ecc_len}{f", interleave={self.interleave}" if self.interleave != 1 else ""})"
+        return f"RSi16({self.rs_block_len}, ecc_len={self.rs_ecc_len}{f", interleave={self.interleave}" if self.interleave != 1 else ""})"

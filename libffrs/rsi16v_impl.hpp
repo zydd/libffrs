@@ -1,5 +1,5 @@
 /**************************************************************************
- * rsi16md_impl.hpp
+ * rsi16v_impl.hpp
  *
  * Copyright 2026 Gabriel Machado
  *
@@ -24,7 +24,7 @@
 #include <vector>
 
 #include "pygfi16.hpp"
-#include "rsi16md.h"
+#include "rsi16v.h"
 
 
 #include <pybind11/stl.h>

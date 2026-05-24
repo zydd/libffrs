@@ -11,12 +11,12 @@ FFRS main module
 """
 
 
-class RSi16md:
+class RSi16:
     block_len: int
     block_size: int
     ecc_len: int
     ecc_size: int
-    def encode(self: libffrs.RSi16md, buffer: collections.abc.Buffer) -> bytearray:
+    def encode(self: libffrs.RSi16, buffer: collections.abc.Buffer) -> bytearray:
         """Systematic encode"""
         ...
     gf: libffrs.GFi16
@@ -26,7 +26,7 @@ class RSi16md:
     message_size: int
     ntt_len: int
     ntt_size: int
-    def repair(self: libffrs.RSi16md, message: collections.abc.Buffer, ecc: collections.abc.Buffer, error_pos: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex] | None = None) -> None:
+    def repair(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer, error_pos: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex] | None = None) -> None:
         """Repair a block with the given error locations"""
         ...
     root: int
@@ -42,7 +42,7 @@ class RSi16md:
     """Enable SIMD x4 encoding"""
     simd_x8: bool
     """Enable SIMD x8 encoding"""
-    def synd(self: libffrs.RSi16md, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bytearray:
+    def synd(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bytearray:
         """Calculate syndromes for the given message and ecc buffers"""
         ...
 

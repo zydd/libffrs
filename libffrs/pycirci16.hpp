@@ -23,7 +23,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "pyrsi16md.hpp"
+#include "pyrsi16.hpp"
 
 
 namespace py = pybind11;
@@ -31,8 +31,8 @@ namespace py = pybind11;
 
 class PyCIRCi16 {
 private:
-    PyRSi16md rsi;
-    PyRSi16md rso;
+    PyRSi16 rsi;
+    PyRSi16 rso;
 
 public:
     const size_t block_len;

@@ -1,5 +1,5 @@
 /**************************************************************************
- * PyRSi16md.hpp
+ * PyRSi16.hpp
  *
  * Copyright 2026 Gabriel Machado
  *
@@ -24,13 +24,13 @@
 #include <pybind11/stl.h>
 
 #include "util.hpp"
-// #include "rsi16md_impl.hpp"
-#include "rsi16md.h"
+// #include "rsi16v_impl.hpp"
+#include "rsi16v.h"
 
 namespace py = pybind11;
 
 
-class PyRSi16md {
+class PyRSi16 {
 private:
     struct rs_data {
         size_t block_len;
@@ -46,7 +46,7 @@ private:
     bool simd_x8;
     bool simd_x16;
 
-    inline PyRSi16md(
+    inline PyRSi16(
         rs_data&& args,
         uint32_t primitive,
         size_t interleave,
@@ -100,7 +100,7 @@ public:
     const size_t interleaved_ecc_len;
     size_t vec_align;
 
-    inline PyRSi16md(
+    inline PyRSi16(
             size_t block_len,
             uint16_t ecc_len,
             uint32_t primitive,
@@ -109,7 +109,7 @@ public:
             std::optional<bool> simd_x8,
             std::optional<bool> simd_x16
     ):
-        PyRSi16md(
+        PyRSi16(
             rs_data(block_len, ecc_len),
             primitive,
             interleave,
@@ -206,36 +206,36 @@ public:
     static inline void register_class(py::module &m) {
         using namespace pybind11::literals;
 
-        py::class_<PyRSi16md>(m, "RSi16md")
-            .def_property_readonly("block_len", [](PyRSi16md& self) { return self.interleaved_block_len; })
-            .def_property_readonly("block_size", [](PyRSi16md& self) { return self.interleaved_block_len * sizeof(uint16_t); })
-            .def_property_readonly("message_len", [](PyRSi16md& self) { return self.interleaved_message_len; })
-            .def_property_readonly("message_size", [](PyRSi16md& self) { return self.interleaved_message_len * sizeof(uint16_t); })
-            .def_property_readonly("ecc_len", [](PyRSi16md& self) { return self.interleaved_ecc_len; })
-            .def_property_readonly("ecc_size", [](PyRSi16md& self) { return self.interleaved_ecc_len * sizeof(uint16_t); })
-            .def_property_readonly("rs_block_len", [](PyRSi16md& self) { return self.block_len; })
-            .def_property_readonly("rs_block_size", [](PyRSi16md& self) { return self.block_len * sizeof(uint16_t); })
-            .def_property_readonly("rs_message_len", [](PyRSi16md& self) { return self.message_len; })
-            .def_property_readonly("rs_message_size", [](PyRSi16md& self) { return self.message_len * sizeof(uint16_t); })
-            .def_property_readonly("rs_ecc_len", [](PyRSi16md& self) { return self.ecc_len; })
-            .def_property_readonly("rs_ecc_size", [](PyRSi16md& self) { return self.ecc_len * sizeof(uint16_t); })
-            .def_property_readonly("ntt_len", [](PyRSi16md& self) { return self.rs16.ntt_len; })
-            .def_property_readonly("ntt_size", [](PyRSi16md& self) { return self.rs16.ntt_len * sizeof(uint16_t); })
-            .def_property_readonly("root", [](PyRSi16md& self) { return self.rs16.root; })
-            .def_property_readonly("gf", [](PyRSi16md& self) -> auto const& { return self.gf; })
-            .def_property_readonly("interleave", [](PyRSi16md& self) { return self.interleave; },
+        py::class_<PyRSi16>(m, "RSi16")
+            .def_property_readonly("block_len", [](PyRSi16& self) { return self.interleaved_block_len; })
+            .def_property_readonly("block_size", [](PyRSi16& self) { return self.interleaved_block_len * sizeof(uint16_t); })
+            .def_property_readonly("message_len", [](PyRSi16& self) { return self.interleaved_message_len; })
+            .def_property_readonly("message_size", [](PyRSi16& self) { return self.interleaved_message_len * sizeof(uint16_t); })
+            .def_property_readonly("ecc_len", [](PyRSi16& self) { return self.interleaved_ecc_len; })
+            .def_property_readonly("ecc_size", [](PyRSi16& self) { return self.interleaved_ecc_len * sizeof(uint16_t); })
+            .def_property_readonly("rs_block_len", [](PyRSi16& self) { return self.block_len; })
+            .def_property_readonly("rs_block_size", [](PyRSi16& self) { return self.block_len * sizeof(uint16_t); })
+            .def_property_readonly("rs_message_len", [](PyRSi16& self) { return self.message_len; })
+            .def_property_readonly("rs_message_size", [](PyRSi16& self) { return self.message_len * sizeof(uint16_t); })
+            .def_property_readonly("rs_ecc_len", [](PyRSi16& self) { return self.ecc_len; })
+            .def_property_readonly("rs_ecc_size", [](PyRSi16& self) { return self.ecc_len * sizeof(uint16_t); })
+            .def_property_readonly("ntt_len", [](PyRSi16& self) { return self.rs16.ntt_len; })
+            .def_property_readonly("ntt_size", [](PyRSi16& self) { return self.rs16.ntt_len * sizeof(uint16_t); })
+            .def_property_readonly("root", [](PyRSi16& self) { return self.rs16.root; })
+            .def_property_readonly("gf", [](PyRSi16& self) -> auto const& { return self.gf; })
+            .def_property_readonly("interleave", [](PyRSi16& self) { return self.interleave; },
                 R"(Number of interleaved codewords for block encoding)")
 
             .def_property_readonly("simd_x4",
-                [](PyRSi16md& self) { return self.simd_x4; },
+                [](PyRSi16& self) { return self.simd_x4; },
                 R"(Enable SIMD x4 encoding)"
             )
             .def_property_readonly("simd_x8",
-                [](PyRSi16md& self) { return self.simd_x8; },
+                [](PyRSi16& self) { return self.simd_x8; },
                 R"(Enable SIMD x8 encoding)"
             )
             .def_property_readonly("simd_x16",
-                [](PyRSi16md& self) { return self.simd_x16; },
+                [](PyRSi16& self) { return self.simd_x16; },
                 R"(Enable SIMD x16 encoding)"
             )
 
@@ -259,18 +259,18 @@ public:
                 "simd_x16"_a = py::none()
             )
 
-            .def("__sizeof__", [](PyRSi16md& self) { return sizeof(self); })
+            .def("__sizeof__", [](PyRSi16& self) { return sizeof(self); })
 
-            .def("encode", cast_args(&PyRSi16md::py_encode),
+            .def("encode", cast_args(&PyRSi16::py_encode),
                 R"(Systematic encode)",
                 "buffer"_a)
 
-            .def("synd", cast_args(&PyRSi16md::py_synd),
+            .def("synd", cast_args(&PyRSi16::py_synd),
                 R"(Calculate syndromes for the given message and ecc buffers)",
                 "message"_a,
                 "ecc"_a)
 
-            .def("repair", cast_args(&PyRSi16md::py_repair),
+            .def("repair", cast_args(&PyRSi16::py_repair),
                 R"(Repair a block with the given error locations)",
                 "message"_a,
                 "ecc"_a,

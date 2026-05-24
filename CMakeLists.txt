@@ -7,16 +7,16 @@ add_subdirectory(pybind11)
 
 pybind11_add_module(pyffrs
     "libffrs/pyffrs.cpp"
-    "libffrs/rsi16md.cpp"
-    "libffrs/rsi16md_sse2.cpp"
-    "libffrs/rsi16md_avx2.cpp"
-    "libffrs/rsi16md_avx512.cpp"
+    "libffrs/rsi16v.cpp"
+    "libffrs/rsi16v_sse2.cpp"
+    "libffrs/rsi16v_avx2.cpp"
+    "libffrs/rsi16v_avx512.cpp"
 )
 
-set_source_files_properties("libffrs/rsi16md_sse2.cpp" PROPERTIES COMPILE_FLAGS "-msse -msse2")
-set_source_files_properties("libffrs/rsi16md_avx2.cpp" PROPERTIES COMPILE_FLAGS "-mavx2")
+set_source_files_properties("libffrs/rsi16v_sse2.cpp" PROPERTIES COMPILE_FLAGS "-msse -msse2")
+set_source_files_properties("libffrs/rsi16v_avx2.cpp" PROPERTIES COMPILE_FLAGS "-mavx2")
 # TODO: create variant with only -mavx512f
-set_source_files_properties("libffrs/rsi16md_avx512.cpp" PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512dq")
+set_source_files_properties("libffrs/rsi16v_avx512.cpp" PROPERTIES COMPILE_FLAGS "-mavx512f -mavx512dq")
 
 
 set_target_properties(pyffrs PROPERTIES OUTPUT_NAME "libffrs")

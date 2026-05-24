@@ -27,6 +27,7 @@ import ffrs
 import ffrs.reference.util
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
 
 
 def get_system_info():
@@ -254,7 +255,7 @@ def circ(args):
 
     results = []
 
-    # TODO: validate RSi16md with 64k block
+    # TODO: validate RSi16 with 64k block
     while block_size % (hash_ratio_den * ecc_ratio_den) == 0 and ecc_ratio_den <= 32768:
         outer_interleave = block_size // (hash_ratio_den * ecc_ratio_den)
         rs = ffrs.CIRC(hash_ratio_den // 2, hash_ratio_num // 2, ecc_ratio_den, ecc_ratio_num, outer_interleave)
@@ -271,24 +272,25 @@ def circ(args):
     cmap = plt.cm.Blues
     for i, (rso_block_len, outer_interleave, res) in enumerate(results):
         success_rates = [successes / tries for _, successes, tries in res]
-        error_counts = [error_count for error_count, _, _ in res]
+        error_rates = [error_count / rs.block_size for error_count, _, _ in res]
         color = cmap((i + 1) / (len(results) + 1))
         plt.plot(
-            error_counts,
+            error_rates,
             success_rates,
             color=color,
             label=f"rso_block_size: {rso_block_len * 2} outer_interleave: {outer_interleave}",
         )
 
     plt.ylabel("repair success rate")
-    plt.xlabel("errors")
-    plt.xscale("log", base=2)
+    plt.xlabel("error rate")
+    plt.gca().xaxis.set_major_formatter(PercentFormatter(xmax=1))
+    # plt.xscale("log", base=2)
     plt.legend()
     plt.tight_layout()
     plt.show()
 
 
-re_algo = re.compile(r"(RSi16md|CIRC)\((\w+=)?\d+(,\s*(\w+=)?\d+)*\)")
+re_algo = re.compile(r"(RSi16|CIRC)\((\w+=)?[\d+\-*/]+(,\s*(\w+=)?[\d+\-*/]+)*\)")
 
 
 def parse_algo(algo):

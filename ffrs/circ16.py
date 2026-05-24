@@ -15,7 +15,7 @@
 #  limitations under the License.
 
 import libffrs
-from . import rsi16md
+from . import rsi16
 
 
 class CIRC(libffrs.CIRCi16):
