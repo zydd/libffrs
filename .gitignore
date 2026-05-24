@@ -3,3 +3,6 @@
 /pybind11
 __pycache__/
 .vscode/
+.venv/
+/*.sh
+/*.rst

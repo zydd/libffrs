@@ -21,6 +21,7 @@
     :recursive:
 
     ffrs
+    libffrs
 
 .. toctree::
     genindex

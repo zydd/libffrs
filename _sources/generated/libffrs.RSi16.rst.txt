@@ -1,0 +1,66 @@
+libffrs.RSi16
+=============
+
+
+
+
+.. currentmodule:: libffrs
+
+.. autoclass:: RSi16
+
+
+    
+    .. rubric:: Methods
+
+    .. autosummary::
+        :nosignatures:
+        
+        RSi16.__init__
+        RSi16.encode
+        RSi16.repair
+        RSi16.synd
+    
+
+
+
+    
+    .. rubric:: Attributes
+
+    .. autosummary::
+        
+        RSi16.block_len
+        RSi16.block_size
+        RSi16.ecc_len
+        RSi16.ecc_size
+        RSi16.gf
+        RSi16.interleave
+        RSi16.message_len
+        RSi16.message_size
+        RSi16.ntt_len
+        RSi16.ntt_size
+        RSi16.root
+        RSi16.rs_block_len
+        RSi16.rs_block_size
+        RSi16.rs_ecc_len
+        RSi16.rs_ecc_size
+        RSi16.rs_message_len
+        RSi16.rs_message_size
+        RSi16.simd_x16
+        RSi16.simd_x4
+        RSi16.simd_x8
+    
+
+
+
+    .. automethod:: RSi16.__init__
+
+        
+    .. automethod:: RSi16.encode
+
+        
+    .. automethod:: RSi16.repair
+
+        
+    .. automethod:: RSi16.synd
+
+        

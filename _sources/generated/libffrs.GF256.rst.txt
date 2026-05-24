@@ -1,10 +1,10 @@
-ffrs.GF256
-==========
+libffrs.GF256
+=============
 
 
 
 
-.. currentmodule:: ffrs
+.. currentmodule:: libffrs
 
 .. autoclass:: GF256
 

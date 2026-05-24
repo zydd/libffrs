@@ -1,0 +1,70 @@
+libffrs.GFi16
+=============
+
+
+
+
+.. currentmodule:: libffrs
+
+.. autoclass:: GFi16
+
+
+    
+    .. rubric:: Methods
+
+    .. autosummary::
+        :nosignatures:
+        
+        GFi16.__init__
+        GFi16.add
+        GFi16.div
+        GFi16.exp
+        GFi16.inv
+        GFi16.log
+        GFi16.mul
+        GFi16.pow
+        GFi16.sub
+    
+
+
+
+    
+    .. rubric:: Attributes
+
+    .. autosummary::
+        
+        GFi16.field_elements
+        GFi16.power
+        GFi16.prime
+        GFi16.primitive
+    
+
+
+
+    .. automethod:: GFi16.__init__
+
+        
+    .. automethod:: GFi16.add
+
+        
+    .. automethod:: GFi16.div
+
+        
+    .. automethod:: GFi16.exp
+
+        
+    .. automethod:: GFi16.inv
+
+        
+    .. automethod:: GFi16.log
+
+        
+    .. automethod:: GFi16.mul
+
+        
+    .. automethod:: GFi16.pow
+
+        
+    .. automethod:: GFi16.sub
+
+        

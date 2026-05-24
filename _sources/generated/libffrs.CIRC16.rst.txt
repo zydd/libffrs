@@ -1,0 +1,60 @@
+libffrs.CIRC16
+==============
+
+
+
+
+.. currentmodule:: libffrs
+
+.. autoclass:: CIRC16
+
+
+    
+    .. rubric:: Methods
+
+    .. autosummary::
+        :nosignatures:
+        
+        CIRC16.__init__
+        CIRC16.encode
+        CIRC16.repair
+    
+
+
+
+    
+    .. rubric:: Attributes
+
+    .. autosummary::
+        
+        CIRC16.block_len
+        CIRC16.block_size
+        CIRC16.ecc_len
+        CIRC16.ecc_size
+        CIRC16.inner_block_len
+        CIRC16.inner_block_size
+        CIRC16.inner_ecc_len
+        CIRC16.inner_ecc_size
+        CIRC16.inner_message_len
+        CIRC16.inner_message_size
+        CIRC16.message_len
+        CIRC16.message_size
+        CIRC16.outer_block_len
+        CIRC16.outer_ecc_len
+        CIRC16.outer_interleave
+        CIRC16.outer_message_len
+        CIRC16.rsi
+        CIRC16.rso
+    
+
+
+
+    .. automethod:: CIRC16.__init__
+
+        
+    .. automethod:: CIRC16.encode
+
+        
+    .. automethod:: CIRC16.repair
+
+        

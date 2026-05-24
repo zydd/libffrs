@@ -5,9 +5,9 @@
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Benchmarks" href="benchmark.html" /><link rel="prev" title="libffrs" href="index.html" />
 
-    <!-- Generated with Sphinx 7.2.6 and Furo 2023.09.10 -->
+    <!-- Generated with Sphinx 7.4.7 and Furo 2023.09.10 -->
         <title>libffrs - libffrs documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=135e06be" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=36a5483c" />
     <link rel="stylesheet" type="text/css" href="_static/css/custom.css?v=16745c89" />
@@ -166,8 +166,19 @@
 </ul>
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="generated/ffrs.html">ffrs</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of ffrs</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="generated/ffrs.CIRC16.html">ffrs.CIRC16</a></li>
 <li class="toctree-l2"><a class="reference internal" href="generated/ffrs.GF256.html">ffrs.GF256</a></li>
+<li class="toctree-l2"><a class="reference internal" href="generated/ffrs.GFi16.html">ffrs.GFi16</a></li>
 <li class="toctree-l2"><a class="reference internal" href="generated/ffrs.RS256.html">ffrs.RS256</a></li>
+<li class="toctree-l2"><a class="reference internal" href="generated/ffrs.RSi16.html">ffrs.RSi16</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="generated/libffrs.html">libffrs</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of libffrs</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="generated/libffrs.CIRC16.html">libffrs.CIRC16</a></li>
+<li class="toctree-l2"><a class="reference internal" href="generated/libffrs.GF256.html">libffrs.GF256</a></li>
+<li class="toctree-l2"><a class="reference internal" href="generated/libffrs.GFi16.html">libffrs.GFi16</a></li>
+<li class="toctree-l2"><a class="reference internal" href="generated/libffrs.RS256.html">libffrs.RS256</a></li>
+<li class="toctree-l2"><a class="reference internal" href="generated/libffrs.RSi16.html">libffrs.RSi16</a></li>
 </ul>
 </li>
 </ul>
@@ -208,15 +219,15 @@
         </div>
         <article role="main">
           <section id="libffrs">
-<h1>libffrs<a class="headerlink" href="#libffrs" title="Link to this heading">#</a></h1>
+<h1>libffrs<a class="headerlink" href="#libffrs" title="Link to this heading">¶</a></h1>
 <p>Fairly <em>F</em>ast &amp; <em>F</em>lexible <em>R</em>eed-<em>S</em>olomon Coding</p>
 <p>This library uses a variation Intel’s Slicing-by-8 algorithm for the encoding routines,
 achieving some hefty speeds depending on the code sizes. See <a class="reference external" href="https://zydd.github.io/libffrs/benchmark.html">Benchmarks</a>.</p>
 <p>The core implementation is done in C++ and exported to Python with <a class="reference external" href="https://github.com/pybind/pybind11">pybind11</a>.</p>
 </section>
 <section id="basic-usage">
-<h1>Basic usage<a class="headerlink" href="#basic-usage" title="Link to this heading">#</a></h1>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">ffrs</span>
+<h1>Basic usage<a class="headerlink" href="#basic-usage" title="Link to this heading">¶</a></h1>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">ffrs</span>
 
 <span class="n">message</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;Hello World!&#39;</span><span class="p">)</span>
 
@@ -244,20 +255,20 @@ achieving some hefty speeds depending on the code sizes. See <a class="reference
 </div>
 </section>
 <section id="installation">
-<h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">#</a></h1>
+<h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h1>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>--recursive<span class="w"> </span>https://github.com/zydd/libffrs.git
 pip<span class="w"> </span>install<span class="w"> </span>./libffrs
 </pre></div>
 </div>
 </section>
 <section id="documentation">
-<h1>Documentation<a class="headerlink" href="#documentation" title="Link to this heading">#</a></h1>
+<h1>Documentation<a class="headerlink" href="#documentation" title="Link to this heading">¶</a></h1>
 <p>Auto-generated documentation can be found at:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://zydd.github.io/libffrs/">https://zydd.github.io/libffrs/</a></p></li>
 </ul>
 <section id="building-the-documentation">
-<h2>Building the documentation<a class="headerlink" href="#building-the-documentation" title="Link to this heading">#</a></h2>
+<h2>Building the documentation<a class="headerlink" href="#building-the-documentation" title="Link to this heading">¶</a></h2>
 <p>Documentation for this project is generated automatically using Sphinx based on class/method signatures and doc strings.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>./libffrs
 pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;sphinx&gt;=7.2&#39;</span><span class="w"> </span><span class="s1">&#39;furo==2023.9.10&#39;</span>
@@ -268,7 +279,7 @@ make<span class="w"> </span>-C<span class="w"> </span>./docs/<span class="w"> </
 </section>
 </section>
 <section id="license">
-<h1>License<a class="headerlink" href="#license" title="Link to this heading">#</a></h1>
+<h1>License<a class="headerlink" href="#license" title="Link to this heading">¶</a></h1>
 <p><strong>libffrs</strong> is licensed under the <a class="reference external" href="https://www.apache.org/licenses/LICENSE-2.0">Apache License, Version 2.0</a></p>
 </section>
 
@@ -301,7 +312,7 @@ make<span class="w"> </span>-C<span class="w"> </span>./docs/<span class="w"> </
         <div class="bottom-of-page">
           <div class="left-details">
             <div class="copyright">
-                Copyright &#169; 2024, Gabriel Machado
+                Copyright &#169; 2026, Gabriel Machado
             </div>
             Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
             
@@ -322,7 +333,7 @@ make<span class="w"> </span>-C<span class="w"> </span>./docs/<span class="w"> </
     </aside>
   </div>
 </div><script src="_static/documentation_options.js?v=5929fcd5"></script>
-    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/scripts/furo.js?v=32e29ea5"></script>
     </body>

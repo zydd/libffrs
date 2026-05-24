@@ -1,10 +1,10 @@
-ffrs.RS256
-==========
+libffrs.RS256
+=============
 
 
 
 
-.. currentmodule:: ffrs
+.. currentmodule:: libffrs
 
 .. autoclass:: RS256
 
@@ -43,12 +43,8 @@ ffrs.RS256
     .. automethod:: RS256.__init__
 
         
-        .. include:: ../extra/ffrs.RS256.__init__.rst
-        
     .. automethod:: RS256.encode
 
-        
-        .. include:: ../extra/ffrs.RS256.encode.rst
         
     .. automethod:: RS256.repair
 
