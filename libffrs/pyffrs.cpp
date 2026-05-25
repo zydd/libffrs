@@ -26,6 +26,76 @@
 #include "pyrsi16.hpp"
 #include "pycirc16.hpp"
 
+#include <pybind11/pybind11.h>
+
+#include <sys/mman.h>
+#include <unistd.h>
+
+#include <cerrno>
+#include <cstring>
+#include <stdexcept>
+
+
+// TODO: make portable
+py::memoryview py_create_buffer(size_t requested_size) {
+    // round up to hugepage size
+    constexpr size_t hugepage_size = 2 * 1024 * 1024;  // 2 MiB
+    size_t alloc_size = ((requested_size + hugepage_size - 1) / hugepage_size) * hugepage_size;
+
+    void *ptr = mmap(
+        nullptr,
+        alloc_size,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS, // | MAP_HUGETLB,
+        -1,
+        0
+    );
+
+    if (ptr == MAP_FAILED) {
+        throw std::runtime_error(
+            std::string("mmap failed: ") + std::strerror(errno));
+    }
+
+    madvise(ptr, alloc_size, MADV_HUGEPAGE);
+    mlock(ptr, alloc_size);
+    memset(ptr, 0, alloc_size);
+
+    auto *mapping = new std::pair{ptr, alloc_size};
+    py::capsule capsule(
+        mapping,
+        "hugepage_array",
+        [](PyObject *capsule) {
+            auto *mapping = reinterpret_cast<std::pair<void *, size_t> *>(PyCapsule_GetPointer(capsule, "hugepage_array"));
+
+            if (mapping) {
+                munmap(mapping->first, mapping->second);
+                delete mapping;
+            }
+        }
+    );
+
+    // return py::array_t<uint8_t>(
+    //     {static_cast<py::ssize_t>(requested_size)},
+    //     {static_cast<py::ssize_t>(sizeof(uint8_t))},
+    //     static_cast<uint8_t *>(ptr),
+    //     capsule
+    // );
+
+    Py_buffer view;
+    auto result = PyBuffer_FillInfo(
+        &view,
+        capsule.ptr(),  // owner object
+        ptr,            // data pointer
+        requested_size, // size in bytes
+        0,              // writable
+        PyBUF_CONTIG    // flags
+    );
+    if (result < 0)
+        throw py::error_already_set();
+
+    return py::reinterpret_steal<py::memoryview>(PyMemoryView_FromBuffer(&view));
+}
+
 
 PYBIND11_MODULE(libffrs, m) {
     m.attr("__version__") = VERSION_INFO;
@@ -40,6 +110,8 @@ PYBIND11_MODULE(libffrs, m) {
 #else
     m.attr("compiler_info") = "unknown";
 #endif
+
+    m.def("create_buffer", &py_create_buffer);
 
     m.doc() = R"(
         FFRS main module

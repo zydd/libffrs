@@ -305,7 +305,8 @@ def cmd_throughput(args):
     input_size = rs.message_size
     input_size = input_size * max(1, round(500 * 2**20 / input_size))
     print("input_size:", input_size / 2**20, "blocks:", input_size / rs.message_size)
-    data = ffrs.reference.util.randbytes(input_size)
+    # data = ffrs.reference.util.randbytes(input_size)
+    data = ffrs.create_buffer(input_size)
     benchmark_throughput(f"rs.encode(data)", dict(rs=rs, data=data), input_size=input_size)
 
 

@@ -302,11 +302,18 @@ private:
                 dst[i + j * dst_stride] = src[i * src_stride + j];
     }
 
-    template<typename Src, typename Dst>
+    template<bool Prefetch = true, size_t PrefetchDistance = 0, typename Src, typename Dst>
     inline void copy_stride(const Src *src, size_t src_stride, Dst *dst, size_t dst_stride, size_t cols, size_t count) const {
         size_t src_i = 0;
         size_t dst_i = 0;
         for (size_t i = 0; i < count; ++i) {
+            if constexpr (Prefetch) {
+                auto next = src_i + src_stride;
+                __builtin_prefetch(&src[next]);
+
+                if constexpr (PrefetchDistance)
+                    __builtin_prefetch(&src[next + PrefetchDistance]);
+            }
             std::copy_n(&src[src_i], cols, &dst[dst_i]);
             // std::memcpy(&dst[dst_i], &src[src_i], cols * sizeof(T));
             src_i += src_stride;
@@ -328,7 +335,7 @@ private:
         // temp_size = block_len * SIMD_W
         size_t vec_cols = interleave / SIMD_W;
         for (size_t i = 0; i < vec_cols; ++i) {
-            copy_stride(&src[i * SIMD_W], interleave, &temp[0], SIMD_W, SIMD_W, message_len);
+            copy_stride<true, SIMD_W / 2>(&src[i * SIMD_W], interleave, &temp[0], SIMD_W, SIMD_W, message_len);
             std::fill_n(&temp[message_len * SIMD_W], ecc_len * SIMD_W, 0);
             // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(GFT));
 
@@ -344,7 +351,7 @@ private:
         size_t encoded_cols = vec_cols * SIMD_W;
         if (encoded_cols < interleave) {
             size_t remaining_cols = interleave - encoded_cols;
-            copy_stride(&src[encoded_cols], interleave, &temp[0], SIMD_W, remaining_cols, message_len);
+            copy_stride<true, SIMD_W / 2>(&src[encoded_cols], interleave, &temp[0], SIMD_W, remaining_cols, message_len);
             std::fill_n(&temp[message_len * SIMD_W], ecc_len * SIMD_W, 0);
             // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(GFT));
 
