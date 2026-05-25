@@ -19,7 +19,21 @@ def format_docstring(txt: str) -> str:
     return docstring
 
 
-def generate_stub(cls, overrides=None, property_types=None) -> str:
+def fullname(cls):
+    module = cls.__module__
+    if module == "builtins":
+        return cls.__qualname__
+    return f"{module}.{cls.__qualname__}"
+
+
+def generate_stub(attr, overrides=None, property_types=None) -> str:
+    if inspect.isclass(attr):
+        cls = attr
+        obj = None
+    else:
+        cls = attr.__class__
+        obj = attr
+
     overrides = overrides or {}
     property_types = property_types or {}
     class_name = cls.__name__
@@ -44,7 +58,8 @@ def generate_stub(cls, overrides=None, property_types=None) -> str:
             lines.append(textwrap.indent(f"def {sig}:\n{method_body}", "    "))
 
         else:  # attribute
-            type_ = property_types.get(name, "Any")
+            type_ = fullname(getattr(obj, name).__class__) if obj else "Any"
+            type_ = property_types.get(name, type_)
             if name.endswith("_len") or name.endswith("_size"):
                 type_ = "int"
             if name.startswith("simd_x"):
@@ -75,13 +90,19 @@ import libffrs
 """
 
 class_stubs = {
-    "RSi16": {"cls": libffrs.RSi16, "property_types": dict(root="int", interleave="int", gf="libffrs.GFi16")},
+    "RSi16": libffrs.RSi16(4, 2),
+    "CIRC16": libffrs.CIRC16(4, 2, 4, 2),
+    "GFi16": libffrs.GFi16(3),
+    "GF256": libffrs.GF256(),
+    "RS256": libffrs.RS256(4, 2),
 }
+
 for cls in dir(libffrs):
     if cls.startswith("_") or not inspect.isclass(getattr(libffrs, cls)) or cls in class_stubs:
         continue
-    class_stubs[cls] = {"cls": getattr(libffrs, cls)}
+    class_stubs[cls] = getattr(libffrs, cls)
 
+class_stubs = [val for _, val in sorted(class_stubs.items(), key=lambda x: x[0])]
 
 output_dir = sys.argv[1]
 
@@ -89,7 +110,7 @@ with open(output_dir + "/__init__.pyi", "w", encoding="utf8") as f:
     f.write(header)
     if libffrs.__doc__:
         f.write(f'"""\n{textwrap.dedent(libffrs.__doc__).strip()}\n"""\n')
-    for stub in class_stubs.values():
+    for stub in class_stubs:
         f.write("\n\n")
-        f.write(generate_stub(**stub))
+        f.write(generate_stub(stub))
         f.write("\n")

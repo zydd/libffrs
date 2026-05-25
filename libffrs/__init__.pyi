@@ -11,45 +11,6 @@ FFRS main module
 """
 
 
-class RSi16:
-    def __init__(self: libffrs.RSi16, block_len: typing.SupportsInt | typing.SupportsIndex, ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
-        """Instantiate a Reed-Solomon encoder with the given configuration"""
-        ...
-    block_len: int
-    block_size: int
-    ecc_len: int
-    ecc_size: int
-    def encode(self: libffrs.RSi16, buffer: collections.abc.Buffer) -> bytearray:
-        """Systematic encode"""
-        ...
-    gf: libffrs.GFi16
-    interleave: int
-    """Number of interleaved codewords for block encoding"""
-    message_len: int
-    message_size: int
-    ntt_len: int
-    ntt_size: int
-    def repair(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer, error_pos: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex] | None = None) -> None:
-        """Repair a block with the given error locations"""
-        ...
-    root: int
-    rs_block_len: int
-    rs_block_size: int
-    rs_ecc_len: int
-    rs_ecc_size: int
-    rs_message_len: int
-    rs_message_size: int
-    simd_x16: bool
-    """Enable SIMD x16 encoding"""
-    simd_x4: bool
-    """Enable SIMD x4 encoding"""
-    simd_x8: bool
-    """Enable SIMD x8 encoding"""
-    def synd(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bytearray:
-        """Calculate syndromes for the given message and ecc buffers"""
-        ...
-
-
 class CIRC16:
     def __init__(self: libffrs.CIRC16, inner_block_len: typing.SupportsInt | typing.SupportsIndex, inner_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_block_len: typing.SupportsInt | typing.SupportsIndex, outer_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
         """Cross-interleaved Reed-Solomon coder"""
@@ -71,13 +32,13 @@ class CIRC16:
     message_size: int
     outer_block_len: int
     outer_ecc_len: int
-    outer_interleave: Any
+    outer_interleave: int
     outer_message_len: int
     def repair(self: libffrs.CIRC16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bool:
         """Repair data"""
         ...
-    rsi: Any
-    rso: Any
+    rsi: libffrs.RSi16
+    rso: libffrs.RSi16
 
 
 class GF256:
@@ -99,7 +60,7 @@ class GF256:
     def exp(self: libffrs.GF256, value: typing.SupportsInt | typing.SupportsIndex) -> int:
         """Exponential function: :math:`a^{\text{value}}`"""
         ...
-    field_elements: Any
+    field_elements: int
     """Always 256"""
     def inv(self: libffrs.GF256, value: typing.SupportsInt | typing.SupportsIndex) -> int:
         """Reciprocal: :math:`\frac{1}{\text{value}}`"""
@@ -113,7 +74,7 @@ class GF256:
     def mul8(self: libffrs.GF256, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
         """Multiply 8 values in a single operation"""
         ...
-    poly1: Any
+    poly1: int
     """Masked irreducible polynomial, excluding MSb"""
     def poly_add(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
         """Add polynomials"""
@@ -151,11 +112,11 @@ class GF256:
     def pow(self: libffrs.GF256, base: typing.SupportsInt | typing.SupportsIndex, exponent: typing.SupportsInt | typing.SupportsIndex) -> int:
         """Power: :math:`\text{base}^\text{exponent}`"""
         ...
-    power: Any
+    power: int
     """Always 8"""
-    prime: Any
+    prime: int
     """Always 2"""
-    primitive: Any
+    primitive: int
     """Primitive value used to generate the field"""
     def sub(self: libffrs.GF256, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
         """Subtraction: :math:`\text{lhs} - \text{rhs}`"""
@@ -180,7 +141,7 @@ class GFi16:
     def exp(self: libffrs.GFi16, value: typing.SupportsInt | typing.SupportsIndex) -> int:
         """Exponential function: :math:`a^{\text{value}}`"""
         ...
-    field_elements: Any
+    field_elements: int
     """:math:`p`"""
     def inv(self: libffrs.GFi16, value: typing.SupportsInt | typing.SupportsIndex) -> int:
         """Reciprocal: :math:`\frac{1}{\text{value}}`"""
@@ -194,11 +155,11 @@ class GFi16:
     def pow(self: libffrs.GFi16, base: typing.SupportsInt | typing.SupportsIndex, exponent: typing.SupportsInt | typing.SupportsIndex) -> int:
         """Power: :math:`\text{base}^\text{exponent}`"""
         ...
-    power: Any
+    power: int
     """Always 1"""
-    prime: Any
+    prime: int
     """:math:`p`"""
-    primitive: Any
+    primitive: int
     """Primitive value used to generate the field"""
     def sub(self: libffrs.GFi16, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
         """Subtraction: :math:`\text{lhs} - \text{rhs}`"""
@@ -219,11 +180,50 @@ class RS256:
     def encode(self: libffrs.RS256, buffer: collections.abc.Buffer) -> bytearray:
         """Encode message, return ecc"""
         ...
-    generator: Any
-    generator_roots: Any
-    gf: Any
+    generator: bytes
+    generator_roots: bytes
+    gf: libffrs.GF256
     message_len: int
     message_size: int
     def repair(self: libffrs.RS256, buffer: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bool:
         """Repair message + ecc"""
+        ...
+
+
+class RSi16:
+    def __init__(self: libffrs.RSi16, block_len: typing.SupportsInt | typing.SupportsIndex, ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
+        """Instantiate a Reed-Solomon encoder with the given configuration"""
+        ...
+    block_len: int
+    block_size: int
+    ecc_len: int
+    ecc_size: int
+    def encode(self: libffrs.RSi16, buffer: collections.abc.Buffer) -> bytearray:
+        """Systematic encode"""
+        ...
+    gf: libffrs.GFi16
+    interleave: int
+    """Number of interleaved codewords for block encoding"""
+    message_len: int
+    message_size: int
+    ntt_len: int
+    ntt_size: int
+    def repair(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer, error_pos: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex] | None = None) -> None:
+        """Repair a block with the given error locations"""
+        ...
+    root: int
+    rs_block_len: int
+    rs_block_size: int
+    rs_ecc_len: int
+    rs_ecc_size: int
+    rs_message_len: int
+    rs_message_size: int
+    simd_x16: bool
+    """Enable SIMD x16 encoding"""
+    simd_x4: bool
+    """Enable SIMD x4 encoding"""
+    simd_x8: bool
+    """Enable SIMD x8 encoding"""
+    def synd(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bytearray:
+        """Calculate syndromes for the given message and ecc buffers"""
         ...
