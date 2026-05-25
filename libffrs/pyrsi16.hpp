@@ -120,19 +120,27 @@ public:
     { }
 
     template<typename Src, typename Dst>
-    inline void encode_blocks(const Src src[], size_t full_blocks, size_t remainder, Dst dst[]) {
-        size_t block = 0;
+    inline void encode_blocks(const Src src[], size_t full_blocks, Dst dst[]) {
         _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
             auto temp = new_aligned<GFT>(block_len * SIMD_W, SIMD_W * sizeof(GFT));
-            while (full_blocks - block >= SIMD_W) {
-                encode_block<SIMD_W>(rs, &src[block * message_len], &temp[0], &dst[block * ecc_len]);
-                block += SIMD_W;
-            }
 
-            remainder += (full_blocks - block) * message_len;
-            if (remainder) {
+            size_t block = 0;
+            for (; full_blocks - block >= SIMD_W; block += SIMD_W)
+                encode_block<SIMD_W>(rs, &src[block * message_len], &temp[0], &dst[block * ecc_len]);
+
+            auto remainder = (full_blocks - block) * message_len;
+            if (remainder)
                 encode_block<SIMD_W>(rs, &src[block * message_len], remainder, &temp[0], &dst[block * ecc_len]);
-            }
+        });
+    }
+
+    template<typename Src, typename Dst>
+    inline void encode_interleaved_blocks(const Src src[], size_t full_blocks, Dst dst[]) {
+        _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
+            // TODO: handle case when interleave is not a multiple of SIMD_W
+            auto temp = new_aligned<GFT>(block_len * SIMD_W, SIMD_W * sizeof(GFT));
+            for (size_t block = 0; block < full_blocks; ++block)
+                _encode_interleaved<SIMD_W>(rs, &src[0], &temp[0], &dst[0]);
         });
     }
 
@@ -536,33 +544,26 @@ private:
         }
     }
 
+
     inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
         if (buf.size == 0)
             return {};
 
-        if (interleave == 1) {
-            size_t full_blocks = buf.size / message_len;
-            size_t output_size = full_blocks * ecc_len;
+        py_assert(buf.size % interleaved_message_len == 0, std::to_string(buf.size));
 
-            // Last block will be smaller if input size is not divisible by message_len
-            size_t input_remainder = buf.size - full_blocks * message_len;
-            if (input_remainder > 0)
-                output_size += ecc_len;
+        size_t full_blocks = buf.size / interleaved_message_len;
+        size_t output_size = full_blocks * interleaved_ecc_len;
 
-            auto output = py::bytearray(nullptr, output_size * sizeof(uint16_t));
-            auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
 
-            encode_blocks(&buf[0], full_blocks, input_remainder, &output_data[0]);
-            return output;
-        } else {
-            // TODO: encode multiple interleaved chunks
-            py_assert(buf.size == message_len * interleave, std::to_string(buf.size));
+        auto output = py::bytearray(nullptr, output_size * sizeof(uint16_t));
+        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
 
-            auto output = py::bytearray(nullptr, ecc_len * interleave * sizeof(uint16_t));
-            auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
-            encode_interleaved(&buf[0], &output_data[0]);
-            return output;
-        }
+        if (interleave == 1)
+            encode_blocks(&buf[0], full_blocks, &output_data[0]);
+        else
+            encode_interleaved_blocks(&buf[0], full_blocks, &output_data[0]);
+
+        return output;
     }
 
     inline void py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, std::optional<std::vector<size_t>> const& error_pos) {

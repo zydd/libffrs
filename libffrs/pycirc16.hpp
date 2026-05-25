@@ -117,25 +117,31 @@ public:
 
 private:
     inline py::bytearray py_encode(buffer_ro<uint16_t> buf) {
-        py_assert(buf.size % rso.interleaved_message_len == 0, std::to_string(buf.size));
-        py_assert(buf.size % rsi.message_len == 0, std::to_string(buf.size));
-        size_t rsi_blocks = buf.size / rsi.message_len;
-        py_assert(rsi_blocks * rsi.message_len == buf.size, std::to_string(buf.size));
+        py_assert(buf.size % message_len == 0, std::to_string(buf.size));
 
-        auto output = py::bytearray(nullptr, ecc_len * sizeof(uint16_t));
+        size_t full_blocks = buf.size / message_len;
+
+        auto output = py::bytearray(nullptr, full_blocks * ecc_len * sizeof(uint16_t));
         auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
         auto temp = new_aligned<GFT>(rso.interleaved_ecc_len, rsi.vec_align);
 
-        auto rso_ecc = &output_data[0];  // size = rso.interleaved_ecc_len
-        auto rsi_ecc = &output_data[rso.interleaved_ecc_len];  // size = rsi_interleaved_ecc_len
-        auto rsio_ecc = &output_data[rso.interleaved_ecc_len + rsi_interleaved_ecc_len];  // size = rsio_ecc_len
-
-        rso.encode_interleaved(&buf[0], &temp[0]);
-        std::copy_n(&temp[0], rso.interleaved_ecc_len, &rso_ecc[0]);
-        rsi.encode_blocks(&buf[0], rsi_blocks, 0, &rsi_ecc[0]);
-        rsi.encode_blocks(&temp[0], rso.ecc_len * outer_interleave, 0, &rsio_ecc[0]);
+        for (size_t i = 0; i < full_blocks; ++i)
+            encode_block(&buf[i * message_len], &output_data[i * ecc_len]);
 
         return output;
+    }
+
+    inline void encode_block(const uint16_t src[], uint16_t dst[]) {
+        auto temp = new_aligned<GFT>(rso.interleaved_ecc_len, rsi.vec_align);
+
+        auto rso_ecc = &dst[0];  // size = rso.interleaved_ecc_len
+        auto rsi_ecc = &dst[rso.interleaved_ecc_len];  // size = rsi_interleaved_ecc_len
+        auto rsio_ecc = &dst[rso.interleaved_ecc_len + rsi_interleaved_ecc_len];  // size = rsio_ecc_len
+
+        rso.encode_interleaved(&src[0], &temp[0]);
+        std::copy_n(&temp[0], rso.interleaved_ecc_len, &rso_ecc[0]);
+        rsi.encode_blocks(&src[0], rso.message_len * outer_interleave, &rsi_ecc[0]);
+        rsi.encode_blocks(&temp[0], rso.ecc_len * outer_interleave, &rsio_ecc[0]);
     }
 
     inline bool py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc) {
@@ -250,8 +256,8 @@ private:
 
         // TODO: sanity check on updated ecc
         std::copy_n(&rso_ecc[0], rso.interleaved_ecc_len, &ecc[0]);
-        rsi.encode_blocks(&message[0], rso.message_len * outer_interleave, 0, &rsi_ecc[0]);
-        rsi.encode_blocks(&rso_ecc[0], rso.ecc_len * outer_interleave, 0, &rsio_ecc[0]);
+        rsi.encode_blocks(&message[0], rso.message_len * outer_interleave, &rsi_ecc[0]);
+        rsi.encode_blocks(&rso_ecc[0], rso.ecc_len * outer_interleave, &rsio_ecc[0]);
 
         return false;
     }

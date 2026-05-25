@@ -290,7 +290,7 @@ def circ(args):
     plt.show()
 
 
-re_algo = re.compile(r"(RSi16|CIRC)\((\w+=)?[\d+\-*/]+(,\s*(\w+=)?[\d+\-*/]+)*\)")
+re_algo = re.compile(r"(RSi16|CIRC16)\((\w+=)?[\d+\-*/]+(,\s*(\w+=)?[\d+\-*/]+)*\)")
 
 
 def parse_algo(algo):
@@ -302,8 +302,11 @@ def cmd_throughput(args):
     rs = parse_algo(args.algo)
     print(get_system_info())
     print(rs.message_size / 2**20, rs.ecc_size / 2**20, rs.ecc_size / rs.message_size)
-    data = ffrs.reference.util.randbytes(rs.message_size)
-    benchmark_throughput(f"rs.encode(data)", dict(rs=rs, data=data), input_size=rs.message_size)
+    input_size = rs.message_size
+    input_size = input_size * max(1, round(500 * 2**20 / input_size))
+    print("input_size:", input_size / 2**20, "blocks:", input_size / rs.message_size)
+    data = ffrs.reference.util.randbytes(input_size)
+    benchmark_throughput(f"rs.encode(data)", dict(rs=rs, data=data), input_size=input_size)
 
 
 def decode_throughput(args):

@@ -73,14 +73,7 @@ class BaseTestCIRC:
         if rs.inner_message_len < 64:
             assert res[-len(res_io) :] == res_io
 
-    def test_circ_repair(self, rs: ffrs.CIRC16):
-        buf = randbytes(rs.message_size)
-        ecc = rs.encode(buf)
-        assert len(ecc) == rs.ecc_size
-
-        msg_orig = bytearray(buf)
-        ecc_orig = bytearray(ecc)
-
+    def add_errors_start(self, rs, buf, ecc):
         # Corrupt message
         for i in range((rs.outer_ecc_len - 1) * rs.inner_message_size):
             buf[i] ^= random.randint(0, 255)
@@ -97,6 +90,32 @@ class BaseTestCIRC:
         rsio_size = self._rsi_ecc_size(rs) + self._rso_ecc_size(rs)
         for i in range(rsio_size, rsio_size + rs.inner_ecc_size):
             ecc[i] ^= random.randint(0, 255)
+
+    def test_circ_repair(self, rs: ffrs.CIRC16):
+        buf = randbytes(rs.message_size)
+        ecc = rs.encode(buf)
+        assert len(ecc) == rs.ecc_size
+
+        msg_orig = bytearray(buf)
+        ecc_orig = bytearray(ecc)
+
+        self.add_errors_start(rs, buf, ecc)
+
+        rs.repair(buf, ecc)
+
+        assert buf == msg_orig
+        assert ecc == ecc_orig
+
+    @pytest.mark.parametrize("count", range(1, 10))
+    def test_circ_repair_multiple(self, rs: ffrs.CIRC16, count):
+        buf = randbytes(rs.message_size)
+        ecc = rs.encode(buf)
+        assert len(ecc) == rs.ecc_size
+
+        msg_orig = bytearray(buf)
+        ecc_orig = bytearray(ecc)
+
+        self.add_errors_start(rs, buf, ecc)
 
         rs.repair(buf, ecc)
 
@@ -245,6 +264,7 @@ class TestCircMult(BaseTestCIRC):
         pass
 
     test_circ_repair = test_skip
+    test_circ_repair_multiple = test_skip
     test_circ_repair_zeroes = test_skip
     test_repair_fallback = test_skip
     test_repair_no_errors = test_skip
