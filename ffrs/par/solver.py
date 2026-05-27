@@ -1,0 +1,303 @@
+#  par/solver.py
+#
+#  Copyright 2026 Gabriel Machado
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+
+import itertools
+import math
+import re
+
+MAX_DOMAIN_SIZE = 65537
+
+
+class _Equation:
+    _re_expression = re.compile(r"^[\w\s{}+-]+$")
+    _re_var = re.compile(r"\{(\w+)\}")
+
+    @staticmethod
+    def solve_for_vars(expr):
+        eq = expr.split("==")
+        if len(eq) != 2:
+            return []
+
+        lhs, rhs = eq
+        lhs_match = _Equation._re_expression.match(lhs)
+        rhs_match = _Equation._re_expression.match(rhs)
+        if not lhs_match and not rhs_match:
+            return []
+
+        if lhs_match and rhs_match:
+            lhs = _Equation._parse_eq_terms(lhs)
+            rhs = _Equation._parse_eq_terms(rhs)
+
+            expr = _Equation._sub(lhs, rhs)
+            if not all(re.match(r"\{\w+\}$", term) for sign, term in expr):
+                print("Warning: unexpected term:", expr)
+                return []
+
+            expr = [(sign, term.strip("{}")) for sign, term in expr]
+            variables = set(term for sign, term in expr)
+            return _Equation._solve_all(variables, expr)
+
+        if not lhs_match:
+            lhs, rhs = rhs, lhs
+
+        lhs = _Equation._parse_eq_terms(lhs)
+
+        if not all(re.match(r"\{\w+\}$", term) for sign, term in lhs):
+            print("Warning: unexpected term:", expr)
+            return []
+
+        lhs = [(sign, term.strip("{}")) for sign, term in lhs]
+
+        rhs_vars = set(_Equation._re_var.findall(rhs))
+
+        # Treat rhs as a single term
+        rhs = _Equation._re_var.sub(r"\1", rhs)
+        rhs = [("+", rhs)]
+
+        expr = _Equation._sub(lhs, rhs)
+        variables = set(term for sign, term in lhs)
+        return _Equation._solve_all(variables, expr, rhs_vars)
+
+    def _parse_eq_terms(expr):
+        expr = re.split(r"([-+])", expr)
+        sign = "+"
+        res = []
+        for term in expr:
+            if term in ["+", "-"]:
+                sign = term
+            else:
+                res.append((sign, term.strip()))
+        return res
+
+    def _sub(lhs, rhs):
+        res = list(lhs)
+        for sign, term in rhs:
+            if (sign, term) in res:
+                res.remove((sign, term))
+            else:
+                opposite_sign = "+" if sign == "-" else "-"
+                res.append((opposite_sign, term))
+        return res
+
+    def _solve_for(var, expr):
+        res = []
+        occurrences = 0
+        var_sign = None
+        for sign, term in expr:
+            if term == var:
+                occurrences += 1
+                var_sign = sign
+
+        assert occurrences == 1, f"{var} appears more than once in {expr}"
+
+        for sign, term in expr:
+            if term == var:
+                continue
+
+            if var_sign == "-":
+                res.append((sign, term))
+            else:
+                opposite_sign = "+" if sign == "-" else "-"
+                res.append((opposite_sign, term))
+        return res
+
+    def _solve_all(vars, expr, other_args=None):
+        other_args = other_args or []
+        eqs = []
+        for var in vars:
+            rhs = _Equation._solve_for(var, expr)
+            rhs = f"{' '.join(f'{sign} {term}' for sign, term in rhs)}"
+            args = [v for v in vars if v != var] + list(other_args)
+            func_code = f"lambda {", ".join(args)}: {rhs}"
+            eqs.append(
+                dict(
+                    eq=f"{var} = {rhs}",
+                    var=var,
+                    func_code=func_code,
+                    func=eval(func_code),
+                    args=args,
+                )
+            )
+        return eqs
+
+
+class Solver:
+    def __init__(self, variables, constraints, free_variables):
+        self._iterations = 0
+        self.constraints = constraints
+        self._resolved_constraints = set()
+        self.free_variables = set(free_variables)
+
+        # Constraints for each variable
+        self.var_constraints = {}
+        for var in variables:
+            self.var_constraints[var] = list()
+            for i, constr in enumerate(constraints):
+                if f"{{{var}}}" in constr:
+                    self.var_constraints[var].append(i)
+
+        # Variables needed by each constraint
+        self.constraint_vars = [None] * len(constraints)
+        for i, constr in enumerate(constraints):
+            self.constraint_vars[i] = list()
+            for var in variables:
+                if f"{{{var}}}" in constr and var not in self.constraint_vars[i]:
+                    self.constraint_vars[i].append(var)
+
+        self.constraint_functions = []
+        for i, constr in enumerate(constraints):
+            args = ", ".join(self.constraint_vars[i])
+            constr = constr.format(**dict(zip(self.constraint_vars[i], self.constraint_vars[i])))
+            func = f"lambda {args}: {constr}"
+            self.constraint_functions.append(eval(func))
+
+        self.equivalences = []
+        self.equivalence_functions = []
+        self.equivalence_vars = []
+
+        print("Equivalences:")
+        for i, constr in enumerate(self.constraints):
+            for eq in _Equation.solve_for_vars(constr):
+                print(f"{len(self.equivalences):2} {eq["var"]} = {eq["func_code"]}")
+                self.equivalences.append(eq["eq"])
+                self.equivalence_functions.append((eq["var"], eq["func"]))
+                self.equivalence_vars.append(eq["args"])
+        print()
+
+    def propagate_equivalences(self, config):
+        updated = True
+        while updated:
+            updated = False
+            for i, (var, func) in enumerate(self.equivalence_functions):
+                arg_domain_size = math.prod(
+                    len(config[arg]) if config[arg] is not None else float("inf") for arg in self.equivalence_vars[i]
+                )
+                var_domain_size = len(config[var]) if config[var] is not None else float("inf")
+                if not (
+                    arg_domain_size < var_domain_size
+                    and arg_domain_size <= MAX_DOMAIN_SIZE
+                    # and var_domain_size > MAX_DOMAIN_SIZE
+                    and var in self.free_variables
+                ):
+                    continue
+
+                # self.free_variables.add(var)
+                valid_set = set(
+                    func(*values) for values in itertools.product(*(config[arg] for arg in self.equivalence_vars[i]))
+                )
+                print(f"equiv: {var:20} {var_domain_size:5} -> {len(valid_set):5}     '{self.equivalences[i]}'")
+                config[var] = valid_set
+
+                # Need to re-evaluate constraints for new set
+                self.resolve_constraints(config, self.var_constraints[var])
+                # self._resolved_constraints -= set(self.var_constraints[var])
+
+                updated = True
+
+    def resolve_constraints(self, config, constraints=None):
+        constraints = constraints or (set(range(len(self.constraints))) - self._resolved_constraints)
+        # constraints = range(len(self.constraints))
+        updated = True
+        while updated:
+            updated = False
+            for idx in constraints:
+                domain_size = math.prod(
+                    len(config[var]) if config[var] is not None else float("inf") for var in self.constraint_vars[idx]
+                )
+                if domain_size > MAX_DOMAIN_SIZE:
+                    continue
+
+                self._resolved_constraints.add(idx)
+
+                valid = [set() for _ in range(len(self.constraint_vars[idx]))]
+                for constr_args in itertools.product(*(config[var] for var in self.constraint_vars[idx])):
+                    try:
+                        self._iterations += 1
+                        constr_eval = self.constraint_functions[idx](*constr_args)
+                    except:
+                        print(
+                            f"Error evaluating constraint '{self.constraints[idx]}'"
+                            f" with values {dict(zip(self.constraint_vars[idx], constr_args))}"
+                        )
+                        breakpoint()
+                        continue
+
+                    # domain_str = ", ".join(f"{k}={v}" for k, v in zip(self.constraint_vars[idx], domains))
+                    # print(f"eval {str(constr_eval):5} '{self.constraints[idx]}' with ({domain_str})")
+
+                    if constr_eval is True:
+                        for i, v in enumerate(constr_args):
+                            valid[i].add(v)
+
+                for i, var in enumerate(self.constraint_vars[idx]):
+                    if len(valid[i]) == len(config[var]):
+                        continue
+
+                    print(f"eval:  {var:20} {len(config[var]):5} -> {len(valid[i]):5}     '{self.constraints[idx]}'")
+
+                    if len(valid[i]) == 0:
+                        raise ValueError(
+                            f"Constraint '{self.constraints[idx]}' is unsatisfiable with current configuration for variable '{var}'"
+                        )
+
+                    config[var] = valid[i]
+                    updated = True
+
+    def observable_domain_size(self, config):
+        return math.prod(len(config[var]) if config[var] is not None else 1 for var in config)
+
+    def domain_size(self, config):
+        return math.prod(len(config[var]) if config[var] is not None else float("inf") for var in config)
+
+    def solve(self, config, vars=None):
+        vars = vars or self.var_constraints.keys()
+        if self._resolved_constraints:
+            for var in vars:
+                self._resolved_constraints -= set(self.var_constraints[var])
+
+        domain_size = self.observable_domain_size(config)
+        print(f"domain size:", domain_size)
+
+        while domain_size > 1:
+            initial_domain_size = domain_size
+
+            self.propagate_equivalences(config)
+            self.resolve_constraints(config)
+
+            domain_size = self.observable_domain_size(config)
+            print(f"domain size:", domain_size)
+            if domain_size == initial_domain_size:
+                break
+
+        return domain_size
+
+    def check_constraints(self, config):
+        for idx, constr in enumerate(self.constraints):
+            domain_size = math.prod(
+                len(config[var]) if config[var] is not None else float("inf") for var in self.constraint_vars[idx]
+            )
+            if domain_size > MAX_DOMAIN_SIZE:
+                print(f"Constraint '{constr}' is not satisfied with current configuration")
+                return False
+
+            for constr_args in itertools.product(*(config[var] for var in self.constraint_vars[idx])):
+                constr_eval = self.constraint_functions[idx](*constr_args)
+                if not constr_eval:
+                    print(f"Constraint '{constr}' is not satisfied with current configuration")
+                    return False
+        else:
+            return True
