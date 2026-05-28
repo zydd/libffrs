@@ -14,12 +14,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import copy
 import itertools
+import logging
 import re
 
 import ffrs
 
-from . import constraints, print_config
+from . import constraints, print_config, print_config_args, logger
 from .cli import CLI
 from .solver import Solver
 
@@ -57,10 +59,12 @@ def circ(args):
     print(solver._iterations)
     print_config(config)
 
-    # if not args.outer_ecc.is_set() and solver.domain_size(config) > 1 and len(config["outer_ecc"]) > 1:
-    #     config["outer_ecc"] = [max(config["outer_ecc"])]
-    #     solver.solve(config, config.keys())
-    #     print_config()
+    if not args.outer_ecc.is_set() and solver.domain_size(config) > 1 and len(config["outer_ecc"]) > 1:
+        for ecc in config["outer_ecc"]:
+            config_ecc = copy.deepcopy(config)
+            config_ecc["outer_ecc"] = [ecc]
+            solver.solve(config_ecc, config_ecc.keys())
+            print_config_args(config_ecc)
 
     # if solver.check_constraints(config) and 0 < solver.domain_size(config) < 10:
     #     configs = list(
@@ -87,6 +91,55 @@ def parse_algo(algo):
 def main():
     cli = CLI()
     args = cli.parse_args()
+    print(args)
+
+    verbosity = args.verbosity.get()
+
+    levels = {
+        "critical": logging.CRITICAL,
+        "warning": logging.WARNING,
+        "info": logging.INFO,
+        "debug": logging.DEBUG,
+    }
+    level = logging.WARNING
+    sub_loggers = {l.name[len(logger.name) + 1 :]: l for l in logger.getChildren()}
+    for arg in verbosity:
+        if arg is None:
+            # -v -v
+            level = -10
+        elif re.match(r"v+$", arg):
+            # -vv
+            level = -10 * len(arg)
+        elif arg in levels:
+            # -vwarning
+            level = levels[arg]
+        else:
+            # -vsolver=10
+            arg_split = arg.split("=")
+            if len(arg_split) != 2:
+                logger.warning("Could not parse verbosity setting '%s'", arg)
+                continue
+
+            logger_name, sub_logger_level = arg_split
+
+            if sub_logger_level in levels:
+                sub_logger_level = levels[sub_logger_level]
+            else:
+                try:
+                    sub_logger_level = int(sub_logger_level)
+                except ValueError:
+                    logger.warning("Could not parse verbosity setting '%s'", arg)
+                    continue
+
+            if logger_name not in sub_loggers:
+                logger.warning("Unknown logger '%s'", arg)
+                continue
+
+            sub_loggers[logger_name].setLevel(sub_logger_level)
+
+    print("verbosity:", type(verbosity), level)
+    logger.setLevel(max(logging.DEBUG, level))
+
     circ(args)
 
 

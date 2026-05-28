@@ -16,10 +16,15 @@
 
 
 import itertools
+import logging
 import math
 import re
 
+from . import logger as parent_logger
+
 MAX_DOMAIN_SIZE = 65537
+
+logger = parent_logger.getChild("solver")
 
 
 class _Equation:
@@ -44,7 +49,7 @@ class _Equation:
 
             expr = _Equation._sub(lhs, rhs)
             if not all(re.match(r"\{\w+\}$", term) for sign, term in expr):
-                print("Warning: unexpected term:", expr)
+                logger.debug("Warning: unexpected term: %s", expr)
                 return []
 
             expr = [(sign, term.strip("{}")) for sign, term in expr]
@@ -57,7 +62,7 @@ class _Equation:
         lhs = _Equation._parse_eq_terms(lhs)
 
         if not all(re.match(r"\{\w+\}$", term) for sign, term in lhs):
-            print("Warning: unexpected term:", expr)
+            logger.debug("Warning: unexpected term: %s", expr)
             return []
 
         lhs = [(sign, term.strip("{}")) for sign, term in lhs]
@@ -169,14 +174,14 @@ class Solver:
         self.equivalence_functions = []
         self.equivalence_vars = []
 
-        print("Equivalences:")
+        logger.debug("Equivalences:")
         for i, constr in enumerate(self.constraints):
             for eq in _Equation.solve_for_vars(constr):
-                print(f"{len(self.equivalences):2} {eq["var"]} = {eq["func_code"]}")
+                logger.debug(f"{len(self.equivalences):2} {eq["var"]} = {eq["func_code"]}")
                 self.equivalences.append(eq["eq"])
                 self.equivalence_functions.append((eq["var"], eq["func"]))
                 self.equivalence_vars.append(eq["args"])
-        print()
+        logger.debug("")
 
     def propagate_equivalences(self, config):
         updated = True
@@ -199,7 +204,13 @@ class Solver:
                 valid_set = set(
                     func(*values) for values in itertools.product(*(config[arg] for arg in self.equivalence_vars[i]))
                 )
-                print(f"equiv: {var:20} {var_domain_size:5} -> {len(valid_set):5}     '{self.equivalences[i]}'")
+                logger.debug(
+                    "equiv: %s %5s -> %-5d     '%s'",
+                    var,
+                    var_domain_size,
+                    len(valid_set),
+                    self.equivalences[i],
+                )
                 config[var] = valid_set
 
                 # Need to re-evaluate constraints for new set
@@ -228,10 +239,11 @@ class Solver:
                     try:
                         self._iterations += 1
                         constr_eval = self.constraint_functions[idx](*constr_args)
-                    except:
-                        print(
-                            f"Error evaluating constraint '{self.constraints[idx]}'"
-                            f" with values {dict(zip(self.constraint_vars[idx], constr_args))}"
+                    except Exception:
+                        logger.exception(
+                            "Error evaluating constraint '%s' with values %s",
+                            self.constraints[idx],
+                            dict(zip(self.constraint_vars[idx], constr_args)),
                         )
                         breakpoint()
                         continue
@@ -247,7 +259,9 @@ class Solver:
                     if len(valid[i]) == len(config[var]):
                         continue
 
-                    print(f"eval:  {var:20} {len(config[var]):5} -> {len(valid[i]):5}     '{self.constraints[idx]}'")
+                    logger.debug(
+                        f"eval: {var:20} {len(config[var]):5} -> {len(valid[i]):<5}     '{self.constraints[idx]}'"
+                    )
 
                     if len(valid[i]) == 0:
                         raise ValueError(
@@ -270,7 +284,7 @@ class Solver:
                 self._resolved_constraints -= set(self.var_constraints[var])
 
         domain_size = self.observable_domain_size(config)
-        print(f"domain size:", domain_size)
+        logger.debug("domain size: %s", domain_size)
 
         while domain_size > 1:
             initial_domain_size = domain_size
@@ -279,7 +293,7 @@ class Solver:
             self.resolve_constraints(config)
 
             domain_size = self.observable_domain_size(config)
-            print(f"domain size:", domain_size)
+            logger.debug("domain size: %s", domain_size)
             if domain_size == initial_domain_size:
                 break
 
@@ -291,13 +305,13 @@ class Solver:
                 len(config[var]) if config[var] is not None else float("inf") for var in self.constraint_vars[idx]
             )
             if domain_size > MAX_DOMAIN_SIZE:
-                print(f"Constraint '{constr}' is not satisfied with current configuration")
+                logger.debug(f"Constraint '{constr}' is not satisfied with current configuration")
                 return False
 
             for constr_args in itertools.product(*(config[var] for var in self.constraint_vars[idx])):
                 constr_eval = self.constraint_functions[idx](*constr_args)
                 if not constr_eval:
-                    print(f"Constraint '{constr}' is not satisfied with current configuration")
+                    logger.debug(f"Constraint '{constr}' is not satisfied with current configuration")
                     return False
         else:
             return True

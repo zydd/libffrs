@@ -15,11 +15,14 @@
 #  limitations under the License.
 
 import copy
+import logging
 import pytest
 
 import ffrs
 import ffrs.par.solver
 from ffrs.par import print_config
+
+ffrs.par.solver.logger.setLevel(logging.DEBUG)
 
 test_config = dict(
     block=None,

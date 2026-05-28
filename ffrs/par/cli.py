@@ -15,6 +15,7 @@
 #  limitations under the License.
 
 import argparse
+import logging
 from . import print_warning
 
 
@@ -85,18 +86,20 @@ def parse_ratio_list(value):
 
 class CLI:
     class Value:
+        _is_default = False
+
         def __init__(self, value, value_parser=None):
             self.value_text = value
             self._value = value_parser(value) if value_parser else value
 
         def __repr__(self):
-            return f"(value: {self._value})"
+            return f"({"default" if self._is_default else "value"}: {repr(self._value)})"
 
         def get(self, default=None):
             return self._value if self._value is not None else default
 
         def is_default(self):
-            return False
+            return self._is_default
 
         def is_set(self):
             return self.has_value() and not self.is_default()
@@ -104,15 +107,18 @@ class CLI:
         def has_value(self):
             return self._value is not None
 
-    class DEFAULT(Value):
-        def is_default(self):
-            return True
+        def append(self, val):
+            if self._is_default:
+                self._is_default = False
+                self._value = [val]
+            else:
+                self._value.append(val)
 
-        def __repr__(self):
-            return f"(default: {self._value})"
+    class DEFAULT(Value):
+        _is_default = True
 
     class HelpFormatter(argparse.HelpFormatter):
-        def __init__(self, prog, indent_increment=2, max_help_position=30, width=None):
+        def __init__(self, prog, indent_increment=2, max_help_position=35, width=None):
             super().__init__(prog, indent_increment, max_help_position, width)
 
         def _get_help_string(self, action):
@@ -125,6 +131,7 @@ class CLI:
             return help
 
     def __init__(self):
+        self.checks = []
         self.main_parser = argparse.ArgumentParser(
             prog="ffrs.par",
             description="File parity",
@@ -132,7 +139,16 @@ class CLI:
         )
 
         self.common_parser = argparse.ArgumentParser(add_help=False)
-        self.checks = []
+
+        self.common_parser.add_argument(
+            "-v",
+            "--verbosity",
+            metavar="level",
+            action="append",
+            nargs="?",
+            default=CLI.DEFAULT("warning", lambda a: [a]),
+            help="Increase/set verbosity level",
+        )
 
         self.common_parser.add_argument(
             "--codec",
@@ -176,7 +192,7 @@ class CLI:
             "--ecc-ratio",
             metavar="ratio",
             action="store",
-            # default=self.DEFAULT("1/16", parse_ratio_list),
+            # default=CLI.DEFAULT("1/16", parse_ratio_list),
             type=parse_ratio_list,
             help="ECC size as a fraction of the message size",
         )
@@ -185,7 +201,7 @@ class CLI:
             "--interleave",
             metavar="size",
             action="store",
-            default=self.DEFAULT("1", parse_size_list),
+            default=CLI.DEFAULT("1", parse_size_list),
             type=parse_size_list,
             help="Interleave multiple blocks",
         )
@@ -196,7 +212,7 @@ class CLI:
             "--primitive",
             metavar="int",
             action="store",
-            default=self.DEFAULT(3),
+            default=CLI.DEFAULT(3),
             type=int,
             help="Primitive n-th root of unity used to generate GF(65537)",
         )
@@ -221,7 +237,7 @@ class CLI:
             metavar="simd",
             nargs="?",
             const="auto",
-            default=self.DEFAULT("auto"),
+            default=CLI.DEFAULT("auto"),
             type=parse_choice_list(["auto"] + simd_choices),
             help="Enable SIMD optimizations",
         )
@@ -264,7 +280,7 @@ class CLI:
             "--inner-message",
             metavar="size",
             action="store",
-            default=self.DEFAULT("4088,4096", parse_size_list),
+            default=CLI.DEFAULT("2040,2048,4088,4096", parse_size_list),
             type=parse_size_list,
             help="Payload size used by the inner codec",
         )
@@ -272,7 +288,7 @@ class CLI:
             "--inner-ecc",
             metavar="size",
             action="store",
-            default=self.DEFAULT("8", parse_size_list),
+            default=CLI.DEFAULT("8", parse_size_list),
             type=parse_size_list,
             help="ECC size of the inner codec",
         )
@@ -295,7 +311,7 @@ class CLI:
             "--outer-ecc",
             metavar="size",
             action="store",
-            default=self.DEFAULT("8,16,32,64,128,256", parse_size_list),
+            default=CLI.DEFAULT("16,32,64,128,256", parse_size_list),
             type=parse_size_list,
             help="ECC size of the outer codec",
         )
@@ -311,7 +327,7 @@ class CLI:
             "--outer-interleave",
             metavar="count",
             action="store",
-            # default=self.DEFAULT("1", parse_int_list),
+            # default=CLI.DEFAULT("1", parse_int_list),
             type=parse_int_list,
             help="Interleave multiple blocks",
         )
@@ -355,7 +371,5 @@ class CLI:
         except ValueError as e:
             # import traceback; traceback.print_exc()
             self.main_parser.error(str(e))
-
-        print(args)
 
         return args
