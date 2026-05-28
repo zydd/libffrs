@@ -49,7 +49,7 @@ class _Equation:
 
             expr = _Equation._sub(lhs, rhs)
             if not all(re.match(r"\{\w+\}$", term) for sign, term in expr):
-                logger.debug("Warning: unexpected term: %s", expr)
+                logger.info("unexpected term: %s", expr)
                 return []
 
             expr = [(sign, term.strip("{}")) for sign, term in expr]
@@ -62,7 +62,7 @@ class _Equation:
         lhs = _Equation._parse_eq_terms(lhs)
 
         if not all(re.match(r"\{\w+\}$", term) for sign, term in lhs):
-            logger.debug("Warning: unexpected term: %s", expr)
+            logger.info("unexpected term: %s", expr)
             return []
 
         lhs = [(sign, term.strip("{}")) for sign, term in lhs]
@@ -142,7 +142,9 @@ class _Equation:
 
 class Solver:
     def __init__(self, variables, constraints, free_variables):
-        self._iterations = 0
+        logger.info("variables: %s", variables)
+        logger.info("free variables: %s", free_variables)
+        self._constraint_evaluations = 0
         self.constraints = constraints
         self._resolved_constraints = set()
         self.free_variables = set(free_variables)
@@ -174,14 +176,14 @@ class Solver:
         self.equivalence_functions = []
         self.equivalence_vars = []
 
-        logger.debug("Equivalences:")
+        logger.info("equivalences:")
         for i, constr in enumerate(self.constraints):
             for eq in _Equation.solve_for_vars(constr):
                 logger.debug(f"{len(self.equivalences):2} {eq["var"]} = {eq["func_code"]}")
                 self.equivalences.append(eq["eq"])
                 self.equivalence_functions.append((eq["var"], eq["func"]))
                 self.equivalence_vars.append(eq["args"])
-        logger.debug("")
+        logger.info("")
 
     def propagate_equivalences(self, config):
         updated = True
@@ -200,17 +202,21 @@ class Solver:
                 ):
                     continue
 
-                # self.free_variables.add(var)
+                # self.free_variables.remove(var)
                 valid_set = set(
                     func(*values) for values in itertools.product(*(config[arg] for arg in self.equivalence_vars[i]))
                 )
-                logger.debug(
-                    "equiv: %s %5s -> %-5d     '%s'",
+                logger.info(
+                    "%-23s %5s -> %-5d     '%s'",
                     var,
                     var_domain_size,
                     len(valid_set),
                     self.equivalences[i],
                 )
+                if config[var] and len(config[var]) <= 32:
+                    logger.debug("removing: %s", config[var] - valid_set)
+                    logger.debug("remaining: %s", valid_set)
+
                 config[var] = valid_set
 
                 # Need to re-evaluate constraints for new set
@@ -237,11 +243,11 @@ class Solver:
                 valid = [set() for _ in range(len(self.constraint_vars[idx]))]
                 for constr_args in itertools.product(*(config[var] for var in self.constraint_vars[idx])):
                     try:
-                        self._iterations += 1
+                        self._constraint_evaluations += 1
                         constr_eval = self.constraint_functions[idx](*constr_args)
                     except Exception:
                         logger.exception(
-                            "Error evaluating constraint '%s' with values %s",
+                            "error evaluating constraint '%s' with values %s",
                             self.constraints[idx],
                             dict(zip(self.constraint_vars[idx], constr_args)),
                         )
@@ -256,12 +262,14 @@ class Solver:
                             valid[i].add(v)
 
                 for i, var in enumerate(self.constraint_vars[idx]):
+                    # log = logger.debug if len(valid[i]) == len(config[var]) else logger.info
                     if len(valid[i]) == len(config[var]):
                         continue
+                    logger.info(f"{var:23} {len(config[var]):5} -> {len(valid[i]):<5}     '{self.constraints[idx]}'")
 
-                    logger.debug(
-                        f"eval: {var:20} {len(config[var]):5} -> {len(valid[i]):<5}     '{self.constraints[idx]}'"
-                    )
+                    if config[var] and len(config[var]) <= 32:
+                        logger.debug("removing: %s", config[var] - valid[i])
+                        logger.debug("remaining: %s", valid[i])
 
                     if len(valid[i]) == 0:
                         raise ValueError(
@@ -283,8 +291,12 @@ class Solver:
             for var in vars:
                 self._resolved_constraints -= set(self.var_constraints[var])
 
+        for k, v in config.items():
+            if v and type(v) is not set:
+                config[k] = set(v)
+
         domain_size = self.observable_domain_size(config)
-        logger.debug("domain size: %s", domain_size)
+        logger.info("observable domain size: %s", domain_size)
 
         while domain_size > 1:
             initial_domain_size = domain_size
@@ -293,10 +305,11 @@ class Solver:
             self.resolve_constraints(config)
 
             domain_size = self.observable_domain_size(config)
-            logger.debug("domain size: %s", domain_size)
+            logger.info("observable domain size: %s", domain_size)
             if domain_size == initial_domain_size:
                 break
 
+        logger.info("constraint evaluations: %s", self._constraint_evaluations)
         return domain_size
 
     def check_constraints(self, config):
@@ -305,13 +318,13 @@ class Solver:
                 len(config[var]) if config[var] is not None else float("inf") for var in self.constraint_vars[idx]
             )
             if domain_size > MAX_DOMAIN_SIZE:
-                logger.debug(f"Constraint '{constr}' is not satisfied with current configuration")
+                logger.info(f"constraint '{constr}' is not satisfied with current configuration")
                 return False
 
             for constr_args in itertools.product(*(config[var] for var in self.constraint_vars[idx])):
                 constr_eval = self.constraint_functions[idx](*constr_args)
                 if not constr_eval:
-                    logger.debug(f"Constraint '{constr}' is not satisfied with current configuration")
+                    logger.info(f"constraint '{constr}' is not satisfied with current configuration")
                     return False
         else:
             return True

@@ -15,8 +15,7 @@
 #  limitations under the License.
 
 import argparse
-import logging
-from . import print_warning
+import sys
 
 
 def parse_size(size_str: str) -> int:
@@ -77,6 +76,8 @@ def parse_int_list(value):
 
 
 def parse_size_list(value):
+    if value == "*":
+        return None
     return [parse_size(i) for i in value.split(",")]
 
 
@@ -146,7 +147,7 @@ class CLI:
             metavar="level",
             action="append",
             nargs="?",
-            default=CLI.DEFAULT("warning", lambda a: [a]),
+            default=CLI.DEFAULT("info", lambda a: [a]),
             help="Increase/set verbosity level",
         )
 
@@ -227,7 +228,7 @@ class CLI:
             help="Full backup + optional extra parity",
             formatter_class=self.HelpFormatter,
         )
-        # backup.set_defaults(ecc_ratio=1, outer_ecc_ratio=1)
+        backup.set_defaults(ecc_ratio=CLI.DEFAULT("1/1", parse_ratio_list))
 
     def arg_simd(self):
         simd_choices = ["x4", "x8", "x16", "sse", "avx2", "avx512"]
@@ -280,7 +281,7 @@ class CLI:
             "--inner-message",
             metavar="size",
             action="store",
-            default=CLI.DEFAULT("2040,2048,4088,4096", parse_size_list),
+            default=CLI.DEFAULT("1020,1024,2040,2048,4088,4096", parse_size_list),
             type=parse_size_list,
             help="Payload size used by the inner codec",
         )
@@ -288,9 +289,16 @@ class CLI:
             "--inner-ecc",
             metavar="size",
             action="store",
-            default=CLI.DEFAULT("8", parse_size_list),
+            default=CLI.DEFAULT("4,8", parse_size_list),
             type=parse_size_list,
             help="ECC size of the inner codec",
+        )
+        circ.add_argument(
+            "--inner-interleaved-ecc",
+            metavar="size",
+            action="store",
+            type=parse_size_list,
+            help="Total ECC size of the inner codec (inner_ecc * outer_block * outer_interleave)",
         )
 
         circ.add_argument(
@@ -316,7 +324,7 @@ class CLI:
             help="ECC size of the outer codec",
         )
         circ.add_argument(
-            "--interleaved-ecc",
+            "--outer-interleaved-ecc",
             metavar="size",
             action="store",
             type=parse_size_list,
@@ -337,7 +345,7 @@ class CLI:
 
     def warn(self, namespace, func, message):
         if not func(namespace):
-            print_warning(message)
+            print(message, file=sys.stderr)
 
     def check_either(self, namespace, *args):
         dests = [arg.lstrip("-").replace("-", "_") for arg in args]
