@@ -172,6 +172,7 @@ class Solver:
             func = f"lambda {args}: {constr}"
             self.constraint_functions.append(eval(func))
 
+        # Equivalences
         self.equivalences = []
         self.equivalence_functions = []
         self.equivalence_vars = []
@@ -185,99 +186,137 @@ class Solver:
                 self.equivalence_vars.append(eq["args"])
         logger.info("")
 
-    def propagate_equivalences(self, config):
-        updated = True
-        while updated:
-            updated = False
-            for i, (var, func) in enumerate(self.equivalence_functions):
-                arg_domain_size = math.prod(
-                    len(config[arg]) if config[arg] is not None else float("inf") for arg in self.equivalence_vars[i]
+        # # Generators
+        # re_divisible = re.compile(r" \{(\w+)\} % \{(\w+)\} == 0 $".replace(" ", r"\s*"))
+        # self.generators = []
+        # for constr in self.constraints:
+        #     match = re_divisible.match(constr)
+        #     if not match:
+        #         continue
+
+        #     num = match[1]
+        #     den = match[2]
+
+        #     self.generators.append((num, den, constr))
+
+    def _propagate_equivalences(self, config):
+        updated = False
+        for i, (var, func) in enumerate(self.equivalence_functions):
+            arg_domain_size = math.prod(
+                len(config[arg]) if config[arg] is not None else float("inf") for arg in self.equivalence_vars[i]
+            )
+            var_domain_size = len(config[var]) if config[var] is not None else float("inf")
+            if not (
+                arg_domain_size < var_domain_size
+                and arg_domain_size <= MAX_DOMAIN_SIZE
+                # and var_domain_size > MAX_DOMAIN_SIZE
+                and var in self.free_variables
+            ):
+                continue
+
+            # self.free_variables.remove(var)
+            valid_set = set(
+                func(*values) for values in itertools.product(*(config[arg] for arg in self.equivalence_vars[i]))
+            )
+            logger.info(
+                "%-23s %5s -> %-5d     '%s'",
+                var,
+                var_domain_size,
+                len(valid_set),
+                self.equivalences[i],
+            )
+            if config[var] and len(config[var]) <= 32:
+                logger.debug("removing: %s", config[var] - valid_set)
+                logger.debug("remaining: %s", valid_set)
+
+            config[var] = valid_set
+
+            # Need to re-evaluate constraints for new set
+            self._resolve_constraints(config, self.var_constraints[var])
+
+            updated = True
+        return updated
+
+    # def _gen_values(self, config):
+    #     for i, (num, den, gen) in enumerate(self.generators):
+    #         if den not in self.free_variables: continue
+    #         if config[num] is None: continue
+    #         if config[den] is None: continue
+    #         if not all(v & (v - 1) == 0 for v in config[num]): continue
+
+    #         den_min_log = math.log2(min(config[den]))
+
+    #         den_v_max_log = round(min(math.log2(max(config[den])), max(math.log2(v) for v in config[num])))
+    #         if den_v_max_log > len(config[den]):
+    #             continue
+
+    #         den_v = {2 ** i for i in range(math.ceil(den_min_log), round(den_v_max_log) + 1)}
+
+    #         if len(den_v) < len(config[den]):
+    #             logger.info(f"{den:23} {len(config[den]):5} -> {len(den_v):<5}     '{gen}'")
+    #             config[den] = den_v
+    #             self._resolve_constraints(config, self.var_constraints[den])
+
+    def _eval_constraint(self, config, idx):
+        updated = False
+        valid = [set() for _ in range(len(self.constraint_vars[idx]))]
+        for constr_args in itertools.product(*(config[var] for var in self.constraint_vars[idx])):
+            try:
+                self._constraint_evaluations += 1
+                constr_eval = self.constraint_functions[idx](*constr_args)
+            except Exception:
+                logger.exception(
+                    "error evaluating constraint '%s' with values %s",
+                    self.constraints[idx],
+                    dict(zip(self.constraint_vars[idx], constr_args)),
                 )
-                var_domain_size = len(config[var]) if config[var] is not None else float("inf")
-                if not (
-                    arg_domain_size < var_domain_size
-                    and arg_domain_size <= MAX_DOMAIN_SIZE
-                    # and var_domain_size > MAX_DOMAIN_SIZE
-                    and var in self.free_variables
-                ):
-                    continue
+                breakpoint()
+                continue
 
-                # self.free_variables.remove(var)
-                valid_set = set(
-                    func(*values) for values in itertools.product(*(config[arg] for arg in self.equivalence_vars[i]))
+            # domain_str = ", ".join(f"{k}={v}" for k, v in zip(self.constraint_vars[idx], domains))
+            # print(f"eval {str(constr_eval):5} '{self.constraints[idx]}' with ({domain_str})")
+
+            if constr_eval is True:
+                for i, v in enumerate(constr_args):
+                    valid[i].add(v)
+
+        for i, var in enumerate(self.constraint_vars[idx]):
+            # log = logger.debug if len(valid[i]) == len(config[var]) else logger.info
+            if len(valid[i]) == len(config[var]):
+                continue
+            logger.info(f"{var:23} {len(config[var]):5} -> {len(valid[i]):<5}     '{self.constraints[idx]}'")
+
+            if config[var] and len(config[var]) <= 32:
+                logger.debug("removing: %s", config[var] - valid[i])
+                logger.debug("remaining: %s", valid[i])
+
+            if len(valid[i]) == 0:
+                raise ValueError(
+                    f"Constraint '{self.constraints[idx]}' is unsatisfiable with current configuration for variable '{var}'"
                 )
-                logger.info(
-                    "%-23s %5s -> %-5d     '%s'",
-                    var,
-                    var_domain_size,
-                    len(valid_set),
-                    self.equivalences[i],
-                )
-                if config[var] and len(config[var]) <= 32:
-                    logger.debug("removing: %s", config[var] - valid_set)
-                    logger.debug("remaining: %s", valid_set)
 
-                config[var] = valid_set
+            config[var] = valid[i]
+            updated = True
 
-                # Need to re-evaluate constraints for new set
-                self.resolve_constraints(config, self.var_constraints[var])
-                # self._resolved_constraints -= set(self.var_constraints[var])
+        return updated
 
-                updated = True
-
-    def resolve_constraints(self, config, constraints=None):
+    def _resolve_constraints(self, config, constraints=None):
         constraints = constraints or (set(range(len(self.constraints))) - self._resolved_constraints)
-        # constraints = range(len(self.constraints))
-        updated = True
-        while updated:
-            updated = False
-            for idx in constraints:
-                domain_size = math.prod(
-                    len(config[var]) if config[var] is not None else float("inf") for var in self.constraint_vars[idx]
-                )
-                if domain_size > MAX_DOMAIN_SIZE:
-                    continue
+        # constraints = range(len(self.constraints))  # force re-evaluation
 
-                self._resolved_constraints.add(idx)
+        domain_sizes = map(lambda idx: (self._constraint_domain_size(config, idx), idx), constraints)
+        domain_sizes = sorted(filter(lambda x: x[0] <= MAX_DOMAIN_SIZE, domain_sizes))
+        updated = 0
+        for domain_size, idx in domain_sizes:
+            updated += self._eval_constraint(config, idx)
+            self._resolved_constraints.add(idx)
+        return updated
 
-                valid = [set() for _ in range(len(self.constraint_vars[idx]))]
-                for constr_args in itertools.product(*(config[var] for var in self.constraint_vars[idx])):
-                    try:
-                        self._constraint_evaluations += 1
-                        constr_eval = self.constraint_functions[idx](*constr_args)
-                    except Exception:
-                        logger.exception(
-                            "error evaluating constraint '%s' with values %s",
-                            self.constraints[idx],
-                            dict(zip(self.constraint_vars[idx], constr_args)),
-                        )
-                        breakpoint()
-                        continue
-
-                    # domain_str = ", ".join(f"{k}={v}" for k, v in zip(self.constraint_vars[idx], domains))
-                    # print(f"eval {str(constr_eval):5} '{self.constraints[idx]}' with ({domain_str})")
-
-                    if constr_eval is True:
-                        for i, v in enumerate(constr_args):
-                            valid[i].add(v)
-
-                for i, var in enumerate(self.constraint_vars[idx]):
-                    # log = logger.debug if len(valid[i]) == len(config[var]) else logger.info
-                    if len(valid[i]) == len(config[var]):
-                        continue
-                    logger.info(f"{var:23} {len(config[var]):5} -> {len(valid[i]):<5}     '{self.constraints[idx]}'")
-
-                    if config[var] and len(config[var]) <= 32:
-                        logger.debug("removing: %s", config[var] - valid[i])
-                        logger.debug("remaining: %s", valid[i])
-
-                    if len(valid[i]) == 0:
-                        raise ValueError(
-                            f"Constraint '{self.constraints[idx]}' is unsatisfiable with current configuration for variable '{var}'"
-                        )
-
-                    config[var] = valid[i]
-                    updated = True
+    def _constraint_domain_size(self, config, idx):
+        domain_size = math.prod(
+            len(config[var]) if config[var] is not None else float("inf") for var in self.constraint_vars[idx]
+        )
+        return domain_size
 
     def observable_domain_size(self, config):
         return math.prod(len(config[var]) if config[var] is not None else 1 for var in config)
@@ -301,8 +340,9 @@ class Solver:
         while domain_size > 1:
             initial_domain_size = domain_size
 
-            self.propagate_equivalences(config)
-            self.resolve_constraints(config)
+            self._propagate_equivalences(config)
+            # self._gen_values(config)
+            self._resolve_constraints(config)
 
             domain_size = self.observable_domain_size(config)
             logger.info("observable domain size: %s", domain_size)
@@ -314,9 +354,7 @@ class Solver:
 
     def check_constraints(self, config):
         for idx, constr in enumerate(self.constraints):
-            domain_size = math.prod(
-                len(config[var]) if config[var] is not None else float("inf") for var in self.constraint_vars[idx]
-            )
+            domain_size = self._constraint_domain_size(config, idx)
             if domain_size > MAX_DOMAIN_SIZE:
                 logger.info(f"constraint '{constr}' is not satisfied with current configuration")
                 return False
