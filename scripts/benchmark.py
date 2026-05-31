@@ -257,20 +257,20 @@ def circ(args):
 
     # TODO: validate RSi16 with 64k block
     while block_size % (hash_ratio_den * ecc_ratio_den) == 0 and ecc_ratio_den <= 32768:
-        outer_interleave = block_size // (hash_ratio_den * ecc_ratio_den)
-        rs = ffrs.CIRC16(hash_ratio_den // 2, hash_ratio_num // 2, ecc_ratio_den, ecc_ratio_num, outer_interleave)
+        interleave = block_size // (hash_ratio_den * ecc_ratio_den)
+        rs = ffrs.CIRC16(hash_ratio_den // 2, hash_ratio_num // 2, ecc_ratio_den, ecc_ratio_num, interleave)
         print(rs)
         assert rs.block_size == block_size, rs.block_size
 
         # benchmark_throughput((f"rs.encode(data)", dict(rs=rs)), input_size=rs.message_size)
         res = benchmark_ber(rs)
-        results.append((ecc_ratio_den, outer_interleave, res))
+        results.append((ecc_ratio_den, interleave, res))
 
         ecc_ratio_num *= 2
         ecc_ratio_den *= 2
 
     cmap = plt.cm.Blues
-    for i, (rso_block_len, outer_interleave, res) in enumerate(results):
+    for i, (rso_block_len, interleave, res) in enumerate(results):
         success_rates = [successes / tries for _, successes, tries in res]
         error_rates = [error_count / rs.block_size for error_count, _, _ in res]
         color = cmap((i + 1) / (len(results) + 1))
@@ -278,7 +278,7 @@ def circ(args):
             error_rates,
             success_rates,
             color=color,
-            label=f"rso_block_size: {rso_block_len * 2} outer_interleave: {outer_interleave}",
+            label=f"rso_block_size: {rso_block_len * 2} interleave: {interleave}",
         )
 
     plt.ylabel("repair success rate")
@@ -330,11 +330,11 @@ def decode_throughput(args):
         rsi_ecc // 2,
         rso_block,
         rso_block * ecc_ratio_num // ecc_ratio_den,
-        args.outer_interleave,
+        args.interleave,
         **extra_args,
     )
 
-    assert rs.block_size == block_size * args.outer_interleave
+    assert rs.block_size == block_size * args.interleave
 
     print(get_system_info())
     print(rs)
@@ -393,7 +393,7 @@ def main():
     parser_dec.add_argument("block_size")
     parser_dec.add_argument("ecc_ratio")
     parser_dec.add_argument("hash_ratio")
-    parser_dec.add_argument("outer_interleave", nargs="?", default=1, type=int)
+    parser_dec.add_argument("interleave", nargs="?", default=1, type=int)
     parser_dec.set_defaults(func=decode_throughput)
 
     args = parser.parse_args()

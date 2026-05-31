@@ -12,7 +12,7 @@ FFRS main module
 
 
 class CIRC16:
-    def __init__(self: libffrs.CIRC16, inner_block_len: typing.SupportsInt | typing.SupportsIndex, inner_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_block_len: typing.SupportsInt | typing.SupportsIndex, outer_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
+    def __init__(self: libffrs.CIRC16, inner_block_len: typing.SupportsInt | typing.SupportsIndex, inner_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_block_len: typing.SupportsInt | typing.SupportsIndex, outer_ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
         """Cross-interleaved Reed-Solomon coder"""
         ...
     block_len: int
@@ -28,11 +28,11 @@ class CIRC16:
     inner_ecc_size: int
     inner_message_len: int
     inner_message_size: int
+    interleave: int
     message_len: int
     message_size: int
     outer_block_len: int
     outer_ecc_len: int
-    outer_interleave: int
     outer_message_len: int
     def repair(self: libffrs.CIRC16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bool:
         """Repair data"""

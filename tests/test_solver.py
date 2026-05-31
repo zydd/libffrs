@@ -39,9 +39,9 @@ test_config = dict(
     outer_ecc_ratio_num=[1],
     outer_ecc=set(2**i for i in range(1, 16)),
     interleave=None,
-    outer_interleaved_ecc=None,
+    interleaved_ecc=None,
     outer_message=range(2, 65536 + 1, 2),
-    outer_interleave=None,
+    interleave=None,
 )
 
 set_values = dict(inner_message=[4096 - 8, 4096], inner_ecc=[8], outer_ecc=[8, 16, 32, 64, 128, 256])

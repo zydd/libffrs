@@ -319,7 +319,7 @@ class CLI:
             metavar="size",
             action="store",
             type=parse_size_list,
-            help="Total ECC size of the inner codec (inner_ecc * outer_block * outer_interleave)",
+            help="Total ECC size of the inner codec (inner_ecc * outer_block * interleave)",
         )
 
         add_circ_arg(
@@ -349,7 +349,7 @@ class CLI:
             metavar="size",
             action="store",
             type=parse_size_list,
-            help="Total ECC size of the outer codec (outer_ecc * inner_message * outer_interleave)",
+            help="Total ECC size of the outer codec (outer_ecc * inner_message * interleave)",
         )
 
         add_circ_arg(

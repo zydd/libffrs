@@ -25,11 +25,11 @@ from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, rand
 class BaseTestCIRC:
     @staticmethod
     def _rsi_ecc_size(rs: ffrs.CIRC16):
-        return rs.outer_message_len * rs.inner_ecc_size * rs.outer_interleave
+        return rs.outer_message_len * rs.inner_ecc_size * rs.interleave
 
     @staticmethod
     def _rso_ecc_size(rs: ffrs.CIRC16):
-        return rs.inner_message_size * rs.outer_ecc_len * rs.outer_interleave
+        return rs.inner_message_size * rs.outer_ecc_len * rs.interleave
 
     @staticmethod
     def add_errors_stride(msg, ecc, stride, max=float("inf")):
@@ -49,7 +49,7 @@ class BaseTestCIRC:
         return count
 
     def test_properties(self, rs: ffrs.CIRC16):
-        assert rs.ecc_len == rs.inner_block_len * rs.outer_block_len * rs.outer_interleave - rs.message_len
+        assert rs.ecc_len == rs.inner_block_len * rs.outer_block_len * rs.interleave - rs.message_len
         assert rs.block_len == rs.message_len + rs.ecc_len
 
     def test_circ_encode(self, rs: ffrs.CIRC16):
@@ -66,7 +66,7 @@ class BaseTestCIRC:
         assert res[len(res_o) :][: len(res_i)] == res_i
 
         res_io = rs.rsi.encode(res_o)
-        assert len(res_io) == rs.outer_ecc_len * rs.inner_ecc_size * rs.outer_interleave
+        assert len(res_io) == rs.outer_ecc_len * rs.inner_ecc_size * rs.interleave
 
         # res_o does not encode the value 0x10000
         # limit to small inputs to reduce chance of failure

@@ -40,7 +40,7 @@ class CIRC16(libffrs.CIRC16):
             f"CIRC("
             f"{self.inner_block_len}, {self.inner_ecc_len}"
             f", {self.outer_block_len}, {self.outer_ecc_len}"
-            f", {self.outer_interleave})"
+            f", {self.interleave})"
         )
 
     def serialize(self):
@@ -49,7 +49,7 @@ class CIRC16(libffrs.CIRC16):
             "circ16"
             f" ip:{b64hex(self.rsi.gf.field_elements)} ig:{b64hex(self.rsi.gf.primitive)} ib:{b64hex(self.inner_block_len)} im:{b64hex(self.inner_message_len)} ie:{b64hex(self.inner_ecc_len)}"
             f" op:{b64hex(self.rso.gf.field_elements)} og:{b64hex(self.rso.gf.primitive)} ob:{b64hex(self.outer_block_len)} om:{b64hex(self.outer_message_len)} oe:{b64hex(self.outer_ecc_len)}"
-            f" i:{b64hex(self.outer_interleave)}"
+            f" i:{b64hex(self.interleave)}"
         ).encode("ascii")
 
     @staticmethod
@@ -71,6 +71,6 @@ class CIRC16(libffrs.CIRC16):
             inner_ecc_len=params["ie"],
             outer_block_len=params["ob"],
             outer_ecc_len=params["oe"],
-            outer_interleave=params["i"],
+            interleave=params["i"],
             primitive=params["ig"],
         )
