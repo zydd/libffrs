@@ -17,6 +17,8 @@
 import libffrs
 from . import rsi16
 
+from .util import b64hex, b64hex_dec
+
 
 class CIRC16(libffrs.CIRC16):
     def check(self, data, ecc, synd=None):
@@ -39,4 +41,36 @@ class CIRC16(libffrs.CIRC16):
             f"{self.inner_block_len}, {self.inner_ecc_len}"
             f", {self.outer_block_len}, {self.outer_ecc_len}"
             f", {self.outer_interleave})"
+        )
+
+    def serialize(self):
+        # circ16 ip:g01 ig:3 ib:x4 im:x0 ie:4 op:g01 og:3 ob:80 om:40 oe:40 i:1
+        return (
+            "circ16"
+            f" ip:{b64hex(self.rsi.gf.field_elements)} ig:{b64hex(self.rsi.gf.primitive)} ib:{b64hex(self.inner_block_len)} im:{b64hex(self.inner_message_len)} ie:{b64hex(self.inner_ecc_len)}"
+            f" op:{b64hex(self.rso.gf.field_elements)} og:{b64hex(self.rso.gf.primitive)} ob:{b64hex(self.outer_block_len)} om:{b64hex(self.outer_message_len)} oe:{b64hex(self.outer_ecc_len)}"
+            f" i:{b64hex(self.outer_interleave)}"
+        ).encode("ascii")
+
+    @staticmethod
+    def deserialize(buf):
+        string = buf.decode("ascii")
+        assert string.startswith("circ16 ")
+        params = {}
+        for part in string[7:].split():
+            key, value = part.split(":", 1)
+            params[key] = b64hex_dec(value)
+
+        assert params["ip"] == params["op"] == 0x10001
+        assert params["ig"] == params["og"]
+        assert params["ib"] == params["im"] + params["ie"]
+        assert params["ob"] == params["om"] + params["oe"]
+
+        return CIRC16(
+            inner_block_len=params["ib"],
+            inner_ecc_len=params["ie"],
+            outer_block_len=params["ob"],
+            outer_ecc_len=params["oe"],
+            outer_interleave=params["i"],
+            primitive=params["ig"],
         )

@@ -16,7 +16,6 @@
 
 
 import itertools
-import logging
 import math
 import re
 
@@ -28,7 +27,7 @@ logger = parent_logger.getChild("solver")
 
 
 class _Equation:
-    _re_expression = re.compile(r"^[\w\s{}+-]+$")
+    _re_expression = re.compile(r"[\w\s{}+-]+$")
     _re_var = re.compile(r"\{(\w+)\}")
 
     @staticmethod
@@ -49,7 +48,7 @@ class _Equation:
 
             expr = _Equation._sub(lhs, rhs)
             if not all(re.match(r"\{\w+\}$", term) for sign, term in expr):
-                logger.info("unexpected term: %s", expr)
+                logger.debug("unexpected term: %s", expr)
                 return []
 
             expr = [(sign, term.strip("{}")) for sign, term in expr]
@@ -62,7 +61,7 @@ class _Equation:
         lhs = _Equation._parse_eq_terms(lhs)
 
         if not all(re.match(r"\{\w+\}$", term) for sign, term in lhs):
-            logger.info("unexpected term: %s", expr)
+            logger.debug("unexpected term: %s", expr)
             return []
 
         lhs = [(sign, term.strip("{}")) for sign, term in lhs]
@@ -144,10 +143,16 @@ class Solver:
     def __init__(self, variables, constraints, free_variables):
         logger.info("variables: %s", variables)
         logger.info("free variables: %s", free_variables)
+        self.free_variables = set(free_variables)
+        self._init_constraints(variables, constraints)
+        self._init_equivalences()
+        self._init_generators()
+        self._resolve_input_constraints()
+
+    def _init_constraints(self, variables, constraints):
         self._constraint_evaluations = 0
         self.constraints = constraints
         self._resolved_constraints = set()
-        self.free_variables = set(free_variables)
 
         # Constraints for each variable
         self.var_constraints = {}
@@ -172,32 +177,42 @@ class Solver:
             func = f"lambda {args}: {constr}"
             self.constraint_functions.append(eval(func))
 
+    def _init_equivalences(self):
         # Equivalences
         self.equivalences = []
         self.equivalence_functions = []
         self.equivalence_vars = []
 
-        logger.info("equivalences:")
+        logger.debug("equivalences:")
         for i, constr in enumerate(self.constraints):
             for eq in _Equation.solve_for_vars(constr):
                 logger.debug(f"{len(self.equivalences):2} {eq["var"]} = {eq["func_code"]}")
                 self.equivalences.append(eq["eq"])
                 self.equivalence_functions.append((eq["var"], eq["func"]))
                 self.equivalence_vars.append(eq["args"])
-        logger.info("")
+        logger.debug("")
 
-        # # Generators
-        # re_divisible = re.compile(r" \{(\w+)\} % \{(\w+)\} == 0 $".replace(" ", r"\s*"))
-        # self.generators = []
-        # for constr in self.constraints:
-        #     match = re_divisible.match(constr)
-        #     if not match:
-        #         continue
+    def _init_generators(self):
+        # Generators
+        re_divisible = re.compile(r" \{(\w+)\} % \{(\w+)\} == 0 $".replace(" ", r"\s*"))
+        self.generators = []
+        for constr in self.constraints:
+            match = re_divisible.match(constr)
+            if not match:
+                continue
 
-        #     num = match[1]
-        #     den = match[2]
+            num = match[1]
+            den = match[2]
 
-        #     self.generators.append((num, den, constr))
+            self.generators.append((num, den, constr))
+
+    def _resolve_input_constraints(self):
+        # Assume that input already satisfies range checks
+        re_inequality = re.compile(r"\d+ <= \{\w+\} (<= \d+)$".replace(" ", r"\s*"))
+        for i, constr in enumerate(self.constraints):
+            if re_inequality.match(constr):
+                logger.debug("assume resolved: %2d '%s'", i, constr)
+                self._resolved_constraints.add(i)
 
     def _propagate_equivalences(self, config):
         updated = False
@@ -206,6 +221,10 @@ class Solver:
                 len(config[arg]) if config[arg] is not None else float("inf") for arg in self.equivalence_vars[i]
             )
             var_domain_size = len(config[var]) if config[var] is not None else float("inf")
+
+            logger.info("equivalence %2s: '%s'", i, self.equivalences[i])
+            logger.debug("domain size: var: %s arg: %s", var_domain_size, arg_domain_size)
+
             if not (
                 arg_domain_size < var_domain_size
                 and arg_domain_size <= MAX_DOMAIN_SIZE
@@ -233,52 +252,62 @@ class Solver:
 
             # Need to re-evaluate constraints for new set
             self._resolve_constraints(config, self.var_constraints[var])
+            # self._resolved_constraints -= set(self.var_constraints[var])
 
             updated = True
         return updated
 
-    # def _gen_values(self, config):
-    #     for i, (num, den, gen) in enumerate(self.generators):
-    #         if den not in self.free_variables: continue
-    #         if config[num] is None: continue
-    #         if config[den] is None: continue
-    #         if not all(v & (v - 1) == 0 for v in config[num]): continue
-
-    #         den_min_log = math.log2(min(config[den]))
-
-    #         den_v_max_log = round(min(math.log2(max(config[den])), max(math.log2(v) for v in config[num])))
-    #         if den_v_max_log > len(config[den]):
-    #             continue
-
-    #         den_v = {2 ** i for i in range(math.ceil(den_min_log), round(den_v_max_log) + 1)}
-
-    #         if len(den_v) < len(config[den]):
-    #             logger.info(f"{den:23} {len(config[den]):5} -> {len(den_v):<5}     '{gen}'")
-    #             config[den] = den_v
-    #             self._resolve_constraints(config, self.var_constraints[den])
-
-    def _eval_constraint(self, config, idx):
-        updated = False
-        valid = [set() for _ in range(len(self.constraint_vars[idx]))]
-        for constr_args in itertools.product(*(config[var] for var in self.constraint_vars[idx])):
-            try:
-                self._constraint_evaluations += 1
-                constr_eval = self.constraint_functions[idx](*constr_args)
-            except Exception:
-                logger.exception(
-                    "error evaluating constraint '%s' with values %s",
-                    self.constraints[idx],
-                    dict(zip(self.constraint_vars[idx], constr_args)),
-                )
-                breakpoint()
+    def _gen_values(self, config):
+        for i, (num, den, gen) in enumerate(self.generators):
+            if den not in self.free_variables:
+                continue
+            if config[num] is None:
+                continue
+            if config[den] is None:
+                continue
+            if not all(v & (v - 1) == 0 for v in config[num]):
                 continue
 
-            # domain_str = ", ".join(f"{k}={v}" for k, v in zip(self.constraint_vars[idx], domains))
-            # print(f"eval {str(constr_eval):5} '{self.constraints[idx]}' with ({domain_str})")
+            den_min_log = math.log2(min(config[den]))
 
-            if constr_eval is True:
-                for i, v in enumerate(constr_args):
-                    valid[i].add(v)
+            den_v_max_log = round(min(math.log2(max(config[den])), max(math.log2(v) for v in config[num])))
+            if den_v_max_log > len(config[den]):
+                continue
+
+            den_v = {2**i for i in range(math.ceil(den_min_log), round(den_v_max_log) + 1)}
+
+            if len(den_v) < len(config[den]):
+                logger.info(f"{den:23} {len(config[den]):5} -> {len(den_v):<5}     '{gen}'")
+                config[den] = den_v
+                self._resolve_constraints(config, self.var_constraints[den])
+
+    def _eval_constraint(self, config, idx):
+        logger.info("constraint: '%s'", self.constraints[idx])
+        evaluations = 0
+        updated = False
+        valid = [set() for _ in range(len(self.constraint_vars[idx]))]
+        constraint = self.constraint_functions[idx]
+        for var_i, var in enumerate(self.constraint_vars[idx]):
+            # logger.warn("var: %s", var)
+            constr_domain = [config[v] for v in self.constraint_vars[idx]]
+            for val in config[var]:
+                # logger.warn("val: %s", var)
+                constr_domain[var_i] = [val]
+                for constr_args in itertools.product(*constr_domain):
+                    try:
+                        evaluations += 1
+                        constr_eval = constraint(*constr_args)
+                    except Exception:
+                        logger.exception(
+                            "error evaluating constraint '%s' with values %s",
+                            self.constraints[idx],
+                            dict(zip(self.constraint_vars[idx], constr_args)),
+                        )
+                        breakpoint()
+                        continue
+                    if constr_eval is True:
+                        valid[var_i].add(val)
+                        break
 
         for i, var in enumerate(self.constraint_vars[idx]):
             # log = logger.debug if len(valid[i]) == len(config[var]) else logger.info
@@ -298,6 +327,11 @@ class Solver:
             config[var] = valid[i]
             updated = True
 
+        self._constraint_evaluations += evaluations
+        if evaluations > 10000:
+            logger.warning("evaluations: %s constraint: '%s'", evaluations, self.constraints[idx])
+        else:
+            logger.info("evaluations: %s", evaluations)
         return updated
 
     def _resolve_constraints(self, config, constraints=None):
@@ -325,8 +359,7 @@ class Solver:
         return math.prod(len(config[var]) if config[var] is not None else float("inf") for var in config)
 
     def solve(self, config, vars=None):
-        vars = vars or self.var_constraints.keys()
-        if self._resolved_constraints:
+        if vars:
             for var in vars:
                 self._resolved_constraints -= set(self.var_constraints[var])
 
@@ -340,7 +373,8 @@ class Solver:
         while domain_size > 1:
             initial_domain_size = domain_size
 
-            self._propagate_equivalences(config)
+            while self._propagate_equivalences(config):
+                pass
             # self._gen_values(config)
             self._resolve_constraints(config)
 

@@ -17,7 +17,6 @@
 
 import logging
 import os
-import re
 import sys
 
 
@@ -61,7 +60,7 @@ class ColorFormatter(logging.Formatter):
 
 
 logger = logging.getLogger("par")
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.ERROR)
 ch = logging.StreamHandler(stream=sys.stdout)
 ch.setFormatter(ColorFormatter())
 logger.addHandler(ch)
@@ -79,20 +78,19 @@ constraints = [
     "2 <= {outer_block} <= 65536",
     "2 <= {outer_message} <= 65536",
     "2 <= {outer_ecc} <= 32768",
+    "1 <= {interleave}",
     "1 <= {outer_interleave}",
     #
-    # "{inner_message} <= 4 * {outer_message}",
-    # "{inner_message} <= 4 * {outer_message}",
-    "{inner_ecc} == 8",
+    "127 <= {inner_message} // {inner_ecc} <= 512",
     #
     "{block} == {message} + {ecc}",
     "{inner_block} == {inner_message} + {inner_ecc}",
     "{outer_block} == {outer_message} + {outer_ecc}",
     #
-    "{block} == {inner_block} * {outer_block} * {outer_interleave}",
-    "{message} == {inner_message} * {outer_message} * {outer_interleave}",
-    "{outer_interleaved_ecc} == {inner_message} * {outer_ecc} * {outer_interleave}",
-    "{inner_interleaved_ecc} == {outer_block} * {inner_ecc} * {outer_interleave}",
+    "{block} == {inner_block} * {outer_block} * {interleave}",
+    "{message} == {outer_message} * {outer_interleave}",
+    "{outer_interleaved_ecc} == {outer_ecc} * {outer_interleave}",
+    "{inner_interleaved_ecc} == {outer_block} * {inner_ecc} * {interleave}",
     "{ecc} == {outer_interleaved_ecc} + {inner_interleaved_ecc}",
     #
     "{outer_message} * {outer_ecc_ratio_num} == {outer_ecc} * {outer_ecc_ratio_den}",
@@ -103,9 +101,9 @@ constraints = [
     #
     "{message} % {inner_message} == 0",
     "{message} % {outer_message} == 0",
+    "{message} % {interleave} == 0",
     "{message} % {outer_interleave} == 0",
     "{message} % ({inner_message} * {outer_message}) == 0",
-    #
     # "{message} % {ecc} == 0",  # not applicable for CIRC
     "{message} % {outer_interleaved_ecc} == 0",
     "{inner_message} % {inner_ecc} == 0",
@@ -113,11 +111,10 @@ constraints = [
     #
     "{block} % {inner_block} == 0",
     "{block} % {outer_block} == 0",
-    "{block} % {outer_interleave} == 0",
+    "{block} % {interleave} == 0",
     "{block} % ({inner_block} * {outer_block}) == 0",
     #
-    "{outer_interleave} == {message} // ({inner_message} * {outer_message})",
-    "{outer_interleave} == {block} // ({inner_block} * {outer_block})",
-    #
-    # "math.gcd({outer_ecc_ratio_num}, {outer_ecc_ratio_den}) == 1",
+    "{interleave} == {message} // ({inner_message} * {outer_message})",
+    "{interleave} == {block} // ({inner_block} * {outer_block})",
+    "{outer_interleave} == {interleave} * {inner_message}",
 ]

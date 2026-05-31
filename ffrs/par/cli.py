@@ -68,6 +68,7 @@ def parse_choice_list(choices):
 
         return items
 
+    parser.choices = choices
     return parser
 
 
@@ -129,6 +130,11 @@ class CLI:
                 if isinstance(default, CLI.DEFAULT):
                     default = default.value_text
                 help += f" [default: {default}]"
+            if action.choices and action.metavar:
+                help += f" [choices: {', '.join(str(c) for c in action.choices)})]"
+            elif action.type and hasattr(action.type, "choices"):
+                help += f" [choices: {', '.join(str(c) for c in sorted(action.type.choices))}]"
+
             return help
 
     def __init__(self):
@@ -202,7 +208,7 @@ class CLI:
             "--interleave",
             metavar="size",
             action="store",
-            default=CLI.DEFAULT("1", parse_size_list),
+            # default=CLI.DEFAULT("1", parse_size_list),
             type=parse_size_list,
             help="Interleave multiple blocks",
         )
@@ -229,6 +235,23 @@ class CLI:
             formatter_class=self.HelpFormatter,
         )
         backup.set_defaults(ecc_ratio=CLI.DEFAULT("1/1", parse_ratio_list))
+        backup.add_argument("input_file", metavar="file", nargs="+")
+
+        existing = backup.add_mutually_exclusive_group()
+        existing.add_argument("-f", "--force", action="store_true", help="Overwrite existing parity files")
+        existing.add_argument("-i", "--ignore-existing", action="store_true", help="Ignore existing parity files")
+        existing.add_argument(
+            "-u",
+            "--update",
+            action="store_true",
+            help="Update parity files if changes are detected (see --update-check)",
+        )
+        existing.add_argument(
+            "--update-check",
+            choices=["timestamp", "hash"],
+            default=CLI.DEFAULT("timestamp"),
+            help="Update parity files based on timestamp or hash",
+        )
 
     def arg_simd(self):
         simd_choices = ["x4", "x8", "x16", "sse", "avx2", "avx512"]
@@ -254,38 +277,36 @@ class CLI:
     def arg_circ(self):
         circ = self.common_parser.add_argument_group("circ16")
 
-        self.check(
-            self.warn,
-            lambda args: (
-                args.codec.get() == "circ16"
-                or (
-                    args.inner_block.is_default()
-                    and args.inner_ecc.is_default()
-                    and args.outer_block.is_default()
-                    and args.outer_ecc.is_default()
-                    and args.outer_ecc_ratio.is_default()
-                    and args.outer_interleave.is_default()
-                )
-            ),
-            "circ16 options have no effect when codec != circ16",
-        )
+        def add_circ_arg(*args, **kwargs):
+            if "dest" in kwargs:
+                dest = kwargs["dest"]
+            else:
+                assert args[-1].startswith("--")
+                dest = args[-1][2:].replace("-", "_")
 
-        circ.add_argument(
+            self.check(
+                self.warn,
+                lambda args: args.codec.get() == "circ16" or getattr(args, dest).is_default(),
+                "circ16 options have no effect when codec != circ16",
+            )
+            circ.add_argument(*args, **kwargs)
+
+        add_circ_arg(
             "--inner-block",
             metavar="size",
             action="store",
             type=parse_size_list,
             help="Block size used by the inner codec",
         )
-        circ.add_argument(
+        add_circ_arg(
             "--inner-message",
             metavar="size",
             action="store",
-            default=CLI.DEFAULT("1020,1024,2040,2048,4088,4096", parse_size_list),
+            default=CLI.DEFAULT("508,512,1020,1024,2040,2048,4088,4096", parse_size_list),
             type=parse_size_list,
             help="Payload size used by the inner codec",
         )
-        circ.add_argument(
+        add_circ_arg(
             "--inner-ecc",
             metavar="size",
             action="store",
@@ -293,7 +314,7 @@ class CLI:
             type=parse_size_list,
             help="ECC size of the inner codec",
         )
-        circ.add_argument(
+        add_circ_arg(
             "--inner-interleaved-ecc",
             metavar="size",
             action="store",
@@ -301,21 +322,21 @@ class CLI:
             help="Total ECC size of the inner codec (inner_ecc * outer_block * outer_interleave)",
         )
 
-        circ.add_argument(
+        add_circ_arg(
             "--outer-block",
             metavar="size",
             action="store",
             type=parse_size_list,
             help="Block size used by the outer codec",
         )
-        circ.add_argument(
+        add_circ_arg(
             "--outer-message",
             metavar="size",
             action="store",
             type=parse_size_list,
             help="Payload size used by the outer codec",
         )
-        circ.add_argument(
+        add_circ_arg(
             "--outer-ecc",
             metavar="size",
             action="store",
@@ -323,7 +344,7 @@ class CLI:
             type=parse_size_list,
             help="ECC size of the outer codec",
         )
-        circ.add_argument(
+        add_circ_arg(
             "--outer-interleaved-ecc",
             metavar="size",
             action="store",
@@ -331,7 +352,7 @@ class CLI:
             help="Total ECC size of the outer codec (outer_ecc * inner_message * outer_interleave)",
         )
 
-        circ.add_argument(
+        add_circ_arg(
             "--outer-interleave",
             metavar="count",
             action="store",

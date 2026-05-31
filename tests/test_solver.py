@@ -20,9 +20,11 @@ import pytest
 
 import ffrs
 import ffrs.par.solver
+import ffrs.par.__main__
 from ffrs.par.__main__ import print_config
 
 ffrs.par.solver.logger.setLevel(logging.DEBUG)
+ffrs.par.__main__.logger.setLevel(logging.DEBUG)
 
 test_config = dict(
     block=None,
@@ -36,9 +38,10 @@ test_config = dict(
     outer_ecc_ratio_den=range(1, 1024 + 1),
     outer_ecc_ratio_num=[1],
     outer_ecc=set(2**i for i in range(1, 16)),
-    outer_interleave=None,
+    interleave=None,
     outer_interleaved_ecc=None,
     outer_message=range(2, 65536 + 1, 2),
+    outer_interleave=None,
 )
 
 set_values = dict(inner_message=[4096 - 8, 4096], inner_ecc=[8], outer_ecc=[8, 16, 32, 64, 128, 256])
@@ -55,12 +58,12 @@ class TestSolver:
             dict(
                 message=[2**30],
                 outer_ecc_ratio_den=[16],
-                outer_interleave=[64],
+                interleave=[64],
             ),
             dict(
                 block=[2**30],
                 outer_ecc_ratio_den=[15],
-                outer_interleave=[64],
+                interleave=[64],
             ),
         ],
     )
@@ -80,22 +83,22 @@ class TestSolver:
         dict(
             message=[2**20],
             outer_ecc_ratio_den=[16],
-            # outer_interleave=[64],
+            # interleave=[64],
         ),
         dict(
             block=[2**20],
             outer_ecc_ratio_den=[15],
-            # outer_interleave=[64],
+            # interleave=[64],
         ),
         dict(
             message=[2**30],
             outer_ecc_ratio_den=[16],
-            # outer_interleave=[64],
+            # interleave=[64],
         ),
         dict(
             block=[2**30],
             outer_ecc_ratio_den=[15],
-            # outer_interleave=[64],
+            # interleave=[64],
         ),
     ],
 )
