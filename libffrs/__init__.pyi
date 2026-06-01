@@ -10,18 +10,12 @@ import libffrs
 FFRS main module
 """
 
-
+compiler_info: str
 class CIRC16:
-    def __init__(self: libffrs.CIRC16, inner_block_len: typing.SupportsInt | typing.SupportsIndex, inner_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_block_len: typing.SupportsInt | typing.SupportsIndex, outer_ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
-        """Cross-interleaved Reed-Solomon coder"""
-        ...
     block_len: int
     block_size: int
     ecc_len: int
     ecc_size: int
-    def encode(self: libffrs.CIRC16, buffer: collections.abc.Buffer) -> bytearray:
-        """Encode data"""
-        ...
     inner_block_len: int
     inner_block_size: int
     inner_ecc_len: int
@@ -34,183 +28,144 @@ class CIRC16:
     outer_block_len: int
     outer_ecc_len: int
     outer_message_len: int
-    def repair(self: libffrs.CIRC16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bool:
-        """Repair data"""
-        ...
     rsi: libffrs.RSi16
     rso: libffrs.RSi16
+    def __init__(self: libffrs.CIRC16, inner_block_len: typing.SupportsInt | typing.SupportsIndex, inner_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_block_len: typing.SupportsInt | typing.SupportsIndex, outer_ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
+        ...
+    def encode(self: libffrs.CIRC16, buffer: collections.abc.Buffer) -> bytearray:
+        ...
+    def repair(self: libffrs.CIRC16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bool:
+        ...
 
 
 class GF256:
-    def __init__(self: libffrs.GF256, primitive: typing.SupportsInt | typing.SupportsIndex = 2, poly1: typing.SupportsInt | typing.SupportsIndex = 285) -> None:
-        """
-        Instantiate type for operations over :math:`GF(p^n)/P`
+    """Finite-field operations optimized for :math:`GF(2^8)`"""
 
-                        Args:
-                            primitive : :math:`a` -- primitive value used to generate the field
-                            polynomial : :math:`P` -- irreducible polynomial used to generate the field
-        """
-        ...
-    def add(self: libffrs.GF256, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Addition: :math:`\text{lhs} + \text{rhs}`"""
-        ...
-    def div(self: libffrs.GF256, num: typing.SupportsInt | typing.SupportsIndex, den: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Division: :math:`\frac{\text{num}}{\text{den}}`"""
-        ...
-    def exp(self: libffrs.GF256, value: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Exponential function: :math:`a^{\text{value}}`"""
-        ...
     field_elements: int
     """Always 256"""
-    def inv(self: libffrs.GF256, value: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Reciprocal: :math:`\frac{1}{\text{value}}`"""
-        ...
-    def log(self: libffrs.GF256, value: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Logarithm: :math:`\log_a (\text{value})`"""
-        ...
-    def mul(self: libffrs.GF256, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Multiplication: :math:`\text{lhs} \times \text{rhs}`"""
-        ...
-    def mul8(self: libffrs.GF256, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
-        """Multiply 8 values in a single operation"""
-        ...
+
     poly1: int
     """Masked irreducible polynomial, excluding MSb"""
-    def poly_add(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
-        """Add polynomials"""
-        ...
-    def poly_divmod(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> tuple:
-        """
-        Polynomial quotient and remainder
 
-                            Returns:
-                                (quotient, remainder)
-        """
-        ...
-    def poly_eval(self: libffrs.GF256, poly: collections.abc.Buffer, x: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Evaluate polynomial at ``x``"""
-        ...
-    def poly_eval8(self: libffrs.GF256, poly: collections.abc.Buffer, xs: collections.abc.Buffer) -> bytearray:
-        """Evaluate polynomial at 8 points on a single operation"""
-        ...
-    def poly_mod(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
-        """Polynomial remainder"""
-        ...
-    def poly_mod_x_n(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
-        """
-        Shifted polynomial remainder
-
-                            :math:`P \times X^n \mod (X^n + p_2)` where ``n = len(p2)``
-        """
-        ...
-    def poly_mul(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
-        """Multiply polynomials"""
-        ...
-    def poly_sub(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
-        """Subtract polynomials"""
-        ...
-    def pow(self: libffrs.GF256, base: typing.SupportsInt | typing.SupportsIndex, exponent: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Power: :math:`\text{base}^\text{exponent}`"""
-        ...
     power: int
     """Always 8"""
+
     prime: int
     """Always 2"""
+
     primitive: int
     """Primitive value used to generate the field"""
+
+    def __init__(self: libffrs.GF256, primitive: typing.SupportsInt | typing.SupportsIndex = 2, poly1: typing.SupportsInt | typing.SupportsIndex = 285) -> None:
+        ...
+    def add(self: libffrs.GF256, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def div(self: libffrs.GF256, num: typing.SupportsInt | typing.SupportsIndex, den: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def exp(self: libffrs.GF256, value: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def inv(self: libffrs.GF256, value: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def log(self: libffrs.GF256, value: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def mul(self: libffrs.GF256, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def mul8(self: libffrs.GF256, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
+        ...
+    def poly_add(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
+        ...
+    def poly_divmod(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> tuple:
+        ...
+    def poly_eval(self: libffrs.GF256, poly: collections.abc.Buffer, x: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def poly_eval8(self: libffrs.GF256, poly: collections.abc.Buffer, xs: collections.abc.Buffer) -> bytearray:
+        ...
+    def poly_mod(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
+        ...
+    def poly_mod_x_n(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
+        ...
+    def poly_mul(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
+        ...
+    def poly_sub(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
+        ...
+    def pow(self: libffrs.GF256, base: typing.SupportsInt | typing.SupportsIndex, exponent: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
     def sub(self: libffrs.GF256, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Subtraction: :math:`\text{lhs} - \text{rhs}`"""
         ...
 
 
 class GFi16:
-    def __init__(self: libffrs.GFi16, primitive: typing.SupportsInt | typing.SupportsIndex) -> None:
-        """
-        Instantiate type for operations over :math:`GF(65537)`
+    """Finite-field operations for prime fields <= 65537"""
 
-                        Args:
-                            primitive : :math:`a` -- primitive value used to generate the field
-        """
-        ...
-    def add(self: libffrs.GFi16, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Addition: :math:`\text{lhs} + \text{rhs}`"""
-        ...
-    def div(self: libffrs.GFi16, num: typing.SupportsInt | typing.SupportsIndex, den: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Division: :math:`\frac{\text{num}}{\text{den}}`"""
-        ...
-    def exp(self: libffrs.GFi16, value: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Exponential function: :math:`a^{\text{value}}`"""
-        ...
     field_elements: int
     """:math:`p`"""
-    def inv(self: libffrs.GFi16, value: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Reciprocal: :math:`\frac{1}{\text{value}}`"""
-        ...
-    def log(self: libffrs.GFi16, value: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Logarithm: :math:`\log_a (\text{value})`"""
-        ...
-    def mul(self: libffrs.GFi16, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Multiplication: :math:`\text{lhs} \times \text{rhs}`"""
-        ...
-    def pow(self: libffrs.GFi16, base: typing.SupportsInt | typing.SupportsIndex, exponent: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Power: :math:`\text{base}^\text{exponent}`"""
-        ...
+
     power: int
     """Always 1"""
+
     prime: int
     """:math:`p`"""
+
     primitive: int
     """Primitive value used to generate the field"""
+
+    def __init__(self: libffrs.GFi16, primitive: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    def add(self: libffrs.GFi16, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def div(self: libffrs.GFi16, num: typing.SupportsInt | typing.SupportsIndex, den: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def exp(self: libffrs.GFi16, value: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def inv(self: libffrs.GFi16, value: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def log(self: libffrs.GFi16, value: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def mul(self: libffrs.GFi16, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
+    def pow(self: libffrs.GFi16, base: typing.SupportsInt | typing.SupportsIndex, exponent: typing.SupportsInt | typing.SupportsIndex) -> int:
+        ...
     def sub(self: libffrs.GFi16, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Subtraction: :math:`\text{lhs} - \text{rhs}`"""
         ...
 
 
 class RS256:
-    def __init__(self: libffrs.RS256, block_len: typing.SupportsInt | typing.SupportsIndex | None = None, message_len: typing.SupportsInt | typing.SupportsIndex | None = None, ecc_len: typing.SupportsInt | typing.SupportsIndex | None = None, primitive: typing.SupportsInt | typing.SupportsIndex = 2, polynomial: typing.SupportsInt | typing.SupportsIndex = 285) -> None:
-        """Instantiate a Reed-Solomon encoder with the given configuration"""
-        ...
-    def _synds(self: libffrs.RS256, buffer: collections.abc.Buffer) -> bytearray:
-        """Compute syndromes"""
-        ...
+    """Reed-Solomon coding over :math:`GF(2^8)`"""
+
     block_len: int
     block_size: int
     ecc_len: int
     ecc_size: int
-    def encode(self: libffrs.RS256, buffer: collections.abc.Buffer) -> bytearray:
-        """Encode message, return ecc"""
-        ...
     generator: bytes
     generator_roots: bytes
     gf: libffrs.GF256
     message_len: int
     message_size: int
+    def __init__(self: libffrs.RS256, block_len: typing.SupportsInt | typing.SupportsIndex | None = None, message_len: typing.SupportsInt | typing.SupportsIndex | None = None, ecc_len: typing.SupportsInt | typing.SupportsIndex | None = None, primitive: typing.SupportsInt | typing.SupportsIndex = 2, polynomial: typing.SupportsInt | typing.SupportsIndex = 285) -> None:
+        ...
+    def _synds(self: libffrs.RS256, buffer: collections.abc.Buffer) -> bytearray:
+        ...
+    def encode(self: libffrs.RS256, buffer: collections.abc.Buffer) -> bytearray:
+        ...
     def repair(self: libffrs.RS256, buffer: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bool:
-        """Repair message + ecc"""
         ...
 
 
 class RSi16:
-    def __init__(self: libffrs.RSi16, block_len: typing.SupportsInt | typing.SupportsIndex, ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
-        """Instantiate a Reed-Solomon encoder with the given configuration"""
-        ...
+    """Reed-Solomon coding over :math:`GF(65537)`"""
+
     block_len: int
     block_size: int
     ecc_len: int
     ecc_size: int
-    def encode(self: libffrs.RSi16, buffer: collections.abc.Buffer) -> bytearray:
-        """Systematic encode"""
-        ...
     gf: libffrs.GFi16
     interleave: int
     """Number of interleaved codewords for block encoding"""
+
     message_len: int
     message_size: int
     ntt_len: int
     ntt_size: int
-    def repair(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer, error_pos: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex] | None = None) -> None:
-        """Repair a block with the given error locations"""
-        ...
     root: int
     rs_block_len: int
     rs_block_size: int
@@ -220,10 +175,22 @@ class RSi16:
     rs_message_size: int
     simd_x16: bool
     """Enable SIMD x16 encoding"""
+
     simd_x4: bool
     """Enable SIMD x4 encoding"""
+
     simd_x8: bool
     """Enable SIMD x8 encoding"""
-    def synd(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bytearray:
-        """Calculate syndromes for the given message and ecc buffers"""
+
+    def __init__(self: libffrs.RSi16, block_len: typing.SupportsInt | typing.SupportsIndex, ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
         ...
+    def encode(self: libffrs.RSi16, buffer: collections.abc.Buffer) -> bytearray:
+        ...
+    def repair(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer, error_pos: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex] | None = None) -> None:
+        ...
+    def synd(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bytearray:
+        ...
+
+
+def create_buffer(arg0: typing.SupportsInt | typing.SupportsIndex) -> memoryview:
+    ...

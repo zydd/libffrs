@@ -15,7 +15,7 @@ def format_docstring(txt: str) -> str:
         docstring += "\n"
     else:
         docstring += txt
-    docstring += '"""'
+    docstring += '"""\n'
     return docstring
 
 
@@ -26,54 +26,62 @@ def fullname(cls):
     return f"{module}.{cls.__qualname__}"
 
 
-def generate_stub(attr, overrides=None, property_types=None) -> str:
-    if inspect.isclass(attr):
-        cls = attr
-        obj = None
+def gen(obj, instances) -> str:
+    is_class = inspect.isclass(obj)
+
+    if not is_class and not inspect.ismodule(obj):
+        cls = obj.__class__
     else:
-        cls = attr.__class__
-        obj = attr
+        cls = obj
 
-    overrides = overrides or {}
-    property_types = property_types or {}
-    class_name = cls.__name__
+    lines = []
 
-    lines = [f"class {class_name}:"]
+    filtered_members = list(
+        filter(
+            lambda x: not ((x[0].startswith("__") and x[0] != "__init__") or x[0].startswith("_pybind11")),
+            inspect.getmembers(cls),
+        )
+    )
 
-    members = inspect.getmembers(cls)
-    count = False
+    # Attributes
+    for name, member in filtered_members:
+        if not callable(member):
+            type_ = "Any" if is_class else fullname(getattr(obj, name).__class__)
+            lines.append(f"{name}: {type_}")
+            if isinstance(member, property) and member.__doc__:
+                lines.append(format_docstring(member.__doc__))
 
-    for name, member in members:
-        if (name.startswith("__") and name != "__init__") or name.startswith("_pybind11"):
-            continue
+    # Classes
+    for name, member in filtered_members:
+        if inspect.isclass(member):
+            cls_lines = [f"class {name}:"]
 
-        elif callable(member):
-            assert member.__doc__
+            if member.__doc__:
+                cls_lines.append(textwrap.indent(format_docstring(member.__doc__), "    "))
+
+            member = instances.get(name, member)
+            attrs = gen(member, instances)
+            if attrs:
+                cls_lines.append(textwrap.indent(attrs, "    "))
+            else:
+                cls_lines.append("    ...\n")
+
+            cls_lines.append("\n")
+            lines.append("\n".join(cls_lines))
+
+    # Methods
+    for name, member in filtered_members:
+        if not inspect.isclass(member) and callable(member):
             newline = member.__doc__.find("\n")
             sig = member.__doc__[:newline]
             doc = member.__doc__[newline + 1 :].strip()
 
-            method_body = textwrap.indent(format_docstring(doc), "    ")
-            method_body += "\n    ..."
-            lines.append(textwrap.indent(f"def {sig}:\n{method_body}", "    "))
+            method_body = ""
+            if doc:
+                textwrap.indent(format_docstring(doc), "    ")
 
-        else:  # attribute
-            type_ = fullname(getattr(obj, name).__class__) if obj else "Any"
-            type_ = property_types.get(name, type_)
-            if name.endswith("_len") or name.endswith("_size"):
-                type_ = "int"
-            if name.startswith("simd_x"):
-                type_ = "bool"
-
-            lines.append(f"    {name}: {type_}")
-
-            if member.__doc__:
-                lines.append(textwrap.indent(format_docstring(member.__doc__), "    "))
-
-        count += 1
-
-    if not count:
-        lines.append("    pass")
+            method_body += "    ..."
+            lines.append(f"def {sig}:\n{method_body}")
 
     return "\n".join(lines)
 
@@ -97,20 +105,12 @@ class_stubs = {
     "RS256": libffrs.RS256(4, 2),
 }
 
-for cls in dir(libffrs):
-    if cls.startswith("_") or not inspect.isclass(getattr(libffrs, cls)) or cls in class_stubs:
-        continue
-    class_stubs[cls] = getattr(libffrs, cls)
-
-class_stubs = [val for _, val in sorted(class_stubs.items(), key=lambda x: x[0])]
-
 output_dir = sys.argv[1]
 
 with open(output_dir + "/__init__.pyi", "w", encoding="utf8") as f:
     f.write(header)
     if libffrs.__doc__:
-        f.write(f'"""\n{textwrap.dedent(libffrs.__doc__).strip()}\n"""\n')
-    for stub in class_stubs:
-        f.write("\n\n")
-        f.write(generate_stub(stub))
-        f.write("\n")
+        f.write(f'"""\n{textwrap.dedent(libffrs.__doc__).strip()}\n"""\n\n')
+
+    f.write(gen(libffrs, class_stubs))
+    f.write("\n")
