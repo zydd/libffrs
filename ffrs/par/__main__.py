@@ -16,6 +16,7 @@
 
 import base64
 import hashlib
+import json
 import logging
 import math
 import os
@@ -399,6 +400,10 @@ def main():
             logger.critical("input file '%s' does not exist", filename)
             return 1
 
+        basename = os.path.basename(filename)
+        basename = json.dumps(basename, ensure_ascii=False)
+        if not re.findall(r"\s", basename):
+            basename = basename[1:-1]
         output_filename = filename + ".ffrs"
 
         if os.path.isfile(output_filename):
@@ -428,12 +433,12 @@ def main():
         with open(output_filename, "wb") as f:
             f.write(b"\x89ffrs\r\n")
             f.write(rs.serialize())
-            f.write(f"\ns:{ffrs.util.b64hex(input_stat.st_size)}\n".encode("ascii"))
-            f.write(f"m:{ffrs.util.b64hex(input_stat.st_mtime_ns)}\n".encode("ascii"))
-            f.write(b"h:")
+            f.write(f"\nf s:{ffrs.util.b64hex(input_stat.st_size)}".encode("ascii"))
+            f.write(f" t:{ffrs.util.b64hex(input_stat.st_mtime_ns)}".encode("ascii"))
+            f.write(b" h:")
             hash_offset = f.tell()
             f.write(base64.urlsafe_b64encode(bytes(sha1.digest_size)).strip(b"="))
-            f.write(b"\n\n")
+            f.write(f" p:{basename}\n\n".encode("utf-8"))
 
             with open(filename, "rb") as input_file:
                 while read := input_file.readinto(buffer):
