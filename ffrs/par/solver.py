@@ -18,12 +18,18 @@
 import itertools
 import math
 import re
+import time
 
+import ffrs.par
 from . import logger as parent_logger
 
 MAX_DOMAIN_SIZE = 65537
 
 logger = parent_logger.getChild("solver")
+
+
+class SolverError(ffrs.par.FfrsParException):
+    pass
 
 
 class _Equation:
@@ -400,3 +406,41 @@ class Solver:
                     return False
         else:
             return True
+
+    def branch_config(self, config, arg, value):
+        t0 = time.time()
+        # logger.debug("branch %s = %s", arg, value)
+        # config2 = copy.deepcopy(config)  # slower than making a new dict
+        config2 = {k: set(v) if v is not None else None for k, v in config.items()}
+        config2[arg] = [value]
+        self.solve(config2, [arg])
+        logger.debug("branching %s = %s took %.2f ms", arg, value, (time.time() - t0) * 1000)
+        return config2
+
+    def _optimize(self, mode, config, arg):
+        t0 = time.time()
+        if mode == "max":
+            arg_values = sorted(config[arg], reverse=True)
+        elif mode == "min":
+            arg_values = sorted(config[arg])
+        else:
+            raise NotImplementedError
+
+        if len(config[arg]) > 1:
+            for i, val in enumerate(arg_values):
+                try:
+                    config2 = self.branch_config(config, arg, val)
+                    logger.debug("optimizing %s = %s (index: %d) took %.2f ms", arg, val, i, (time.time() - t0) * 1000)
+                    return config2
+                except ValueError:
+                    pass
+            raise SolverError(f"could not optimize {arg}")
+        return config
+
+    def minimize(self, config, arg):
+        logger.info("minimize %s", arg)
+        return self._optimize("min", config, arg)
+
+    def maximize(self, config, arg):
+        logger.info("maximize %s", arg)
+        return self._optimize("max", config, arg)

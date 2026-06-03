@@ -14,6 +14,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import ffrs
 
 _b64hex_alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-"
 
@@ -32,3 +33,71 @@ def b64hex_dec(val: str) -> int:
         result <<= 6
         result |= _b64hex_alphabet.index(c)
     return result
+
+
+def format_size(n):
+    units = ["", "k", "m", "g", "t", "p"]
+    colors = [
+        "\033[36m",  # cyan
+        "\033[32m",  # green
+        "\033[33m",  # yellow
+        "\033[31m",  # red
+        "\033[35m",  # magenta
+        "\033[94m",  # light blue
+    ]
+    if n <= 0:
+        return str(n)
+    parts = []
+    for eng in range(len(units) - 1, -1, -1):
+        shift = eng * 10
+        value = 1 << shift
+        if n >= value:
+            q, n = divmod(n, value)
+            if q:
+                parts.append(f"{colors[eng]}{q}{units[eng]}\033[0m")
+    return "".join(parts)
+
+
+def _ansi_ljust(s, w):
+    return s + " " * max(0, w - len(re.sub(r"\033\[[0-9;]*m", "", s)))
+
+
+def format_config(config) -> str:
+    parts = ["config: {"]
+    for k in sorted(config):
+        val = config[k]
+        if val is None:
+            sval = "\033[35m[[[...]]]\033[0m"
+        elif len(val) > 32:
+            sval = f"\033[35m[[[{len(val)}]]]\033[0m"
+        else:
+            sval = "[" + ", ".join((map(format_size, sorted(val)))) + "]"
+
+        parts.append(f"  {repr(k):23}: {sval},")
+    parts.append("}\n")
+    return "\n".join(parts)
+
+
+def format_config_args(config) -> str:
+    assert (
+        len(config["inner_block"])
+        == len(config["inner_ecc"])
+        == len(config["outer_block"])
+        == len(config["outer_ecc"])
+        == len(config["interleave"])
+        == 1
+    )
+    return (
+        f"CIRC16({next(iter(config['inner_block'])) // 2}, {next(iter(config['inner_ecc'])) // 2},"
+        f" {next(iter(config['outer_block']))}, {next(iter(config['outer_ecc']))}, {next(iter(config['interleave']))})"
+    )
+
+
+def instantiate_config(config):
+    return ffrs.CIRC16(
+        next(iter(config["inner_block"])) // 2,
+        next(iter(config["inner_ecc"])) // 2,
+        next(iter(config["outer_block"])),
+        next(iter(config["outer_ecc"])),
+        next(iter(config["interleave"])),
+    )

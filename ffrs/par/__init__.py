@@ -32,10 +32,11 @@ class ColorFormatter(logging.Formatter):
     bold_yellow = "\033[33;1m"
     dim = "\033[1;30m"
     gray = "\033[38;20m"
+    green = "\033[32m"
     red = "\033[31;20m"
+    reset = "\033[0m"
     white = "\033[37;20m"
     yellow = "\033[33;20m"
-    reset = "\033[0m"
     # format_string = "%(asctime)s %(threadName)-8s %(levelname)-8s %(filename)s:%(lineno)-3d: %(funcName)s: %(message)s"
     format_string = "[%(levelname)-8s %(relpath)s:%(lineno)d:%(funcName)s] "
     module_path = os.path.dirname(os.path.dirname(__file__))
@@ -44,7 +45,7 @@ class ColorFormatter(logging.Formatter):
         super().__init__(*args, **kwargs)
         self.FORMATS = {
             logging.DEBUG: logging.Formatter(f"{self.dim}{self.format_string}%(message)s{self.reset}"),
-            logging.INFO: logging.Formatter(f"{self.format_string}%(message)s"),
+            logging.INFO: logging.Formatter(f"{self.green}{self.format_string}{self.reset}%(message)s"),
             logging.WARNING: logging.Formatter(
                 f"{self.bold_yellow}{self.format_string}{self.reset}{self.yellow}%(message)s{self.reset}"
             ),

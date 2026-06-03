@@ -17,6 +17,8 @@
 import argparse
 import sys
 
+import ffrs.par.backup
+
 
 def parse_size(size_str: str) -> int:
     size_str = size_str.strip().lower()
@@ -234,7 +236,7 @@ class CLI:
             help="Full backup + optional extra parity",
             formatter_class=self.HelpFormatter,
         )
-        backup.set_defaults(ecc_ratio=CLI.DEFAULT("1/1", parse_ratio_list))
+        backup.set_defaults(module=ffrs.par.backup, ecc_ratio=CLI.DEFAULT("1/1", parse_ratio_list))
         backup.add_argument("input_file", metavar="file", nargs="+")
 
         existing = backup.add_mutually_exclusive_group()
