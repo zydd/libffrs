@@ -152,7 +152,7 @@ private:
         py_assert(inner_blocks == rso.message_len * interleave);
 
         auto buf_rsi = new_aligned<GFT>(rsi.block_len, rsi.vec_align);
-        auto temp2_rsi = new_aligned<GFT>(rsi.block_len * 2, rsi.vec_align);
+        auto repair_temp_rsi = new_aligned<GFT>(rsi.repair_temp_len, rsi.vec_align);
         auto synds_rsi = new_aligned<GFT>(rso.block_len * rsi.ecc_len * interleave, rsi.vec_align);
 
         // Widen rso ecc to u32
@@ -166,14 +166,14 @@ private:
             &message[0],
             &rsi_ecc[0],
             rso.message_len * interleave,
-            &temp2_rsi[0],
+            &repair_temp_rsi[0],
             &synds_rsi[0]
         );
         rsi.synd_blocks(
             &rso_ecc[0],
             &rsio_ecc[0],
             rso.ecc_len * interleave,
-            &temp2_rsi[0],
+            &repair_temp_rsi[0],
             &synds_rsi[rso.message_len * interleave * rsi.ecc_len]
         );
 
@@ -203,7 +203,7 @@ private:
 
                 std::copy_n(&rso_ecc[rso_offset], rsi.message_len, &buf_rsi[0]);
                 std::copy_n(&rsio_ecc[rsio_offset], rsi.ecc_len, &buf_rsi[rsi.message_len]);
-                rsi.repair_block(&buf_rsi[0], inner_zero_locations, &temp2_rsi[0]);
+                rsi.repair_block(&buf_rsi[0], inner_zero_locations, &repair_temp_rsi[0]);
                 std::copy_n(&buf_rsi[0], rsi.message_len, &rso_ecc[rso_offset]);
 
                 if (std::all_of(inner_zero_locations.begin(), inner_zero_locations.end(),
@@ -223,10 +223,10 @@ private:
                 if (std::any_of(&synds_rsi[synd_offset], &synds_rsi[synd_offset + rsi.ecc_len], [](auto v) { return v != 0; })) {
                     // Repair zeroes in rsi ecc
                     if (std::any_of(&rsi_ecc[synd_offset], &rsi_ecc[synd_offset + rsi.ecc_len], [](auto v) { return v == 0; })) {
-                        std::copy_n(&synds_rsi[synd_offset], rsi.ecc_len, &temp2_rsi[0]);
-                        rsi.ecc_mix(&temp2_rsi[0]);
+                        std::copy_n(&synds_rsi[synd_offset], rsi.ecc_len, &repair_temp_rsi[0]);
+                        rsi.ecc_mix(&repair_temp_rsi[0]);
 
-                        if (std::all_of(&temp2_rsi[0], &temp2_rsi[rsi.ecc_len], [](auto v) { return (v & 0xffff) == 0; })) {
+                        if (std::all_of(&repair_temp_rsi[0], &repair_temp_rsi[rsi.ecc_len], [](auto v) { return (v & 0xffff) == 0; })) {
                             continue;
                         }
                     }

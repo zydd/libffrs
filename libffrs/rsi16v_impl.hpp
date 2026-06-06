@@ -32,6 +32,7 @@
 // #define FFRS_CHECK_BOUNDS
 // #define FFRS_DEBUG_LONG_DIVISION
 // #define FFRS_DEBUG_POLY_DIVISION
+// #define FFRS_DEBUG_REPAIR
 
 
 template<typename Vec, typename = std::enable_if_t<sizeof(Vec) % sizeof(::GFT) == 0>>
@@ -106,6 +107,16 @@ inline void _print_vec(const char *name, const Vec *const v, size_t len) {
     #define pd_print(...)
 #endif
 
+#ifdef FFRS_DEBUG_REPAIR
+    #define r_print_vec(name, v, len) _print_vec(name, v, len)
+    #define r_print_vec_intt(name, v, len) do { inttr(v); _print_vec(name, v, len); nttr(v); } while(0)
+    #define r_print(...) py::print(__VA_ARGS__)
+#else
+    #define r_print_vec(...)
+    #define r_print_vec_intt(...)
+    #define r_print(...)
+#endif
+
 
 typedef GFT GFTx4 __attribute__((vector_size(4 * sizeof(GFT))));
 typedef GFT GFTx8 __attribute__((vector_size(8 * sizeof(GFT))));
@@ -139,6 +150,7 @@ public:
         _rbo_shift = 16 - __builtin_ctzl(ntt_len);
         ntt_len_i = gf.inv(ntt_len);
         ecc_len_i = gf.inv(ecc_len);
+        ecc2_len_i = gf.inv(ecc_len * 2);
 
         // root = gf.exp(gf.div(gf.log(1), ntt_len));
         root = gf.pow(gf.primitive, 65536 / ntt_len);
@@ -178,6 +190,17 @@ public:
         for (size_t i = 0; i < ecc_len; ++i) {
             _roots_ecc[i] = gf.pow(ecc_root, i);
             _roots_i_ecc[i] = gf.pow(ecc_root_i, i);
+        }
+
+        ::GFT ecc2_root = gf.pow(gf.primitive, 65536 / (ecc_len * 2));
+        py_assert(gf.pow(ecc2_root, ecc_len * 2) == 1, "ntt root of unity sanity check failed");
+        py_assert(gf.pow(ecc2_root, ecc_len) == 65536, "ntt root of unity sanity check failed");
+        ::GFT ecc2_root_i = gf.inv(ecc2_root);
+        _roots_ecc2.resize(ecc_len * 2);
+        _roots_i_ecc2.resize(ecc_len * 2);
+        for (size_t i = 0; i < ecc_len * 2; ++i) {
+            _roots_ecc2[i] = gf.pow(ecc2_root, i);
+            _roots_i_ecc2[i] = gf.pow(ecc2_root_i, i);
         }
 
         _pntt_shift.resize(block_len);
@@ -301,7 +324,7 @@ public:
      * computes the full iNTT from the first `ecc_len` symbols of `block`
      */
     inline void pintt_ecc(GFT *const ntt_block) const {
-        for (size_t i = 1; i < ntt_len / ecc_len; ++i) {
+        for (size_t i = 1; i < block_len / ecc_len; ++i) {
             std::copy_n(&ntt_block[0], ecc_len, &ntt_block[i * ecc_len]);
             for (size_t j = 0; j < ecc_len; ++j)
                 ntt_block[i * ecc_len + j] = gf.mul(ntt_block[i * ecc_len + j], _pintt_shift[i * ecc_len + j]);
@@ -320,8 +343,8 @@ public:
 
         // compute synds
         auto synds = &temp_ntt1_ecc6[ecc_len * 0];
-        std::copy_n(&block[0], block_len, &temp_ntt1_ecc6[ecc_len * 0]);
-        pntt(&synds[ecc_len * 0]);
+        std::copy_n(&block[0], block_len, &synds[0]);
+        pntt(&synds[0]);
 
         // init evaluator_poly with synds
         auto evaluator_poly = &synds[0];
@@ -346,13 +369,82 @@ public:
         );
     }
 
-    inline void repair(GFT *const block, const size_t *const error_pos_rbo, size_t error_count, GFT *const temp2) const {
+    inline void repair(GFT *const block, const size_t *const error_pos_rbo, size_t error_count, GFT *const temp_ntt1_ecc6) const {
+        // temp_ntt1_ecc6 = ntt_len + ecc_len * 6
+
+        // compute synds
+        auto synds = &temp_ntt1_ecc6[ecc_len * 0];
+        std::copy_n(&block[0], block_len, &synds[0]);
+        pntt(&synds[0]);
+        r_print_vec("synds", synds, ecc_len);
+
+        // init evaluator_poly with synds
+        auto evaluator_poly = &synds[0];  // size = ecc_len * 2
+        auto locator_poly = &temp_ntt1_ecc6[ecc_len * 2];  // size = ecc_len * 2
+        error_locator(&error_pos_rbo[0], error_count, &locator_poly[0]);
+        r_print_vec("locator_poly", locator_poly, ecc_len);
+
+        auto locator_poly_deg = error_count;
+        error_evaluator(&locator_poly[0], locator_poly_deg, &evaluator_poly[0], &temp_ntt1_ecc6[ecc_len * 4]);
+        r_print_vec("evaluator_poly", evaluator_poly, ecc_len);
+
+        auto evaluator_poly_len = ecc_len;
+        auto locator_poly_deriv = &temp_ntt1_ecc6[ecc_len * 1];
+
+        // TODO: remove copy_n and add dst array to _deriv
+        std::copy_n(&locator_poly[0], ecc_len, &locator_poly_deriv[0]);
+        _deriv_shifted(locator_poly_deriv, ecc_len);
+        auto locator_poly_deriv_len = _get_vec_size(&locator_poly_deriv[0], ecc_len);
+        r_print_vec("locator_poly_deriv", locator_poly_deriv, ecc_len);
+
+        // TODO: only need to check one lane
+        auto locator_poly_deriv_len_max = vec_max(locator_poly_deriv_len);
+
+        for (size_t i = 0; i < error_count; ++i) {
+            auto pos_rbo = error_pos_rbo[i];
+            auto pos = rbo(pos_rbo);
+            r_print("error pos:", pos);
+
+            ::GFT x = _roots_ntt[pos_rbo];
+
+            GFT error = forney(
+                &locator_poly_deriv[0], locator_poly_deriv_len_max,
+                &evaluator_poly[0], evaluator_poly_len,
+                x
+            );
+
+            r_print_vec("error", &error, 1);
+
+            block[pos] = gf.add(block[pos], error);
+        }
+    }
+
+    inline void repair_ntt(GFT *const block, const size_t *const error_pos_rbo, size_t error_count, GFT *const temp_ntt1_ecc6) const {
         ntt(block);
+        auto locator_poly = &temp_ntt1_ecc6[block_len];
+        error_locator_rev(error_pos_rbo, error_count, locator_poly);
 
-        auto locator_poly = &temp2[block_len];
-        error_locator(error_pos_rbo, error_count, locator_poly);
-        repair_ntt(block, locator_poly, error_count, temp2);
+        auto err_ntt = &temp_ntt1_ecc6[0];
 
+        // copy synds
+        std::copy_n(&block[0], ecc_len, &err_ntt[0]);
+
+        for (size_t j = ecc_len; j < ntt_len; ++j) {
+            GFT sum = GFT{0};
+            for (size_t i = 0; i < error_count; ++i)
+                sum = gf.sub(sum, gf.mul(locator_poly[i], err_ntt[j - error_count + i]));
+
+            err_ntt[j] = sum;
+            block[j] = gf.sub(block[j], sum);
+        }
+
+        std::fill_n(&block[0], ecc_len, GFT{0});
+
+        // TODO limit to error positions only, test if performance improvement
+        // for (size_t j = 0; j < error_count; ++j) {
+        //     size_t i = error_pos_rbo[j];
+        //     block[i] = gf.div(block[i], ntt_len);
+        // }
         intt(block);
     }
 
@@ -369,10 +461,13 @@ protected:
     const size_t pntt_blocks;
     ::GFT ntt_len_i;
     ::GFT ecc_len_i;
+    ::GFT ecc2_len_i;
     std::vector<::GFT> _roots_ntt;
     std::vector<::GFT> _roots_i_ntt;
     std::vector<::GFT> _roots_ecc;
     std::vector<::GFT> _roots_i_ecc;
+    std::vector<::GFT> _roots_ecc2;
+    std::vector<::GFT> _roots_i_ecc2;
     std::vector<::GFT> _ecc_mix;
     std::vector<::GFT> _ecc_mix_i;
     std::vector<::GFT> _pntt_shift;
@@ -660,7 +755,10 @@ protected:
     ) const {
         auto x_inv = GFT{} + gf.inv(x);
         auto numerator = _eval(evaluator_poly, evaluator_poly_len, x_inv);
+        r_print_vec("evaluator_poly(x**-1)", &numerator, 1);
         auto denominator = _eval(locator_poly_deriv, locator_poly_deriv_len, x_inv);
+        r_print_vec("locator_poly_deriv(x**-1)", &denominator, 1);
+
         auto error = gf.mul(gf.div(numerator, denominator), x);
         return error;
     }
@@ -787,18 +885,49 @@ protected:
         }
     }
 
-    inline void error_locator(const size_t *const error_pos_rbo, size_t error_count, GFT *const locator_poly) const {
+    inline void error_locator_rev(const size_t *const error_pos_rbo, size_t error_count, GFT *const locator_poly) const {
         std::fill_n(&locator_poly[0], ecc_len, GFT{0});
 
         size_t last_error = error_count - 1;
 
         for (size_t j = 0; j < error_count; ++j) {
-            GFT x = GFT{} + gf.neg(gf.pow(root, error_pos_rbo[j]));
+            GFT x = GFT{} + gf.pow(root, error_pos_rbo[j]);
             for (size_t i = last_error - j; i < last_error; ++i) {
-                locator_poly[i] = gf.add(locator_poly[i], gf.mul(locator_poly[i + 1], x));
+                locator_poly[i] = gf.sub(locator_poly[i], gf.mul(locator_poly[i + 1], x));
             }
-            locator_poly[last_error] = gf.add(locator_poly[last_error], x);
+            locator_poly[last_error] = gf.sub(locator_poly[last_error], x);
         }
+    }
+
+    inline void error_locator(const size_t *const error_pos_rbo, size_t error_count, GFT *const locator_poly) const {
+        std::fill_n(&locator_poly[0], ecc_len, GFT{0});
+
+        for (size_t j = 0; j < error_count; ++j) {
+            GFT x = GFT{} + _roots_ntt[error_pos_rbo[j]];
+            for (size_t i = error_count - 1; i > 0; --i) {
+                locator_poly[i] = gf.sub(locator_poly[i], gf.mul(locator_poly[i - 1], x));
+            }
+            locator_poly[0] = gf.sub(locator_poly[0], x);
+        }
+    }
+
+    inline void error_evaluator(const GFT *const locator_poly, size_t locator_poly_deg, GFT *const evaluator_poly, GFT *const temp) const {
+        // evaluator_poly initialized with synds
+        std::fill_n(&evaluator_poly[ecc_len], ecc_len, GFT{0});
+
+        nttr2(&evaluator_poly[0]);
+
+        std::copy_n(&locator_poly[0], locator_poly_deg, &temp[1]);
+        temp[0] = GFT{} + 1;
+        std::fill_n(&temp[locator_poly_deg + 1], ecc_len * 2 - locator_poly_deg, GFT{0});
+
+        nttr2(&temp[0]);
+
+        for (size_t i = 0; i < ecc_len * 2; ++i)
+            evaluator_poly[i] = gf.mul(evaluator_poly[i], temp[i]);
+
+        inttr2(&evaluator_poly[0]);
+        std::fill_n(&evaluator_poly[ecc_len], ecc_len, GFT{0});
     }
 
     inline void find_roots_ntt(
@@ -811,7 +940,7 @@ protected:
         std::fill_n(&roots[0], ntt_len, GFT{0});
         std::copy_n(&locator_poly[0], ecc_len, &roots[0]);
 
-        // intt(&roots[0]);
+        py_assert(vec_max(locator_poly_len) <= ecc_len);
         pintt_ecc(&roots[0]);
 
         GFT lanes = ~GFT{0};
@@ -846,28 +975,6 @@ protected:
                 block[i] = gf.add(block[i], error);
             }
         }
-    }
-
-    inline void repair_ntt(GFT *const block_ntt, const GFT *const locator_poly, size_t error_count, GFT *const temp) const {
-        // copy synds
-        std::copy_n(&block_ntt[0], ecc_len, &temp[0]);
-
-        for (size_t j = ecc_len; j < ntt_len; ++j) {
-            GFT sum = GFT{0};
-            for (size_t i = 0; i < error_count; ++i)
-                sum = gf.sub(sum, gf.mul(locator_poly[i], temp[j - error_count + i]));
-
-            temp[j] = sum;
-            block_ntt[j] = gf.sub(block_ntt[j], sum);
-        }
-
-        std::fill_n(&block_ntt[0], ecc_len, GFT{0});
-
-        // TODO limit to error positions only, test if performance improvement
-        // for (size_t j = 0; j < error_count; ++j) {
-        //     size_t i = error_pos_rbo[j];
-        //     block[i] = gf.div(block[i], ntt_len);
-        // }
     }
 
     inline size_t _vec_shift(const GFT *const a, size_t a_len, size_t shift, GFT *const r) const {
@@ -950,6 +1057,14 @@ protected:
             r[i] = gf.mul(r[i + 1], i + 1);
         r[r_len - 1] = GFT{0};
         return r_len - 1;
+    }
+
+    inline size_t _deriv_shifted(GFT *const r, size_t r_len) const {
+        check_le_ecc(r_len);
+
+        for (::GFT i = 0; i < r_len; ++i)
+            r[i] = gf.mul(r[i], i + 1);
+        return r_len;
     }
 
     template<typename T>
@@ -1088,8 +1203,18 @@ protected:
 
     inline void inttr(GFT *const block) const {
         ct_butterfly(&_roots_i_ecc[0], &block[0], ecc_len);
-        for (size_t j = 0; j < ecc_len; ++j)
-            block[j] = gf.mul(block[j], ecc_len_i);
+        for (size_t i = 0; i < ecc_len; ++i)
+            block[i] = gf.mul(block[i], ecc_len_i);
+    }
+
+    inline void nttr2(GFT *const block) const {
+        gs_butterfly(&_roots_ecc2[0], &block[0], ecc_len * 2, ecc_len * 2);
+    }
+
+    inline void inttr2(GFT *const block) const {
+        ct_butterfly(&_roots_i_ecc2[0], &block[0], ecc_len * 2);
+        for (size_t i = 0; i < ecc_len * 2; ++i)
+            block[i] = gf.mul(block[i], ecc2_len_i);
     }
 
     inline void ntt(GFT *const block) const {
@@ -1098,8 +1223,8 @@ protected:
 
     inline void intt(GFT *const block) const {
         gs_butterfly(&_roots_i_ntt[0], &block[0], ntt_len, ntt_len);
-        for (size_t j = 0; j < ntt_len; ++j)
-            block[j] = gf.mul(block[j], ntt_len_i);
+        for (size_t i = 0; i < ntt_len; ++i)
+            block[i] = gf.mul(block[i], ntt_len_i);
     }
 };
 
@@ -1152,6 +1277,17 @@ uint16_t RSi16v<W>::rbo(uint16_t v) const {
 template <size_t W>
 void RSi16v<W>::repair(GFT *const block, const size_t *const error_pos_rbo, size_t error_count, GFT *const temp2) const {
     d->repair(
+        reinterpret_cast<simd_map_t<W> *>(block),
+        error_pos_rbo,
+        error_count,
+        reinterpret_cast<simd_map_t<W> *>(temp2)
+    );
+}
+
+
+template <size_t W>
+void RSi16v<W>::repair_ntt(GFT *const block, const size_t *const error_pos_rbo, size_t error_count, GFT *const temp2) const {
+    d->repair_ntt(
         reinterpret_cast<simd_map_t<W> *>(block),
         error_pos_rbo,
         error_count,

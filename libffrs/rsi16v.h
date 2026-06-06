@@ -34,6 +34,7 @@ public:
     ~RSi16v();
     void encode(GFT block[]) const;
     void repair(GFT block[], const size_t error_pos_rbo[], size_t error_count, GFT temp2[]) const;
+    void repair_ntt(GFT block[], const size_t error_pos_rbo[], size_t error_count, GFT temp2[]) const;
     void repair(GFT block[], GFT temp2[]) const;
     void pntt(GFT block[]) const;
     void ecc_mix(GFT block[]) const;

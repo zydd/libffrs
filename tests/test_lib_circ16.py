@@ -101,6 +101,11 @@ class BaseTestCIRC:
 
         self.add_errors_start(rs, buf, ecc)
 
+        # buf_err = bytearray(buf)
+        # ecc_err = bytearray(ecc)
+        # rs2 = ffrs.CIRC16(rs.inner_block_len, rs.inner_ecc_len, rs.outer_block_len, rs.outer_ecc_len, rs.interleave, simd_x16=False, simd_x8=False, simd_x4=False)
+        # rs2.repair(buf_err, ecc_err)
+
         rs.repair(buf, ecc)
 
         assert buf == msg_orig
@@ -257,14 +262,4 @@ class TestCircPower2(BaseTestCIRC):
     ],
 )
 class TestCircMult(BaseTestCIRC):
-    # Limited support for multiples of powers of 2
-    # TODO: partial intt or switch to forney algo
-    @pytest.mark.skip
-    def test_skip(self, rs: ffrs.CIRC16):
-        pass
-
-    test_circ_repair = test_skip
-    test_circ_repair_multiple = test_skip
-    test_circ_repair_zeroes = test_skip
-    test_repair_fallback = test_skip
-    test_repair_no_errors = test_skip
+    pass

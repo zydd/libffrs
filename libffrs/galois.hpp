@@ -189,9 +189,9 @@ struct gf_exp_log_lut_i16 {
             if constexpr (std::is_integral_v<T> && std::is_integral_v<U>) {
                 return Super::div(a, b);
             } else {
-                auto q = GF::gather(&Super::log(0), a) + 0x10000 - GF::gather(&Super::log(0), b);
+                auto q = GF::gather(&Super::_log[0], a) + 0x10000 - GF::gather(&Super::_log[0], b);
                 q -= (q >= 0x10000) & 0x10000;
-                return GF::gather(&Super::_exp[0], q);
+                return GF::gather(&Super::_exp[0], q) & (a != 0);
             }
         }
 

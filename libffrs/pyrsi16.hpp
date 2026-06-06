@@ -68,7 +68,8 @@ private:
         interleave(interleave),
         interleaved_block_len(block_len * interleave),
         interleaved_message_len(message_len * interleave),
-        interleaved_ecc_len(ecc_len * interleave)
+        interleaved_ecc_len(ecc_len * interleave),
+        repair_temp_len(rs16.ntt_len + ecc_len * 6)
     {
         if (simd_x16)
             vec_align = 16 * sizeof(GFT);
@@ -98,6 +99,7 @@ public:
     const size_t interleaved_block_len;
     const size_t interleaved_message_len;
     const size_t interleaved_ecc_len;
+    const size_t repair_temp_len;
     size_t vec_align;
 
     inline PyRSi16(
@@ -170,13 +172,12 @@ public:
         });
     }
 
-    inline void repair_block(uint32_t block[], std::vector<size_t> const& error_pos, uint32_t temp2[]) const {
+    inline void repair_block(uint32_t block[], std::vector<size_t> const& error_pos, uint32_t temp_ntt1_ecc6[]) const {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)
             error_pos_rbo[i] = rs16.rbo(error_pos[i]);
 
-        py_assert(block_len == rs16.ntt_len, "block len != NTT len: " + std::to_string(block_len) + " != " + std::to_string(rs16.ntt_len));
-        rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
+        rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
     }
 
     template<typename Src>
@@ -283,6 +284,10 @@ public:
                 "message"_a,
                 "ecc"_a,
                 "error_pos"_a = py::none())
+
+            .def("rbo", [](PyRSi16& self, uint16_t i) { return self.rs16.rbo(i); },
+                R"(Reverse Bit Order)",
+                "i"_a)
 
             .doc() = R"(Reed-Solomon coding over :math:`GF(65537)`)";
     }
@@ -400,7 +405,7 @@ private:
         // block_len = message_len + ecc_len
         // chunk_size = block_len * interleave
 
-        auto temp_ntt1_ecc6 = new_aligned<GFT>((rs16.ntt_len + ecc_len * 6) * SIMD_W, SIMD_W * sizeof(GFT));
+        auto temp_ntt1_ecc6 = new_aligned<GFT>((repair_temp_len) * SIMD_W, SIMD_W * sizeof(GFT));
         auto buf = new_aligned<GFT>(block_len * SIMD_W, SIMD_W * sizeof(GFT));
 
         message += col_start;
@@ -463,11 +468,8 @@ private:
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
         // interleaved_size = block_len * interleave
-        // temp2_size = block_len * SIMD_W * 2
 
-        auto temp2 = new_aligned<GFT>(block_len * SIMD_W * 2, SIMD_W * sizeof(GFT));
-
-        py_assert(block_len == rs.ntt_len, "block len != NTT len: " + std::to_string(block_len) + " != " + std::to_string(rs.ntt_len));
+        auto temp_ntt1_ecc6 = new_aligned<GFT>((repair_temp_len) * SIMD_W, SIMD_W * sizeof(GFT));
         auto buf = new_aligned<GFT>(block_len * SIMD_W, SIMD_W * sizeof(GFT));
 
         message += col_start;
@@ -488,7 +490,7 @@ private:
             // Interleaved ecc
             copy_stride(&ecc[i * SIMD_W], interleave, &buf[message_len * SIMD_W], SIMD_W, SIMD_W, ecc_len);
 
-            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
+            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
 
             copy_stride(&buf[0], SIMD_W, &message[i * SIMD_W], interleave, SIMD_W, message_len);
 
@@ -502,6 +504,8 @@ private:
         size_t encoded_cols = vec_cols * SIMD_W;
         if (encoded_cols < col_count) {
             size_t remaining_cols = col_count - encoded_cols;
+            // TODO: fill_stride
+            std::fill_n(&buf[0], block_len * SIMD_W, GFT{0});
             copy_stride(&message[encoded_cols], interleave, &buf[0], SIMD_W, remaining_cols, message_len);
 
             // Sequential ecc
@@ -510,7 +514,7 @@ private:
             // Interleaved ecc
             copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * SIMD_W], SIMD_W, remaining_cols, ecc_len);
 
-            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
+            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
 
             copy_stride(&buf[0], SIMD_W, &message[encoded_cols], interleave, remaining_cols, message_len);
 
@@ -586,6 +590,7 @@ private:
             std::copy_n(&message[0], message_len, &buf[0]);
             std::copy_n(&ecc[0], ecc_len, &buf[message_len]);
 
+            auto temp_ntt1_ecc6 = new_aligned<GFT>(repair_temp_len, sizeof(GFT));
             if (error_pos) {
                 py_assert(error_pos->size() <= ecc_len);
 
@@ -593,12 +598,9 @@ private:
                 for (size_t i = 0; i < error_pos->size(); ++i)
                     error_pos_rbo[i] = rs16.rbo((*error_pos)[i]);
 
-                auto temp2 = new_aligned<GFT>(block_len * 2, sizeof(GFT));
-                py_assert(block_len == rs16.ntt_len, "block len != NTT len: " + std::to_string(block_len) + " != " + std::to_string(rs16.ntt_len));
-                rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp2[0]);
+                rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
 
             } else {
-                auto temp_ntt1_ecc6 = new_aligned<GFT>(rs16.ntt_len + ecc_len * 6, sizeof(GFT));
                 rs16.repair(&buf[0], &temp_ntt1_ecc6[0]);
             }
 
