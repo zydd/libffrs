@@ -174,7 +174,7 @@ private:
             &rsio_ecc[0],
             rso.ecc_len * interleave,
             &repair_temp_rsi[0],
-            &synds_rsi[rso.message_len * interleave * rsi.ecc_len]
+            &synds_rsi[rsi_interleaved_ecc_len]
         );
 
         // Repair zeroes in rso ecc

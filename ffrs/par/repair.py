@@ -30,8 +30,14 @@ from . import logger as parent_logger
 logger = parent_logger.getChild("repair")
 
 
+def parse_hash(buf: bytes):
+    algo, value = buf.split(b":", 1)
+    assert algo == b"b2"
+    return base64.urlsafe_b64decode(value + b"==").hex()
+
+
 def parse_file_info(buf: bytes):
-    # b"f s:bsr0 t:1yQIW4R8BWI h:KfqN0Swd05U2VAEQoUcUbqhE1r8 p:test\n"
+    # b"f s:bsr0 t:1yQIW4R8BWI h:b2:KfqN0Swd05U2VAEQoUcUbqhE1r8 p:test\n"
 
     params = {}
     for part in buf.split():
@@ -45,7 +51,7 @@ def parse_file_info(buf: bytes):
         path = f'"{path}"'
 
     return {
-        "hash": base64.urlsafe_b64decode(params[b"h"] + b"==").hex(),
+        "hash": parse_hash(params[b"h"]),
         "path": json.loads(path),
         "size": ffrs.util.b64hex_dec(params[b"s"].decode("ascii")),
         "timestamp": ffrs.util.b64hex_dec(params[b"t"].decode("ascii")),
@@ -116,13 +122,14 @@ def main(args):
 
             rs.repair(data, ecc)
 
-            repaired_hash = hashlib.sha1(data[:read_data]).hexdigest()
+            repaired_hash = hashlib.blake2b(data[:read_data], digest_size=20, usedforsecurity=False).hexdigest()
             if repaired_hash != file_info["hash"]:
                 logger.error("hash mismatch for '%s'", filename)
                 continue
 
         with open(filename, "wb") as output_file:
             output_file.write(data[:read_data])
+        os.utime(filename, ns=(input_stat.st_atime_ns, file_info["timestamp"]))
 
     logger.info("done")
     return 0

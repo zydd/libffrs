@@ -151,7 +151,7 @@ def main(args):
         # TODO:
         assert rs.message_size >= input_stat.st_size, "Chunking not implemented yet"
 
-        sha1 = hashlib.sha1()
+        hasher = hashlib.blake2b(digest_size=20, usedforsecurity=False)
         buffer = ffrs.create_buffer(rs.message_size)
         assert len(buffer) == rs.message_size
 
@@ -160,9 +160,9 @@ def main(args):
             f.write(rs.serialize())
             f.write(f"\nf s:{ffrs.util.b64hex(input_stat.st_size)}".encode("ascii"))
             f.write(f" t:{ffrs.util.b64hex(input_stat.st_mtime_ns)}".encode("ascii"))
-            f.write(b" h:")
+            f.write(b" h:b2:")
             hash_offset = f.tell()
-            f.write(base64.urlsafe_b64encode(bytes(sha1.digest_size)).strip(b"="))
+            f.write(base64.urlsafe_b64encode(bytes(hasher.digest_size)).strip(b"="))
             f.write(f" p:{basename}\n\n".encode("utf-8"))
 
             with open(filename, "rb") as input_file:
@@ -170,10 +170,10 @@ def main(args):
                     if read < rs.message_size:
                         buffer[read:] = bytes(rs.message_size - read)
 
-                    sha1.update(buffer[:read])
+                    hasher.update(buffer[:read])
                     encoded = rs.encode(buffer)
                     f.write(encoded)
                 f.seek(hash_offset)
-                f.write(base64.urlsafe_b64encode(sha1.digest()).strip(b"="))
+                f.write(base64.urlsafe_b64encode(hasher.digest()).strip(b"="))
     logger.info("done")
     return 0
