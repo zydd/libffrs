@@ -170,7 +170,7 @@ def main(args):
                     if read < rs.message_size:
                         buffer[read:] = bytes(rs.message_size - read)
 
-                    sha1.update(buffer)
+                    sha1.update(buffer[:read])
                     encoded = rs.encode(buffer)
                     f.write(encoded)
                 f.seek(hash_offset)

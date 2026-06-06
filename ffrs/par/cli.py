@@ -18,6 +18,7 @@ import argparse
 import sys
 
 import ffrs.par.backup
+import ffrs.par.repair
 
 
 def parse_size(size_str: str) -> int:
@@ -230,6 +231,7 @@ class CLI:
 
         subparsers = self.main_parser.add_subparsers(dest="command")
 
+        # Backup
         backup = subparsers.add_parser(
             "backup",
             parents=[self.common_parser],
@@ -254,6 +256,16 @@ class CLI:
             default=CLI.DEFAULT("timestamp"),
             help="Update parity files based on timestamp or hash",
         )
+
+        # Repair
+        repair = subparsers.add_parser(
+            "repair",
+            parents=[self.common_parser],
+            help="Repair files using existing parity",
+            formatter_class=self.HelpFormatter,
+        )
+        repair.add_argument("input_file", metavar="file", nargs="+")
+        repair.set_defaults(module=ffrs.par.repair)
 
     def arg_simd(self):
         simd_choices = ["x4", "x8", "x16", "sse", "avx2", "avx512"]

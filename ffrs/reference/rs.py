@@ -3,10 +3,14 @@ from ffrs.reference.util import rbo
 
 
 def locator(GF, w, err_pos):
+    # print("errors:", err_pos)
+    # print("root:", w)
     poly = P(GF, [1])
     for pos in err_pos:
-        x = -(w**pos)
-        poly = poly * P(GF, [1, x])
+        x = GF(w**pos)
+        # print("pos", pos)
+        # print("loc", poly)
+        poly = poly * P(GF, [1, -x])
     return poly
 
 
