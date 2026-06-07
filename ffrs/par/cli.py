@@ -55,6 +55,8 @@ log.addHandler(stderr_handler)
 
 
 _UNSET = object()
+_DEFAULT_MOD_LOG_LEVEL = ffrs.par.log.level
+_DEFAULT_CLI_LOG_LEVEL = log.level
 
 
 class Value:
@@ -135,7 +137,8 @@ class CLI:
             help="Increase/set verbosity level",
         )
 
-        self.parser.add_argument(
+        codec_args = self.parser.add_argument_group("codec")
+        codec_args.add_argument(
             "--codec",
             action="store",
             default="circ16",
@@ -146,7 +149,7 @@ class CLI:
         self.check(lambda args: args.codec != "rsi16" or self.check_either(args, "--block", "--message"))
         self.check(self.check_either, "--block", "--message")
         # self.check(self.check_mutually_exclusive, "--block", "--message")
-        self.parser.add_argument(
+        codec_args.add_argument(
             "-b",
             "--block",
             metavar="size",
@@ -154,7 +157,7 @@ class CLI:
             type=parse_size_list,
             help="Block size to use when encoding. block = message + ecc",
         )
-        self.parser.add_argument(
+        codec_args.add_argument(
             "-m",
             "--message",
             metavar="size",
@@ -164,7 +167,7 @@ class CLI:
         )
 
         self.check(self.check_mutually_exclusive, "--ecc", "--ecc-ratio")
-        self.parser.add_argument(
+        codec_args.add_argument(
             "-e",
             "--ecc",
             metavar="size",
@@ -172,7 +175,7 @@ class CLI:
             type=parse_size_list,
             help="ECC size in a parity block",
         )
-        self.parser.add_argument(
+        codec_args.add_argument(
             "-r",
             "--ecc-ratio",
             metavar="ratio",
@@ -182,7 +185,7 @@ class CLI:
             help="ECC size as a fraction of the message size",
         )
 
-        self.parser.add_argument(
+        codec_args.add_argument(
             "--interleave",
             metavar="size",
             action="store",
@@ -191,9 +194,7 @@ class CLI:
             help="Interleave multiple blocks",
         )
 
-        self.arg_simd()
-
-        self.parser.add_argument(
+        codec_args.add_argument(
             "--primitive",
             metavar="int",
             action="store",
@@ -203,11 +204,13 @@ class CLI:
         )
 
         self.arg_circ()
+        self.arg_simd()
 
     def arg_simd(self):
+        simd = self.parser.add_argument_group("simd")
         simd_choices = ["x4", "x8", "x16", "sse", "avx2", "avx512"]
         self.check(self.check_mutually_exclusive, "--simd", "--no-simd")
-        self.parser.add_argument(
+        simd.add_argument(
             "--simd",
             metavar="simd",
             nargs="?",
@@ -216,7 +219,7 @@ class CLI:
             type=parse_choice_list(["auto"] + simd_choices),
             help="Enable SIMD optimizations",
         )
-        self.parser.add_argument(
+        simd.add_argument(
             "--no-simd",
             metavar="simd",
             nargs="?",
@@ -302,14 +305,13 @@ class CLI:
             type=parse_size_list,
             help="Total ECC size of the outer codec (outer_ecc * inner_message * interleave)",
         )
-
         add_circ_arg(
             "--outer-interleave",
             metavar="count",
             action="store",
             # default=DEFAULT("1", parse_int_list),
             type=parse_int_list,
-            help="Interleave multiple blocks",
+            help="Number of interleaved blocks of the outer codec",
         )
 
     def check(self, func, *args):
@@ -356,7 +358,7 @@ class CLI:
         set_log_verbosity(args)
         log.debug(args)
 
-        self.main_function(args)
+        return self.main_function(args)
 
 
 def new_parser(prog, desc):
@@ -378,11 +380,14 @@ def parse_size(size_str: str) -> int:
         "t": 1024**4,
     }
 
-    if size_str[-1] in multipliers:
-        number = float(size_str[:-1]) if "" in size_str[:-1] else int(size_str[:-1])
-        return int(number * multipliers[size_str[-1]])
-    else:
-        return int(size_str)
+    total = 0
+    for chunk in re.split(r"(?<=[a-zA-Z])(?=\d)", size_str):
+        if chunk[-1] in multipliers:
+            number = float(chunk[:-1]) if "" in chunk[:-1] else int(chunk[:-1])
+            total += int(number * multipliers[chunk[-1]])
+        else:
+            total += int(chunk)
+    return total
 
 
 def parse_ratio(ratio_str: str) -> tuple[float, float]:
@@ -436,6 +441,15 @@ def parse_ratio_list(value):
     return [parse_ratio(i) for i in value.split(",")]
 
 
+_re_algo = re.compile(r"(RSi16|CIRC)\((\w+=)?[\d+\-*/]+(,\s*(\w+=)?[\d+\-*/]+)*\)")
+
+
+def parse_algo(algo):
+    if not _re_algo.match(algo):
+        raise ValueError(f"Invalid format: {algo}")
+    return eval("ffrs" + algo)
+
+
 def set_log_verbosity(args):
     verbosity = args.verbosity.get()
     levels = {
@@ -455,7 +469,7 @@ def set_log_verbosity(args):
             log_level_diff -= 10 * (1 + len(arg))
         elif arg in levels:
             # -vwarning
-            log_level_diff = levels[arg] - log.level
+            log_level_diff = levels[arg] - _DEFAULT_CLI_LOG_LEVEL
         else:
             # -vsolver=10
             arg_split = arg.split("=")
@@ -480,8 +494,10 @@ def set_log_verbosity(args):
 
             par_sub_logs[log_name].setLevel(sub_log_level)
 
-    ffrs.par.log.setLevel(max(logging.DEBUG, ffrs.par.log.level + min(0, log.level - logging.DEBUG + log_level_diff)))
-    log.setLevel(max(logging.DEBUG, log.level + log_level_diff))
+    ffrs.par.log.setLevel(
+        max(logging.DEBUG, _DEFAULT_MOD_LOG_LEVEL + min(0, _DEFAULT_CLI_LOG_LEVEL - logging.DEBUG + log_level_diff))
+    )
+    log.setLevel(max(logging.DEBUG, _DEFAULT_CLI_LOG_LEVEL + log_level_diff))
 
 
 class OuterScopeGetter(object):

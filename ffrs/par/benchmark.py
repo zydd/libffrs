@@ -25,23 +25,24 @@ import ffrs
 import ffrs.par
 import ffrs.util
 
-from .backup import maximize_interleaving
 from . import cli
+from .opt import maximize_interleaving
 from .cli import log
 
 
 def benchmark_throughput(
+    args,
     statement,
     env,
     input_size,
     setup=None,
-    cpu_cache_flush_size=50 * 2**20,  # 50 MB
-    duration=5,
-    update_interval=1,
-    cooldown=5,
 ):
+    duration = args.duration.get()
+    cpu_cache_flush_size = args.cpu_cache_flush_size.get()
+    update_interval = args.update_interval.get()
+    cooldown = args.cooldown.get()
     number = 1
-    repeat = 5
+    repeat = args.min_repeats.get()
 
     assert "random" not in env
     env["random"] = random
@@ -82,22 +83,29 @@ def benchmark_throughput(
     return peak_throughput
 
 
-def main(args):
+def benchmark_encode(args):
     input_size = args.input_size.get()
     rs = maximize_interleaving(args, input_size)
+    log.info("codec: %s", rs)
+    log.info("input size: %s", ffrs.util.format_size(input_size))
+    log.info(
+        "buffer size: %s (+%.1f%%)", ffrs.util.format_size(rs.message_size), (rs.message_size / input_size - 1) * 100
+    )
+    data = ffrs.create_buffer(rs.message_size)
+    benchmark_throughput(args, f"rs.encode(data)", dict(rs=rs, data=data), input_size=rs.message_size)
+
+
+def main(args):
     log.debug("platform: %s", platform.platform())
     log.debug("processor: %s", platform.processor())
     log.debug(
         "python: %s %s %s %s", platform.python_implementation(), platform.python_version(), *platform.architecture()
     )
     log.debug("ffrs compiled with: %s", ffrs.compiler_info)
-    log.info("codec: %s", rs)
 
     match args.function.get():
         case "encode":
-            log.info("buffer size: %s", ffrs.util.format_size(rs.message_size))
-            data = ffrs.create_buffer(rs.message_size)
-            benchmark_throughput(f"rs.encode(data)", dict(rs=rs, data=data), input_size=rs.message_size)
+            benchmark_encode(args)
 
         case other:
             raise ffrs.par.FfrsParException(f"unknown function: {other}")
@@ -107,14 +115,56 @@ def main(args):
 
 
 def arg_parser(parser):
+    # Add module group first
+    benchmark = parser.add_argument_group("benchmark")
+
     cli_parser = cli.CLI(parser, main)
     cli_parser.parser.add_argument("function", metavar="func")
-    cli_parser.parser.add_argument(
+
+    benchmark.add_argument(
+        "-s",
         "--input-size",
         metavar="size",
         type=cli.parse_size,
         default=cli.DEFAULT("100m", cli.parse_size),
         help="Input size for benchmarking",
+    )
+    benchmark.add_argument(
+        "-t",
+        "--duration",
+        metavar="time",
+        type=int,
+        default=cli.DEFAULT(5),
+        help="Benchmark duration",
+    )
+    benchmark.add_argument(
+        "-c",
+        "--cooldown",
+        metavar="time",
+        type=int,
+        default=cli.DEFAULT(5),
+        help="Cooldown before starting benchmark",
+    )
+    benchmark.add_argument(
+        "--min-repeats",
+        metavar="n",
+        type=int,
+        default=cli.DEFAULT(5),
+        help="Minimum number of executions",
+    )
+    benchmark.add_argument(
+        "--cpu-cache-flush-size",
+        metavar="size",
+        type=cli.parse_size,
+        default=cli.DEFAULT("50m", cli.parse_size),
+        help="Operation on a large chunk of memory to mitigate CPU caching effects on measured performance",
+    )
+    benchmark.add_argument(
+        "--update-interval",
+        metavar="time",
+        type=int,
+        default=cli.DEFAULT(1),
+        help="Interval to print current throughput to stdout",
     )
     return cli_parser
 

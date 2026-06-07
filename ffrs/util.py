@@ -16,7 +16,7 @@
 
 import ffrs
 
-_b64hex_alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-"
+_b64hex_alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
 
 
 def b64hex(val: int) -> str:

@@ -58,7 +58,7 @@ class _Equation:
                 return []
 
             expr = [(sign, term.strip("{}")) for sign, term in expr]
-            variables = set(term for sign, term in expr)
+            variables = sorted(set(term for sign, term in expr))
             return _Equation._solve_all(variables, expr)
 
         if not lhs_match:
@@ -72,14 +72,14 @@ class _Equation:
 
         lhs = [(sign, term.strip("{}")) for sign, term in lhs]
 
-        rhs_vars = set(_Equation._re_var.findall(rhs))
+        rhs_vars = sorted(set(_Equation._re_var.findall(rhs)))
 
         # Treat rhs as a single term
         rhs = _Equation._re_var.sub(r"\1", rhs)
         rhs = [("+", rhs)]
 
         expr = _Equation._sub(lhs, rhs)
-        variables = set(term for sign, term in lhs)
+        variables = sorted(set(term for sign, term in lhs))
         return _Equation._solve_all(variables, expr, rhs_vars)
 
     def _parse_eq_terms(expr):

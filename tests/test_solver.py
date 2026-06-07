@@ -15,16 +15,13 @@
 #  limitations under the License.
 
 import copy
-import logging
 import pytest
 
 import ffrs
 import ffrs.par.solver
-import ffrs.par.__main__
 from ffrs.util import format_config
+from ffrs.par.opt import CONSTRAINTS
 
-ffrs.par.solver.log.setLevel(logging.DEBUG)
-ffrs.par.__main__.log.setLevel(logging.DEBUG)
 
 test_config = dict(
     block=None,
@@ -70,7 +67,7 @@ class TestSolver:
     def test_full_solution(self, vars):
         config = copy.deepcopy(test_config)
         config.update(vars)
-        solver = ffrs.par.solver.Solver(config.keys(), ffrs.par.constraints, test_config_free | set(vars.keys()))
+        solver = ffrs.par.solver.Solver(config.keys(), CONSTRAINTS, test_config_free | set(vars.keys()))
         solver.solve(config)
         print(format_config(config))
         assert solver.domain_size(config) == 1
@@ -106,7 +103,7 @@ class TestSolverPartialConfig:
     def test_partial_solution(self, vars):
         config = copy.deepcopy(test_config)
         config.update(vars)
-        solver = ffrs.par.solver.Solver(config.keys(), ffrs.par.constraints, test_config_free | set(vars.keys()))
+        solver = ffrs.par.solver.Solver(config.keys(), CONSTRAINTS, test_config_free | set(vars.keys()))
         solver.solve(config)
         print(format_config(config))
         assert 1 < solver.domain_size(config) <= 20736
@@ -114,7 +111,7 @@ class TestSolverPartialConfig:
     def test_partial_solution_continue(self, vars):
         config = copy.deepcopy(test_config)
         config.update(vars)
-        solver = ffrs.par.solver.Solver(config.keys(), ffrs.par.constraints, test_config_free | set(vars.keys()))
+        solver = ffrs.par.solver.Solver(config.keys(), CONSTRAINTS, test_config_free | set(vars.keys()))
         solver.solve(config)
         print(format_config(config))
         assert 1 < solver.domain_size(config) <= 20736

@@ -19,107 +19,14 @@
 import base64
 import hashlib
 import json
-import math
 import os
 import re
-import time
 
 import ffrs
-import ffrs.par.exc
 import ffrs.util
 
-from . import cli, constraints, log as parent_log
-from .cli import CLI, log
-from .solver import Solver
-
-log = parent_log.getChild("backup")
-
-
-def maximize_interleaving(args, file_size):
-    t0 = time.time()
-    file_size = max(file_size, 8192)
-
-    config = dict(
-        block=args.block.get(None),
-        message=None,  # choose based on file_size
-        ecc=args.ecc.get(None),
-        inner_block=args.inner_block.get(range(2, 65536 + 1, 2)),
-        inner_message=range(2, 65536 + 1, 2),  # choose based on file_size
-        inner_ecc=args.inner_ecc.get(set(2**i for i in range(1, 16))),
-        outer_block=args.outer_block.get(range(2, 65536 + 1, 2)),
-        outer_message=args.outer_message.get(range(2, 65536 + 1, 2)),
-        outer_ecc=args.outer_ecc.get(set(2**i for i in range(1, 16))),
-        outer_ecc_ratio_num=(
-            set(num for num, den in args.ecc_ratio.get()) if args.ecc_ratio.has_value() else range(1, 1 + 1)
-        ),
-        outer_ecc_ratio_den=(
-            set(den for num, den in args.ecc_ratio.get()) if args.ecc_ratio.has_value() else range(1, 1024 + 1)
-        ),
-        interleave=args.interleave.get(None),
-        inner_interleaved_ecc=args.outer_interleaved_ecc.get(None),
-        outer_interleaved_ecc=args.outer_interleaved_ecc.get(None),
-        outer_interleave=args.outer_interleave.get(None),
-    )
-
-    free_variables = {k for k in config if k not in args or not getattr(args, k).has_value()}
-    free_variables |= {"message", "inner_message"}
-    if args.ecc_ratio.has_value():
-        free_variables.remove("outer_ecc_ratio_den")
-        free_variables.remove("outer_ecc_ratio_num")
-
-    log.debug(ffrs.util.format_config(config))
-
-    constraints.append(f"{file_size} <= {{message}} <= {2 * file_size}")
-
-    solver = Solver(config.keys(), constraints, free_variables)
-
-    try:
-        solver.solve(config)
-    except ValueError:
-        log.exception("could not determine configuration")
-        # return
-        raise
-
-    for outer_ecc in config["outer_ecc"]:
-        try:
-            log.debug("branch outer_ecc")
-            config2 = solver.branch_config(config, "outer_ecc", outer_ecc)
-            log.debug(ffrs.util.format_config(config2))
-
-            log.debug("compute outer_interleave")
-            max_padding = 0.05 if file_size <= 16000 else 0.01
-            config2["outer_interleave"] = [
-                math.ceil(file_size / outer_message) + i
-                for outer_message in config2["outer_message"]
-                for i in range(min(100, math.ceil(file_size * max_padding / outer_message)))
-            ]
-            solver.solve(config2, ["outer_interleave"])
-            log.debug(ffrs.util.format_config(config2))
-
-            config2 = solver.maximize(config2, "inner_message")
-            log.debug(ffrs.util.format_config(config2))
-
-            config2 = solver.minimize(config2, "inner_ecc")
-            log.debug(ffrs.util.format_config(config2))
-
-            config2 = solver.minimize(config2, "message")
-            log.debug(ffrs.util.format_config(config2))
-
-            log.info("solver iterations: %s", solver._constraint_evaluations)
-            log.info("max message ratio: %s", max(config2["message"]) / file_size)
-            log.info("max hash ratio: %s", max(config2["inner_interleaved_ecc"]) / file_size)
-            config = config2
-            break
-        except ValueError:
-            log.debug("could not set outer_ecc to %s", outer_ecc)
-    else:
-        raise ffrs.par.exc.OptimizationError("could not optimize interleaving")
-
-    log.debug(ffrs.util.format_config(config))
-    t1 = time.time() - t0
-    if t1 > 10e-3:
-        log.warning("time to solve: %.2f [ms]", t1 * 1000)
-    return ffrs.util.instantiate_config(config)
+from . import cli, opt
+from .cli import log
 
 
 def main(args):
@@ -133,6 +40,7 @@ def main(args):
         if not re.findall(r"\s", basename):
             basename = basename[1:-1]
         output_filename = filename + ".ffrs"
+        log.info("output file: %s", output_filename)
 
         if os.path.isfile(output_filename):
             if args.force.get():
@@ -147,7 +55,7 @@ def main(args):
             log.debug("skipping empty file: '%s'", filename)
             continue
 
-        rs = maximize_interleaving(args, input_stat.st_size)
+        rs = opt.maximize_interleaving(args, input_stat.st_size)
         log.info("codec: %s", rs)
         log.info("buffer size: %s", ffrs.util.format_size(rs.message_size))
 
@@ -185,7 +93,6 @@ def main(args):
 def arg_parser(parser):
     cli_parser = cli.CLI(parser, main)
     cli_parser.parser.set_defaults(ecc_ratio="1/1")
-    cli_parser.parser.add_argument("function", metavar="func")
     cli_parser.parser.add_argument("input_file", metavar="file", nargs="+")
 
     existing = cli_parser.parser.add_mutually_exclusive_group()

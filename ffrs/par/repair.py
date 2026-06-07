@@ -14,22 +14,19 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Repair files using existing parity data"""
+"""Repair files using parity data"""
 
 import base64
 import hashlib
 import json
 import os
-import re
 import io
 
 import ffrs
-import ffrs.par.exc
 import ffrs.util
 
-from . import cli, log as parent_log
-
-log = parent_log.getChild("repair")
+from . import cli
+from .cli import log
 
 
 def parse_hash(buf: bytes):
@@ -39,7 +36,7 @@ def parse_hash(buf: bytes):
 
 
 def parse_file_info(buf: bytes):
-    # b"f s:bsr0 t:1yQIW4R8BWI h:b2:KfqN0Swd05U2VAEQoUcUbqhE1r8 p:test\n"
+    # b"f s:bsr0 t:1yQIW4R8BWI h:b2:KfqN0Swd05U2VAEQoUcUbqHE1r8 p:test\n"
 
     params = {}
     for part in buf.split():
@@ -127,7 +124,7 @@ def main(args):
             repaired_hash = hashlib.blake2b(data[:read_data], digest_size=20, usedforsecurity=False).hexdigest()
             if repaired_hash != file_info["hash"]:
                 log.error("hash mismatch for '%s'", filename)
-                continue
+                return 1
 
         with open(filename, "wb") as output_file:
             output_file.write(data[:read_data])
