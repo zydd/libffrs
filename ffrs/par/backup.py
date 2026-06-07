@@ -14,6 +14,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+"""Full backup + optional extra parity"""
+
 import base64
 import hashlib
 import json
@@ -26,10 +28,11 @@ import ffrs
 import ffrs.par.exc
 import ffrs.util
 
-from . import constraints, logger as parent_logger
+from . import cli, constraints, log as parent_log
+from .cli import CLI, log
 from .solver import Solver
 
-logger = parent_logger.getChild("backup")
+log = parent_log.getChild("backup")
 
 
 def maximize_interleaving(args, file_size):
@@ -37,9 +40,9 @@ def maximize_interleaving(args, file_size):
     file_size = max(file_size, 8192)
 
     config = dict(
-        block=args.block.get(),
+        block=args.block.get(None),
         message=None,  # choose based on file_size
-        ecc=args.ecc.get(),
+        ecc=args.ecc.get(None),
         inner_block=args.inner_block.get(range(2, 65536 + 1, 2)),
         inner_message=range(2, 65536 + 1, 2),  # choose based on file_size
         inner_ecc=args.inner_ecc.get(set(2**i for i in range(1, 16))),
@@ -52,10 +55,10 @@ def maximize_interleaving(args, file_size):
         outer_ecc_ratio_den=(
             set(den for num, den in args.ecc_ratio.get()) if args.ecc_ratio.has_value() else range(1, 1024 + 1)
         ),
-        interleave=args.interleave.get(),
-        inner_interleaved_ecc=args.outer_interleaved_ecc.get(),
-        outer_interleaved_ecc=args.outer_interleaved_ecc.get(),
-        outer_interleave=args.outer_interleave.get(),
+        interleave=args.interleave.get(None),
+        inner_interleaved_ecc=args.outer_interleaved_ecc.get(None),
+        outer_interleaved_ecc=args.outer_interleaved_ecc.get(None),
+        outer_interleave=args.outer_interleave.get(None),
     )
 
     free_variables = {k for k in config if k not in args or not getattr(args, k).has_value()}
@@ -64,7 +67,7 @@ def maximize_interleaving(args, file_size):
         free_variables.remove("outer_ecc_ratio_den")
         free_variables.remove("outer_ecc_ratio_num")
 
-    logger.debug(ffrs.util.format_config(config))
+    log.debug(ffrs.util.format_config(config))
 
     constraints.append(f"{file_size} <= {{message}} <= {2 * file_size}")
 
@@ -73,17 +76,17 @@ def maximize_interleaving(args, file_size):
     try:
         solver.solve(config)
     except ValueError:
-        logger.exception("could not determine configuration")
+        log.exception("could not determine configuration")
         # return
         raise
 
     for outer_ecc in config["outer_ecc"]:
         try:
-            logger.debug("branch outer_ecc")
+            log.debug("branch outer_ecc")
             config2 = solver.branch_config(config, "outer_ecc", outer_ecc)
-            logger.debug(ffrs.util.format_config(config2))
+            log.debug(ffrs.util.format_config(config2))
 
-            logger.debug("compute outer_interleave")
+            log.debug("compute outer_interleave")
             max_padding = 0.05 if file_size <= 16000 else 0.01
             config2["outer_interleave"] = [
                 math.ceil(file_size / outer_message) + i
@@ -91,38 +94,38 @@ def maximize_interleaving(args, file_size):
                 for i in range(min(100, math.ceil(file_size * max_padding / outer_message)))
             ]
             solver.solve(config2, ["outer_interleave"])
-            logger.debug(ffrs.util.format_config(config2))
+            log.debug(ffrs.util.format_config(config2))
 
             config2 = solver.maximize(config2, "inner_message")
-            logger.debug(ffrs.util.format_config(config2))
+            log.debug(ffrs.util.format_config(config2))
 
             config2 = solver.minimize(config2, "inner_ecc")
-            logger.debug(ffrs.util.format_config(config2))
+            log.debug(ffrs.util.format_config(config2))
 
             config2 = solver.minimize(config2, "message")
-            logger.debug(ffrs.util.format_config(config2))
+            log.debug(ffrs.util.format_config(config2))
 
-            logger.info("solver iterations: %s", solver._constraint_evaluations)
-            logger.info("max message ratio: %s", max(config2["message"]) / file_size)
-            logger.info("max hash ratio: %s", max(config2["inner_interleaved_ecc"]) / file_size)
+            log.info("solver iterations: %s", solver._constraint_evaluations)
+            log.info("max message ratio: %s", max(config2["message"]) / file_size)
+            log.info("max hash ratio: %s", max(config2["inner_interleaved_ecc"]) / file_size)
             config = config2
             break
         except ValueError:
-            logger.debug("could not set outer_ecc to %s", outer_ecc)
+            log.debug("could not set outer_ecc to %s", outer_ecc)
     else:
         raise ffrs.par.exc.OptimizationError("could not optimize interleaving")
 
-    logger.debug(ffrs.util.format_config(config))
+    log.debug(ffrs.util.format_config(config))
     t1 = time.time() - t0
     if t1 > 10e-3:
-        logger.warning("time to solve: %.2f [ms]", t1 * 1000)
+        log.warning("time to solve: %.2f [ms]", t1 * 1000)
     return ffrs.util.instantiate_config(config)
 
 
 def main(args):
     for filename in args.input_file.get():
         if not os.path.isfile(filename):
-            logger.critical("input file '%s' does not exist", filename)
+            log.critical("input file '%s' does not exist", filename)
             return 1
 
         basename = os.path.basename(filename)
@@ -133,20 +136,20 @@ def main(args):
 
         if os.path.isfile(output_filename):
             if args.force.get():
-                logger.info("overwriting '%s'", output_filename)
+                log.info("overwriting '%s'", output_filename)
             else:
-                logger.critical("output file '%s' already exists", output_filename)
+                log.critical("output file '%s' already exists", output_filename)
                 return 1
 
         input_stat = os.stat(filename)
 
         if input_stat.st_size == 0:
-            logger.debug("skipping empty file: '%s'", filename)
+            log.debug("skipping empty file: '%s'", filename)
             continue
 
         rs = maximize_interleaving(args, input_stat.st_size)
-        logger.info("codec: %s", rs)
-        logger.info("buffer size: %s", ffrs.util.format_size(rs.message_size))
+        log.info("codec: %s", rs)
+        log.info("buffer size: %s", ffrs.util.format_size(rs.message_size))
 
         # TODO:
         assert rs.message_size >= input_stat.st_size, "Chunking not implemented yet"
@@ -175,5 +178,32 @@ def main(args):
                     f.write(encoded)
                 f.seek(hash_offset)
                 f.write(base64.urlsafe_b64encode(hasher.digest()).strip(b"="))
-    logger.info("done")
+    log.info("done")
     return 0
+
+
+def arg_parser(parser):
+    cli_parser = cli.CLI(parser, main)
+    cli_parser.parser.set_defaults(ecc_ratio="1/1")
+    cli_parser.parser.add_argument("function", metavar="func")
+    cli_parser.parser.add_argument("input_file", metavar="file", nargs="+")
+
+    existing = cli_parser.parser.add_mutually_exclusive_group()
+    existing.add_argument("-f", "--force", action="store_true", help="Overwrite existing parity files")
+    existing.add_argument("-i", "--ignore-existing", action="store_true", help="Ignore existing parity files")
+    existing.add_argument(
+        "-u",
+        "--update",
+        action="store_true",
+        help="Update parity files if changes are detected (see --update-check)",
+    )
+    existing.add_argument(
+        "--update-check",
+        choices=["timestamp", "hash"],
+        default=cli.DEFAULT("timestamp"),
+        help="Update parity files based on timestamp or hash",
+    )
+
+
+if __name__ == "__main__":
+    cli.main()

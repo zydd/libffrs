@@ -21,11 +21,11 @@ import re
 import time
 
 import ffrs.par
-from . import logger as parent_logger
+from . import log as parent_log
 
 MAX_DOMAIN_SIZE = 65537
 
-logger = parent_logger.getChild("solver")
+log = parent_log.getChild("solver")
 
 
 class SolverError(ffrs.par.FfrsParException):
@@ -54,7 +54,7 @@ class _Equation:
 
             expr = _Equation._sub(lhs, rhs)
             if not all(re.match(r"\{\w+\}$", term) for sign, term in expr):
-                logger.debug("unexpected term: %s", expr)
+                log.debug("unexpected term: %s", expr)
                 return []
 
             expr = [(sign, term.strip("{}")) for sign, term in expr]
@@ -67,7 +67,7 @@ class _Equation:
         lhs = _Equation._parse_eq_terms(lhs)
 
         if not all(re.match(r"\{\w+\}$", term) for sign, term in lhs):
-            logger.debug("unexpected term: %s", expr)
+            log.debug("unexpected term: %s", expr)
             return []
 
         lhs = [(sign, term.strip("{}")) for sign, term in lhs]
@@ -147,8 +147,8 @@ class _Equation:
 
 class Solver:
     def __init__(self, variables, constraints, free_variables):
-        logger.info("variables: %s", variables)
-        logger.info("free variables: %s", free_variables)
+        log.info("variables: %s", variables)
+        log.info("free variables: %s", free_variables)
         self.free_variables = set(free_variables)
         self._init_constraints(variables, constraints)
         self._init_equivalences()
@@ -189,14 +189,14 @@ class Solver:
         self.equivalence_functions = []
         self.equivalence_vars = []
 
-        logger.debug("equivalences:")
+        log.debug("equivalences:")
         for i, constr in enumerate(self.constraints):
             for eq in _Equation.solve_for_vars(constr):
-                logger.debug(f"{len(self.equivalences):2} {eq["var"]} = {eq["func_code"]}")
+                log.debug(f"{len(self.equivalences):2} {eq["var"]} = {eq["func_code"]}")
                 self.equivalences.append(eq["eq"])
                 self.equivalence_functions.append((eq["var"], eq["func"]))
                 self.equivalence_vars.append(eq["args"])
-        logger.debug("")
+        log.debug("")
 
     def _init_generators(self):
         # Generators
@@ -217,7 +217,7 @@ class Solver:
         re_inequality = re.compile(r"\d+ <= \{\w+\} (<= \d+)$".replace(" ", r"\s*"))
         for i, constr in enumerate(self.constraints):
             if re_inequality.match(constr):
-                logger.debug("assume resolved: %2d '%s'", i, constr)
+                log.debug("assume resolved: %2d '%s'", i, constr)
                 self._resolved_constraints.add(i)
 
     def _propagate_equivalences(self, config):
@@ -228,8 +228,8 @@ class Solver:
             )
             var_domain_size = len(config[var]) if config[var] is not None else float("inf")
 
-            logger.info("equivalence %2s: '%s'", i, self.equivalences[i])
-            logger.debug("domain size: var: %s arg: %s", var_domain_size, arg_domain_size)
+            log.info("equivalence %2s: '%s'", i, self.equivalences[i])
+            log.debug("domain size: var: %s arg: %s", var_domain_size, arg_domain_size)
 
             if not (
                 arg_domain_size < var_domain_size
@@ -243,7 +243,7 @@ class Solver:
             valid_set = set(
                 func(*values) for values in itertools.product(*(config[arg] for arg in self.equivalence_vars[i]))
             )
-            logger.info(
+            log.info(
                 "%-23s %5s -> %-5d     '%s'",
                 var,
                 var_domain_size,
@@ -251,8 +251,8 @@ class Solver:
                 self.equivalences[i],
             )
             if config[var] and len(config[var]) <= 32:
-                logger.debug("removing: %s", config[var] - valid_set)
-                logger.debug("remaining: %s", valid_set)
+                log.debug("removing: %s", config[var] - valid_set)
+                log.debug("remaining: %s", valid_set)
 
             config[var] = valid_set
 
@@ -283,28 +283,28 @@ class Solver:
             den_v = {2**i for i in range(math.ceil(den_min_log), round(den_v_max_log) + 1)}
 
             if len(den_v) < len(config[den]):
-                logger.info(f"{den:23} {len(config[den]):5} -> {len(den_v):<5}     '{gen}'")
+                log.info(f"{den:23} {len(config[den]):5} -> {len(den_v):<5}     '{gen}'")
                 config[den] = den_v
                 self._resolve_constraints(config, self.var_constraints[den])
 
     def _eval_constraint(self, config, idx):
-        logger.info("constraint: '%s'", self.constraints[idx])
+        log.info("constraint: '%s'", self.constraints[idx])
         evaluations = 0
         updated = False
         valid = [set() for _ in range(len(self.constraint_vars[idx]))]
         constraint = self.constraint_functions[idx]
         for var_i, var in enumerate(self.constraint_vars[idx]):
-            # logger.warn("var: %s", var)
+            # log.warn("var: %s", var)
             constr_domain = [config[v] for v in self.constraint_vars[idx]]
             for val in config[var]:
-                # logger.warn("val: %s", var)
+                # log.warn("val: %s", var)
                 constr_domain[var_i] = [val]
                 for constr_args in itertools.product(*constr_domain):
                     try:
                         evaluations += 1
                         constr_eval = constraint(*constr_args)
                     except Exception:
-                        logger.exception(
+                        log.exception(
                             "error evaluating constraint '%s' with values %s",
                             self.constraints[idx],
                             dict(zip(self.constraint_vars[idx], constr_args)),
@@ -316,14 +316,14 @@ class Solver:
                         break
 
         for i, var in enumerate(self.constraint_vars[idx]):
-            # log = logger.debug if len(valid[i]) == len(config[var]) else logger.info
+            # log = log.debug if len(valid[i]) == len(config[var]) else log.info
             if len(valid[i]) == len(config[var]):
                 continue
-            logger.info(f"{var:23} {len(config[var]):5} -> {len(valid[i]):<5}     '{self.constraints[idx]}'")
+            log.info(f"{var:23} {len(config[var]):5} -> {len(valid[i]):<5}     '{self.constraints[idx]}'")
 
             if config[var] and len(config[var]) <= 32:
-                logger.debug("removing: %s", config[var] - valid[i])
-                logger.debug("remaining: %s", valid[i])
+                log.debug("removing: %s", config[var] - valid[i])
+                log.debug("remaining: %s", valid[i])
 
             if len(valid[i]) == 0:
                 raise ValueError(
@@ -335,9 +335,9 @@ class Solver:
 
         self._constraint_evaluations += evaluations
         if evaluations > 10000:
-            logger.warning("evaluations: %s constraint: '%s'", evaluations, self.constraints[idx])
+            log.warning("evaluations: %s constraint: '%s'", evaluations, self.constraints[idx])
         else:
-            logger.info("evaluations: %s", evaluations)
+            log.info("evaluations: %s", evaluations)
         return updated
 
     def _resolve_constraints(self, config, constraints=None):
@@ -374,7 +374,7 @@ class Solver:
                 config[k] = set(v)
 
         domain_size = self.observable_domain_size(config)
-        logger.info("observable domain size: %s", domain_size)
+        log.info("observable domain size: %s", domain_size)
 
         while domain_size > 1:
             initial_domain_size = domain_size
@@ -385,36 +385,36 @@ class Solver:
             self._resolve_constraints(config)
 
             domain_size = self.observable_domain_size(config)
-            logger.info("observable domain size: %s", domain_size)
+            log.info("observable domain size: %s", domain_size)
             if domain_size == initial_domain_size:
                 break
 
-        logger.info("constraint evaluations: %s", self._constraint_evaluations)
+        log.info("constraint evaluations: %s", self._constraint_evaluations)
         return domain_size
 
     def check_constraints(self, config):
         for idx, constr in enumerate(self.constraints):
             domain_size = self._constraint_domain_size(config, idx)
             if domain_size > MAX_DOMAIN_SIZE:
-                logger.info(f"constraint '{constr}' is not satisfied with current configuration")
+                log.info(f"constraint '{constr}' is not satisfied with current configuration")
                 return False
 
             for constr_args in itertools.product(*(config[var] for var in self.constraint_vars[idx])):
                 constr_eval = self.constraint_functions[idx](*constr_args)
                 if not constr_eval:
-                    logger.info(f"constraint '{constr}' is not satisfied with current configuration")
+                    log.info(f"constraint '{constr}' is not satisfied with current configuration")
                     return False
         else:
             return True
 
     def branch_config(self, config, arg, value):
         t0 = time.time()
-        # logger.debug("branch %s = %s", arg, value)
+        # log.debug("branch %s = %s", arg, value)
         # config2 = copy.deepcopy(config)  # slower than making a new dict
         config2 = {k: set(v) if v is not None else None for k, v in config.items()}
         config2[arg] = [value]
         self.solve(config2, [arg])
-        logger.debug("branching %s = %s took %.2f ms", arg, value, (time.time() - t0) * 1000)
+        log.debug("branching %s = %s took %.2f ms", arg, value, (time.time() - t0) * 1000)
         return config2
 
     def _optimize(self, mode, config, arg):
@@ -430,7 +430,7 @@ class Solver:
             for i, val in enumerate(arg_values):
                 try:
                     config2 = self.branch_config(config, arg, val)
-                    logger.debug("optimizing %s = %s (index: %d) took %.2f ms", arg, val, i, (time.time() - t0) * 1000)
+                    log.debug("optimizing %s = %s (index: %d) took %.2f ms", arg, val, i, (time.time() - t0) * 1000)
                     return config2
                 except ValueError:
                     pass
@@ -438,9 +438,9 @@ class Solver:
         return config
 
     def minimize(self, config, arg):
-        logger.info("minimize %s", arg)
+        log.info("minimize %s", arg)
         return self._optimize("min", config, arg)
 
     def maximize(self, config, arg):
-        logger.info("maximize %s", arg)
+        log.info("maximize %s", arg)
         return self._optimize("max", config, arg)

@@ -14,6 +14,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+"""Repair files using existing parity data"""
+
 import base64
 import hashlib
 import json
@@ -25,9 +27,9 @@ import ffrs
 import ffrs.par.exc
 import ffrs.util
 
-from . import logger as parent_logger
+from . import cli, log as parent_log
 
-logger = parent_logger.getChild("repair")
+log = parent_log.getChild("repair")
 
 
 def parse_hash(buf: bytes):
@@ -86,7 +88,7 @@ def parse_ffrs_file(f: io.BufferedReader):
 def main(args):
     for filename in args.input_file.get():
         if not os.path.isfile(filename):
-            logger.critical("input file '%s' does not exist", filename)
+            log.critical("input file '%s' does not exist", filename)
             return 1
 
         # TODO: autodetect file if .ffrs is provided
@@ -95,7 +97,7 @@ def main(args):
         input_stat = os.stat(filename)
 
         if input_stat.st_size == 0:
-            logger.debug("skipping empty file: '%s'", filename)
+            log.debug("skipping empty file: '%s'", filename)
             continue
 
         parity_filename = filename + ".ffrs"
@@ -103,9 +105,9 @@ def main(args):
         with open(parity_filename, "rb") as parity_file:
             rs, file_info = parse_ffrs_file(parity_file)
 
-            logger.info("codec: %s", rs)
-            logger.info("buffer size: %s", ffrs.util.format_size(rs.message_size))
-            logger.info("file info: %s", file_info)
+            log.info("codec: %s", rs)
+            log.info("buffer size: %s", ffrs.util.format_size(rs.message_size))
+            log.info("file info: %s", file_info)
 
             assert input_stat.st_mtime_ns == file_info["timestamp"], "timestamp mismatch"
             assert input_stat.st_size == file_info["size"], "file size mismatch"
@@ -124,12 +126,22 @@ def main(args):
 
             repaired_hash = hashlib.blake2b(data[:read_data], digest_size=20, usedforsecurity=False).hexdigest()
             if repaired_hash != file_info["hash"]:
-                logger.error("hash mismatch for '%s'", filename)
+                log.error("hash mismatch for '%s'", filename)
                 continue
 
         with open(filename, "wb") as output_file:
             output_file.write(data[:read_data])
         os.utime(filename, ns=(input_stat.st_atime_ns, file_info["timestamp"]))
 
-    logger.info("done")
+    log.info("done")
     return 0
+
+
+def arg_parser(parser):
+    cli_parser = cli.CLI(parser, main)
+    cli_parser.parser.add_argument("input_file", metavar="file", nargs="+")
+    return cli_parser
+
+
+if __name__ == "__main__":
+    cli.main()

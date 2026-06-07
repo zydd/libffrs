@@ -60,11 +60,11 @@ class ColorFormatter(logging.Formatter):
         return self.FORMATS[record.levelno].format(record)
 
 
-logger = logging.getLogger("par")
-logger.setLevel(logging.ERROR)
+log = logging.getLogger("par")
+log.setLevel(logging.ERROR)
 ch = logging.StreamHandler(stream=sys.stdout)
 ch.setFormatter(ColorFormatter())
-logger.addHandler(ch)
+log.addHandler(ch)
 
 
 constraints = [

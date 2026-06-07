@@ -14,50 +14,23 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import logging
+"""File parity tools"""
+
 import math
 import re
-import sys
 
 import ffrs
 import ffrs.par
 import ffrs.par.exc
 import ffrs.util
 
-from . import constraints
-from .cli import CLI
+from . import constraints, cli
+from .cli import CLI, log
 from .solver import Solver
 
-
-class MaxLevelFilter(logging.Filter):
-    def __init__(self, level):
-        self.level = level
-
-    def filter(self, record):
-        return record.levelno < self.level
-
-
-class ColorFormatter(ffrs.par.ColorFormatter):
-    format_string = "%(levelname)s: "
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.FORMATS[logging.INFO] = logging.Formatter("%(message)s")
-
-
-logger = logging.getLogger("__main__")
-logger.setLevel(logging.INFO)
-
-stdout_handler = logging.StreamHandler(sys.stdout)
-stdout_handler.setLevel(logging.DEBUG)
-stdout_handler.addFilter(MaxLevelFilter(logging.WARNING))
-stdout_handler.setFormatter(ColorFormatter())
-logger.addHandler(stdout_handler)
-
-stderr_handler = logging.StreamHandler(sys.stderr)
-stderr_handler.setLevel(logging.WARNING)
-stderr_handler.setFormatter(ColorFormatter())
-logger.addHandler(stderr_handler)
+import ffrs.par.backup
+import ffrs.par.benchmark
+import ffrs.par.repair
 
 
 def circ(args):
@@ -88,20 +61,20 @@ def circ(args):
         free_variables.remove("outer_ecc_ratio_den")
         free_variables.remove("outer_ecc_ratio_num")
 
-    logger.debug(ffrs.util.format_config(config))
+    ffrs.par.log.debug(ffrs.util.format_config(config))
 
     solver = Solver(config.keys(), constraints, free_variables)
 
     try:
         solver.solve(config)
     except ValueError:
-        logger.exception("could not determine configuration")
+        ffrs.par.log.exception("could not determine configuration")
         return
 
-    logger.debug(ffrs.util.format_config(config))
+    ffrs.par.log.debug(ffrs.util.format_config(config))
 
     domain_size = solver.domain_size(config)
-    logger.debug("domain size: %s", domain_size)
+    ffrs.par.log.debug("domain size: %s", domain_size)
 
     if not math.isfinite(domain_size):
         raise ffrs.par.exc.OptimizationError("could not determine configuration")
@@ -127,72 +100,34 @@ def parse_algo(algo):
     return eval("ffrs" + algo)
 
 
-def set_log_verbosity(args):
-    verbosity = args.verbosity.get()
-    levels = {
-        "critical": logging.CRITICAL,
-        "warning": logging.WARNING,
-        "info": logging.INFO,
-        "debug": logging.DEBUG,
-    }
-    log_level_diff = 0
-    par_sub_loggers = {l.name[len(ffrs.par.logger.name) + 1 :]: l for l in ffrs.par.logger.getChildren()}
-    for arg in verbosity:
-        if arg is None:
-            # -v -v
-            log_level_diff -= 10
-        elif re.match(r"v+$", arg):
-            # -vv
-            log_level_diff -= 10 * (1 + len(arg))
-        elif arg in levels:
-            # -vwarning
-            log_level_diff = levels[arg] - logger.level
-        else:
-            # -vsolver=10
-            arg_split = arg.split("=")
-            if len(arg_split) != 2:
-                logger.warning("could not parse verbosity setting '%s'", arg)
-                continue
-
-            logger_name, sub_logger_level = arg_split
-
-            if sub_logger_level in levels:
-                sub_logger_level = levels[sub_logger_level]
-            else:
-                try:
-                    sub_logger_level = int(sub_logger_level)
-                except ValueError:
-                    logger.warning("could not parse verbosity setting '%s'", arg)
-                    continue
-
-            if logger_name not in par_sub_loggers:
-                logger.warning("unknown logger '%s'", arg)
-                continue
-
-            par_sub_loggers[logger_name].setLevel(sub_logger_level)
-
-    ffrs.par.logger.setLevel(
-        max(logging.DEBUG, ffrs.par.logger.level + min(0, logger.level - logging.DEBUG + log_level_diff))
-    )
-    logger.setLevel(max(logging.DEBUG, logger.level + log_level_diff))
-
-
 def main():
-    cli = CLI()
-    args = cli.parse_args()
-    set_log_verbosity(args)
-    logger.debug("args: %s", args)
+    parser = cli.new_parser(__package__, __doc__)
 
-    args.module.get().main(args)
+    modules = {
+        "backup": ffrs.par.backup,
+        "benchmark": ffrs.par.benchmark,
+        "repair": ffrs.par.repair,
+    }
 
-    return 0
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    for name, module in modules.items():
+        subparser = subparsers.add_parser(
+            name,
+            help=module.__doc__.lstrip().split("\n", 1)[0],
+            description=module.__doc__,
+            formatter_class=parser.formatter_class,
+        )
+        module.arg_parser(subparser)
+
+    args = parser.parse_args()
+    return args.cli_main(args)
 
 
 if __name__ == "__main__":
     try:
         quit(main())
     except ffrs.par.FfrsParException as e:
-        logger.critical("%s", e)
+        log.critical("%s", e)
     except Exception:
-        logger.exception("unexpected error")
+        log.exception("unexpected error")
         quit(1)
