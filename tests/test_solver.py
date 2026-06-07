@@ -21,10 +21,10 @@ import pytest
 import ffrs
 import ffrs.par.solver
 import ffrs.par.__main__
-from ffrs.par.__main__ import print_config
+from ffrs.util import format_config
 
-ffrs.par.solver.logger.setLevel(logging.DEBUG)
-ffrs.par.__main__.logger.setLevel(logging.DEBUG)
+ffrs.par.solver.log.setLevel(logging.DEBUG)
+ffrs.par.__main__.log.setLevel(logging.DEBUG)
 
 test_config = dict(
     block=None,
@@ -38,8 +38,8 @@ test_config = dict(
     outer_ecc_ratio_den=range(1, 1024 + 1),
     outer_ecc_ratio_num=[1],
     outer_ecc=set(2**i for i in range(1, 16)),
-    interleave=None,
-    interleaved_ecc=None,
+    outer_interleave=None,
+    outer_interleaved_ecc=None,
     outer_message=range(2, 65536 + 1, 2),
     interleave=None,
 )
@@ -72,7 +72,7 @@ class TestSolver:
         config.update(vars)
         solver = ffrs.par.solver.Solver(config.keys(), ffrs.par.constraints, test_config_free | set(vars.keys()))
         solver.solve(config)
-        print_config(config)
+        print(format_config(config))
         assert solver.domain_size(config) == 1
         assert solver.check_constraints(config)
 
@@ -108,7 +108,7 @@ class TestSolverPartialConfig:
         config.update(vars)
         solver = ffrs.par.solver.Solver(config.keys(), ffrs.par.constraints, test_config_free | set(vars.keys()))
         solver.solve(config)
-        print_config(config)
+        print(format_config(config))
         assert 1 < solver.domain_size(config) <= 20736
 
     def test_partial_solution_continue(self, vars):
@@ -116,13 +116,13 @@ class TestSolverPartialConfig:
         config.update(vars)
         solver = ffrs.par.solver.Solver(config.keys(), ffrs.par.constraints, test_config_free | set(vars.keys()))
         solver.solve(config)
-        print_config(config)
+        print(format_config(config))
         assert 1 < solver.domain_size(config) <= 20736
         assert len(config["outer_ecc"]) > 1
 
         config["outer_ecc"] = [max(config["outer_ecc"])]
         # solver.free_variables.remove("outer_ecc")
         solver.solve(config, ["outer_ecc"])
-        print_config(config)
+        print(format_config(config))
         assert solver.domain_size(config) == 1
         assert solver.check_constraints(config)
