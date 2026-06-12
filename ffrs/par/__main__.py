@@ -16,7 +16,6 @@
 
 """File parity tools"""
 
-import re
 import sys
 
 import ffrs
@@ -27,11 +26,13 @@ from .cli import log
 
 import ffrs.par.backup
 import ffrs.par.benchmark
+import ffrs.par.combined
 import ffrs.par.repair
 
 CLI_MODULES = {
     "backup": ffrs.par.backup,
     "benchmark": ffrs.par.benchmark,
+    "combined": ffrs.par.combined,
     "repair": ffrs.par.repair,
 }
 

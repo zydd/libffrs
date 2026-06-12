@@ -180,7 +180,7 @@ class CLI:
             "--ecc-ratio",
             metavar="ratio",
             action="store",
-            default=DEFAULT("1/16", parse_ratio_list),
+            default=DEFAULT("1/15,1/16", parse_ratio_list),
             type=parse_ratio_list,
             help="ECC size as a fraction of the message size",
         )

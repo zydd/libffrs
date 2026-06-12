@@ -110,6 +110,7 @@ public:
             .def_property_readonly("outer_message_len", [](PyCIRC16& self) { return self.rso.message_len; })
             .def_property_readonly("outer_ecc_len", [](PyCIRC16& self) { return self.rso.ecc_len; })
             .def_property_readonly("interleave", [](PyCIRC16& self) { return self.interleave; })
+            .def_property_readonly("__sizeof__", [](PyRS256& self) { return sizeof(self); })
 
             .def("encode", cast_args(&PyCIRC16::py_encode), R"(Encode data)", "buffer"_a)
             .def("repair", cast_args(&PyCIRC16::py_repair), R"(Repair data)", "message"_a, "ecc"_a);

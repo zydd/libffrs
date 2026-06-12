@@ -14,8 +14,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Full backup + optional extra parity"""
-
 import math
 import time
 
@@ -173,10 +171,11 @@ def maximize_interleaving(args, file_size):
 
 
 def circ(args):
+    t0 = time.time()
     config = dict(
-        block=args.block.get(),
-        message=args.message.get(),
-        ecc=args.ecc.get(),
+        block=args.block.get(None),
+        message=args.message.get(None),
+        ecc=args.ecc.get(None),
         inner_block=args.inner_block.get(range(2, 65536 + 1, 2)),
         inner_message=args.inner_message.get(range(2, 65536 + 1, 2)),
         inner_ecc=args.inner_ecc.get(set(2**i for i in range(1, 16))),
@@ -189,10 +188,10 @@ def circ(args):
         outer_ecc_ratio_den=(
             set(den for num, den in args.ecc_ratio.get()) if args.ecc_ratio.has_value() else range(1, 1024 + 1)
         ),
-        interleave=args.interleave.get(),
-        inner_interleaved_ecc=args.outer_interleaved_ecc.get(),
-        outer_interleaved_ecc=args.outer_interleaved_ecc.get(),
-        outer_interleave=args.outer_interleave.get(),
+        interleave=args.interleave.get(None),
+        inner_interleaved_ecc=args.outer_interleaved_ecc.get(None),
+        outer_interleaved_ecc=args.outer_interleaved_ecc.get(None),
+        outer_interleave=args.outer_interleave.get(None),
     )
 
     free_variables = {k for k in config if k not in args or not getattr(args, k).has_value()}
@@ -200,32 +199,51 @@ def circ(args):
         free_variables.remove("outer_ecc_ratio_den")
         free_variables.remove("outer_ecc_ratio_num")
 
-    ffrs.par.log.debug(ffrs.util.format_config(config))
+    log.debug(ffrs.util.format_config(config))
 
     solver = Solver(config.keys(), CONSTRAINTS, free_variables)
 
     try:
         solver.solve(config)
     except ValueError:
-        ffrs.par.log.exception("could not determine configuration")
+        log.exception("could not determine configuration")
         return
 
-    ffrs.par.log.debug(ffrs.util.format_config(config))
+    log.debug(ffrs.util.format_config(config))
 
     domain_size = solver.domain_size(config)
-    ffrs.par.log.debug("domain size: %s", domain_size)
+    log.debug("domain size: %s", domain_size)
 
     if not math.isfinite(domain_size):
+        log.warning("undetermined variables")
         raise ffrs.par.exc.OptimizationError("could not determine configuration")
 
-    solver.maximize(config, "inner_message")
-    solver.maximize(config, "inner_ecc")
-    solver.maximize(config, "outer_ecc")
+    log.debug("maximize inner_message")
+    config = solver.maximize(config, "inner_message")
+    log.debug(ffrs.util.format_config(config))
+    log.debug("domain size: %s", ffrs.util.LazyString(solver.domain_size, config))
+
+    log.debug("maximize outer_ecc")
+    config = solver.maximize(config, "outer_ecc")
+    log.debug(ffrs.util.format_config(config))
+    log.debug("domain size: %s", ffrs.util.LazyString(solver.domain_size, config))
+
+    log.debug("maximize inner_ecc")
+    config = solver.minimize(config, "inner_ecc")
+    domain_size = solver.domain_size(config)
+    log.debug(ffrs.util.format_config(config))
+    log.debug("domain size: %s", domain_size)
+
+    log.info("solver iterations: %s", solver._constraint_evaluations)
 
     if domain_size == 1:
         assert solver.check_constraints(config)
-        ffrs.util.print_config_args(config)
+        log.info(ffrs.util.format_config_args(config))
     else:
+        log.warning("no valid solution")
         raise ffrs.par.exc.OptimizationError("could not determine configuration")
 
+    t1 = time.time() - t0
+    if t1 > 10e-3:
+        log.warning("time to solve: %.2f [ms]", t1 * 1000)
     return ffrs.util.instantiate_config(config)

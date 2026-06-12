@@ -16,13 +16,23 @@
 
 import ffrs
 
-_b64hex_alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
+_B64HEX_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
+
+
+class LazyString:
+    def __init__(self, func, *args, **kwargs):
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+    def __str__(self):
+        return str(self.func(*self.args, **self.kwargs))
 
 
 def b64hex(val: int) -> str:
     result = ""
     while val:
-        result = _b64hex_alphabet[val & 0x3F] + result
+        result = _B64HEX_ALPHABET[val & 0x3F] + result
         val >>= 6
     return result
 
@@ -31,7 +41,7 @@ def b64hex_dec(val: str) -> int:
     result = 0
     for c in val:
         result <<= 6
-        result |= _b64hex_alphabet.index(c)
+        result |= _B64HEX_ALPHABET.index(c)
     return result
 
 

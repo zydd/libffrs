@@ -22,7 +22,6 @@ import ffrs.par.solver
 from ffrs.util import format_config
 from ffrs.par.opt import CONSTRAINTS
 
-
 test_config = dict(
     block=None,
     ecc=None,

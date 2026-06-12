@@ -25,7 +25,7 @@ import io
 import ffrs
 import ffrs.util
 
-from . import cli
+from . import cli, format, fs
 from .cli import log
 
 
@@ -83,52 +83,21 @@ def parse_ffrs_file(f: io.BufferedReader):
 
 
 def main(args):
-    for filename in args.input_file.get():
-        if not os.path.isfile(filename):
-            log.critical("input file '%s' does not exist", filename)
-            return 1
+    filename = args.input_file.get()
+    if not os.path.isfile(filename):
+        log.critical("input file '%s' does not exist", filename)
+        return 1
 
-        # TODO: autodetect file if .ffrs is provided
-        assert not filename.endswith(".ffrs")
+    with format.Reader(filename) as input:
+        rs = input.read_header()
+        ecc = ffrs.create_buffer(rs.ecc_size)
+        data = ffrs.create_buffer(rs.message_size)
 
-        input_stat = os.stat(filename)
-
-        if input_stat.st_size == 0:
-            log.debug("skipping empty file: '%s'", filename)
-            continue
-
-        parity_filename = filename + ".ffrs"
-        parity_stat = os.stat(parity_filename)
-        with open(parity_filename, "rb") as parity_file:
-            rs, file_info = parse_ffrs_file(parity_file)
-
-            log.info("codec: %s", rs)
-            log.info("buffer size: %s", ffrs.util.format_size(rs.message_size))
-            log.info("file info: %s", file_info)
-
-            assert input_stat.st_mtime_ns == file_info["timestamp"], "timestamp mismatch"
-            assert input_stat.st_size == file_info["size"], "file size mismatch"
-            assert input_stat.st_size <= rs.message_size, "chunking not supported yet"
-
-            ecc = ffrs.create_buffer(rs.ecc_size)
-            read_ecc = parity_file.readinto(ecc)
-            assert read_ecc == rs.ecc_size, "could not read ECC data"
-            assert parity_file.tell() == parity_stat.st_size, "leftover data in parity file"
-
-        with open(filename, "rb") as input_file:
-            data = ffrs.create_buffer(rs.message_size)
-            read_data = input_file.readinto(data)
-
+        for filelist in input.blocks(ecc):
+            fs.read_filelist_into(filelist, data)
             rs.repair(data, ecc)
 
-            repaired_hash = hashlib.blake2b(data[:read_data], digest_size=20, usedforsecurity=False).hexdigest()
-            if repaired_hash != file_info["hash"]:
-                log.error("hash mismatch for '%s'", filename)
-                return 1
-
-        with open(filename, "wb") as output_file:
-            output_file.write(data[:read_data])
-        os.utime(filename, ns=(input_stat.st_atime_ns, file_info["timestamp"]))
+            fs.write_filelist_into(filelist, data)
 
     log.info("done")
     return 0
@@ -136,7 +105,7 @@ def main(args):
 
 def arg_parser(parser):
     cli_parser = cli.CLI(parser, main)
-    cli_parser.parser.add_argument("input_file", metavar="file", nargs="+")
+    cli_parser.parser.add_argument("input_file", metavar="file")
     return cli_parser
 
 

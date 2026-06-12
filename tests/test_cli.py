@@ -78,11 +78,11 @@ class TestCliBackupRepair:
         assert list(filter(lambda record: record.levelno >= logging.WARNING, caplog.records)) == []
 
     def test_backup_repair_no_errors(self, input_size, capsys, caplog, tmp_path: pathlib.Path):
-        input_file, _output_file = self._backup(input_size, tmp_path)
+        input_file, output_file = self._backup(input_size, tmp_path)
         input_file_mtime = input_file.stat().st_mtime_ns
         input_file_hash = hashlib.blake2b(input_file.read_bytes()).digest()
 
-        assert ffrs.par.__main__.main("repair", str(input_file)) == 0
+        assert ffrs.par.__main__.main("repair", str(output_file)) == 0
 
         assert input_file.stat().st_mtime_ns == input_file_mtime
         assert hashlib.blake2b(input_file.read_bytes()).digest() == input_file_hash
@@ -91,7 +91,7 @@ class TestCliBackupRepair:
         assert list(filter(lambda record: record.levelno >= logging.WARNING, caplog.records)) == []
 
     def test_backup_repair_corrupted(self, input_size, capsys, caplog, tmp_path: pathlib.Path):
-        input_file, _output_file = self._backup(input_size, tmp_path)
+        input_file, output_file = self._backup(input_size, tmp_path)
         input_file_mtime = input_file.stat().st_mtime_ns
         input_file_hash = hashlib.blake2b(input_file.read_bytes()).digest()
 
@@ -100,7 +100,7 @@ class TestCliBackupRepair:
         os.utime(input_file, ns=(input_file.stat().st_atime_ns, input_file_mtime))
         assert hashlib.blake2b(input_file.read_bytes()).digest() != input_file_hash
 
-        assert ffrs.par.__main__.main("repair", str(input_file)) == 0
+        assert ffrs.par.__main__.main("repair", str(output_file)) == 0
 
         assert input_file.stat().st_mtime_ns == input_file_mtime
         assert hashlib.blake2b(input_file.read_bytes()).digest() == input_file_hash

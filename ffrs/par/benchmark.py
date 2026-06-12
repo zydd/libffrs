@@ -103,12 +103,10 @@ def main(args):
     )
     log.debug("ffrs compiled with: %s", ffrs.compiler_info)
 
-    match args.function.get():
-        case "encode":
-            benchmark_encode(args)
-
-        case other:
-            raise ffrs.par.FfrsParException(f"unknown function: {other}")
+    if args.function.get() == "encode":
+        benchmark_encode(args)
+    else:
+        raise ffrs.par.FfrsParException(f"unknown function: {args.function.get()}")
 
     log.info("done")
     return 0

@@ -234,6 +234,7 @@ public:
             .def_property_readonly("gf", [](PyRSi16& self) -> auto const& { return self.gf; })
             .def_property_readonly("interleave", [](PyRSi16& self) { return self.interleave; },
                 R"(Number of interleaved codewords for block encoding)")
+            .def_property_readonly("__sizeof__", [](PyRS256& self) { return sizeof(self); })
 
             .def_property_readonly("simd_x4",
                 [](PyRSi16& self) { return self.simd_x4; },

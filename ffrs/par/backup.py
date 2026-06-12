@@ -25,7 +25,7 @@ import re
 import ffrs
 import ffrs.util
 
-from . import cli, opt
+from . import cli, format, opt
 from .cli import log
 
 
@@ -59,33 +59,27 @@ def main(args):
         log.info("codec: %s", rs)
         log.info("buffer size: %s", ffrs.util.format_size(rs.message_size))
 
-        # TODO:
-        assert rs.message_size >= input_stat.st_size, "Chunking not implemented yet"
+        # TODO: chunking if file is too large
+        assert rs.message_size >= input_stat.st_size
 
         hasher = hashlib.blake2b(digest_size=20, usedforsecurity=False)
         buffer = ffrs.create_buffer(rs.message_size)
         assert len(buffer) == rs.message_size
 
-        with open(output_filename, "wb") as f:
-            f.write(b"\x89ffrs\r\n")
-            f.write(rs.serialize())
-            f.write(f"\nf s:{ffrs.util.b64hex(input_stat.st_size)}".encode("ascii"))
-            f.write(f" t:{ffrs.util.b64hex(input_stat.st_mtime_ns)}".encode("ascii"))
-            f.write(b" h:b2:")
-            hash_offset = f.tell()
-            f.write(base64.urlsafe_b64encode(bytes(hasher.digest_size)).strip(b"="))
-            f.write(f" p:{basename}\n\n".encode("utf-8"))
+        with open(filename, "rb") as input_file:
+            while read := input_file.readinto(buffer):
+                if read < rs.message_size:
+                    buffer[read:] = bytes(rs.message_size - read)
 
-            with open(filename, "rb") as input_file:
-                while read := input_file.readinto(buffer):
-                    if read < rs.message_size:
-                        buffer[read:] = bytes(rs.message_size - read)
+                hasher.update(buffer[:read])
+                encoded = rs.encode(buffer)
 
-                    hasher.update(buffer[:read])
-                    encoded = rs.encode(buffer)
-                    f.write(encoded)
-                f.seek(hash_offset)
-                f.write(base64.urlsafe_b64encode(hasher.digest()).strip(b"="))
+            with format.Writer(output_filename) as fd:
+                fd.write_header(rs)
+
+                file_info = ("f", input_stat.st_size, input_stat.st_mtime_ns, hasher.digest(), filename)
+                fd.write_block([file_info], encoded)
+
     log.info("done")
     return 0
 
@@ -110,6 +104,7 @@ def arg_parser(parser):
         default=cli.DEFAULT("timestamp"),
         help="Update parity files based on timestamp or hash",
     )
+    return cli_parser
 
 
 if __name__ == "__main__":
