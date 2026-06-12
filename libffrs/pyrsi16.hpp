@@ -37,11 +37,11 @@ private:
         size_t ecc_len;
     };
 
-    PyGFi16 gf;
-    RSi16v<1> rs16;
-    RSi16v<4> rs16x4;
-    RSi16v<8> rs16x8;
-    RSi16v<16> rs16x16;
+    const PyGFi16 gf;
+    const RSi16v<1> rs16;
+    const RSi16v<4> rs16x4;
+    const RSi16v<8> rs16x8;
+    const RSi16v<16> rs16x16;
     bool simd_x4;
     bool simd_x8;
     bool simd_x16;
@@ -234,7 +234,6 @@ public:
             .def_property_readonly("gf", [](PyRSi16& self) -> auto const& { return self.gf; })
             .def_property_readonly("interleave", [](PyRSi16& self) { return self.interleave; },
                 R"(Number of interleaved codewords for block encoding)")
-            .def_property_readonly("__sizeof__", [](PyRS256& self) { return sizeof(self); })
 
             .def_property_readonly("simd_x4",
                 [](PyRSi16& self) { return self.simd_x4; },
@@ -269,7 +268,7 @@ public:
                 "simd_x16"_a = py::none()
             )
 
-            .def("__sizeof__", [](PyRSi16& self) { return sizeof(self); })
+            .def("__sizeof_cpp__", [](PyRSi16& self) { return sizeof(self); })
 
             .def("encode", cast_args(&PyRSi16::py_encode),
                 R"(Systematic encode)",

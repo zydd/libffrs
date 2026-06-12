@@ -65,6 +65,7 @@ public:
                 )",
                 "primitive"_a
             )
+            .def("__sizeof_cpp__", [](PyGFi16& self) { return sizeof(self); })
             .def("mul", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::mul), R"(Multiplication: :math:`\text{lhs} \times \text{rhs}`)", "lhs"_a, "rhs"_a)
             .def("add", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::add), R"(Addition: :math:`\text{lhs} + \text{rhs}`)", "lhs"_a, "rhs"_a)
             .def("sub", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::sub), R"(Subtraction: :math:`\text{lhs} - \text{rhs}`)", "lhs"_a, "rhs"_a)

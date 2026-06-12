@@ -174,7 +174,7 @@ public:
                 "block_len"_a = py::none(), "message_len"_a = py::none(), "ecc_len"_a = py::none(),
                 "primitive"_a = 2, "polynomial"_a = 0x11d)
 
-            .def("__sizeof__", [](PyRS256& self) { return sizeof(self); })
+            .def("__sizeof_cpp__", [](PyRS256& self) { return sizeof(self); })
 
             .def("encode", cast_args(&PyRS256::py_encode),
                 R"(Encode message, return ecc)",

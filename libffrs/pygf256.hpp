@@ -117,6 +117,7 @@ public:
                 )",
                 "primitive"_a = 2, "poly1"_a = 0x11d
             )
+            .def("__sizeof_cpp__", [](PyGF256& self) { return sizeof(self); })
             .def("mul", &PyGF256::mul, R"(Multiplication: :math:`\text{lhs} \times \text{rhs}`)", "lhs"_a, "rhs"_a)
             .def("add", &PyGF256::add, R"(Addition: :math:`\text{lhs} + \text{rhs}`)", "lhs"_a, "rhs"_a)
             .def("sub", &PyGF256::sub, R"(Subtraction: :math:`\text{lhs} - \text{rhs}`)", "lhs"_a, "rhs"_a)
