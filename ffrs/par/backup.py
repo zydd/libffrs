@@ -87,9 +87,10 @@ def main(args):
 def arg_parser(parser):
     cli_parser = cli.CLI(parser, main)
     cli_parser.parser.set_defaults(ecc_ratio="1/1")
-    cli_parser.parser.add_argument("input_file", metavar="file", nargs="+")
+    backup = parser.add_argument_group("backup")
+    backup.add_argument("input_file", metavar="file", nargs="+")
 
-    existing = cli_parser.parser.add_mutually_exclusive_group()
+    existing = backup.add_mutually_exclusive_group()
     existing.add_argument("-f", "--force", action="store_true", help="Overwrite existing parity files")
     existing.add_argument("-i", "--ignore-existing", action="store_true", help="Ignore existing parity files")
     existing.add_argument(

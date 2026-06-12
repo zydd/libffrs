@@ -105,7 +105,8 @@ def main(args):
 
 def arg_parser(parser):
     cli_parser = cli.CLI(parser, main)
-    cli_parser.parser.add_argument("input_file", metavar="file")
+    repair = parser.add_argument_group("repair")
+    repair.add_argument("input_file", metavar="parity_file", help="Parity file (.ffrs)")
     return cli_parser
 
 
