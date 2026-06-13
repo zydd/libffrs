@@ -378,6 +378,12 @@ public:
         pntt(&synds[0]);
         r_print_vec("synds", synds, ecc_len);
 
+        // stop if all synds are zero
+        if (std::all_of(&synds[0], &synds[ecc_len], [](const GFT& v) { return vec_max(v) == 0; })) {
+            r_print("no errors detected");
+            return;
+        }
+
         // init evaluator_poly with synds
         auto evaluator_poly = &synds[0];  // size = ecc_len * 2
         auto locator_poly = &temp_ntt1_ecc6[ecc_len * 2];  // size = ecc_len * 2
@@ -793,7 +799,7 @@ protected:
         }
     }
 
-    bool vec_any(GFT const& a) const {
+    static inline bool vec_any(GFT const& a) {
         if constexpr (std::is_integral_v<GFT>) {
             return a != 0;
         } else {
@@ -805,7 +811,7 @@ protected:
         }
     }
 
-    ::GFT vec_min(GFT const& a) const {
+    static inline ::GFT vec_min(GFT const& a) {
         if constexpr (std::is_integral_v<GFT>) {
             return a;
         } else {
@@ -818,7 +824,7 @@ protected:
         }
     }
 
-    ::GFT vec_max(GFT const& a) const {
+    static inline ::GFT vec_max(GFT const& a) {
         // *std::max_element(reinterpret_cast<::GFT *>(&root_count), reinterpret_cast<::GFT *>(&root_count + 1));
 
         if constexpr (std::is_integral_v<GFT>) {
@@ -833,7 +839,7 @@ protected:
         }
     }
 
-    GFT vec_min(GFT const& a, GFT const& b) const {
+    static inline GFT vec_min(GFT const& a, GFT const& b) {
         if constexpr (std::is_integral_v<GFT>) {
             return std::min(a, b);
         } else {
@@ -845,7 +851,7 @@ protected:
         }
     }
 
-    GFT vec_max(GFT const& a, GFT const& b) const {
+    static inline GFT vec_max(GFT const& a, GFT const& b) {
         if constexpr (std::is_integral_v<GFT>) {
             return std::max(a, b);
         } else {
@@ -857,7 +863,7 @@ protected:
         }
     }
 
-    void vec_rotate(GFT *const vec, GFT const& n) const {
+    inline void vec_rotate(GFT *const vec, GFT const& n) const {
         if constexpr (std::is_integral_v<GFT>) {
             std::rotate(&vec[0], &vec[n], &vec[ecc_len]);
         } else {
@@ -872,7 +878,7 @@ protected:
         }
     }
 
-    GFT gather_vec(const GFT *const src, GFT const& i) const {
+    inline GFT gather_vec(const GFT *const src, GFT const& i) const {
         if constexpr (std::is_integral_v<GFT>) {
             return src[i];
         } else {

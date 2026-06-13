@@ -122,4 +122,6 @@ PYBIND11_MODULE(libffrs, m) {
     PyGFi16::register_class(m);
     PyRSi16::register_class(m);
     PyCIRC16::register_class(m);
+
+    m.def("set_logger", [](py::object&& logger) { PyLogger::set_logger(logger); });
 }

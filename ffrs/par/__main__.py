@@ -56,6 +56,7 @@ def main(*argv):
 
 if __name__ == "__main__":
     try:
+        ffrs.set_logger(ffrs.par.log.getChild("rs"))
         quit(main(*sys.argv[1:]))
     except ffrs.par.FfrsParException as e:
         log.critical("%s", e)

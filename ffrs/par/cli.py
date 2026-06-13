@@ -1,3 +1,4 @@
+#
 #  par/cli.py
 #
 #  Copyright 2026 Gabriel Machado
@@ -498,6 +499,7 @@ def set_log_verbosity(args):
         max(logging.DEBUG, _DEFAULT_MOD_LOG_LEVEL + min(0, _DEFAULT_CLI_LOG_LEVEL - logging.DEBUG + log_level_diff))
     )
     log.setLevel(max(logging.DEBUG, _DEFAULT_CLI_LOG_LEVEL + log_level_diff))
+    ffrs.set_logger(ffrs.par.log.getChild("rs"))
 
 
 class OuterScopeGetter(object):
@@ -518,8 +520,9 @@ class OuterScopeGetter(object):
 
 
 def main():
-    outer = OuterScopeGetter()
     try:
+        ffrs.set_logger(ffrs.par.log.getChild("rs"))
+        outer = OuterScopeGetter()
         parser = new_parser(outer.__loader__.name, outer.__doc__)
         cli_parser = outer.arg_parser(parser)
         quit(cli_parser.main())

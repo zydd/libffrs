@@ -39,7 +39,7 @@ class ColorFormatter(logging.Formatter):
     yellow = "\033[33;20m"
     # format_string = "%(asctime)s %(threadName)-8s %(levelname)-8s %(filename)s:%(lineno)-3d: %(funcName)s: %(message)s"
     format_string = "[%(levelname)-8s %(relpath)s:%(lineno)d:%(funcName)s] "
-    module_path = os.path.dirname(os.path.dirname(__file__))
+    base_path = os.path.abspath(os.path.join(__file__, "../../.."))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -56,7 +56,7 @@ class ColorFormatter(logging.Formatter):
         }
 
     def format(self, record):
-        record.relpath = os.path.relpath(record.pathname, self.module_path)
+        record.relpath = os.path.relpath(record.pathname, self.base_path)
         return self.FORMATS[record.levelno].format(record)
 
 

@@ -1,3 +1,4 @@
+#
 #  test_lib_circ16.py
 #
 #  Copyright 2026 Gabriel Machado
@@ -14,10 +15,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import pytest
+import logging
 import random
+import sys
+
+import pytest
 
 import ffrs
+import ffrs.par
 
 from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, randbytes
 
@@ -180,7 +185,6 @@ class BaseTestCIRC:
         err_count = self.add_errors_stride(
             buf, [], rs.inner_message_size + 2, rs.inner_message_len * rs.outer_ecc_len // 2
         )
-        print(rs, err_count)
 
         rs.repair(buf, ecc)
 
@@ -262,4 +266,23 @@ class TestCircPower2(BaseTestCIRC):
     ],
 )
 class TestCircMult(BaseTestCIRC):
+    pass
+
+
+@pytest.fixture(scope="class")
+def setup_logger():
+    level = ffrs.par.log.level
+    ffrs.par.log.setLevel(logging.INFO)
+    ffrs.set_logger(ffrs.par.log)
+    yield
+    ffrs.set_logger(None)
+    ffrs.par.log.setLevel(level)
+
+
+@pytest.mark.parametrize(
+    "rs",
+    [ffrs.CIRC16(256, 2, 512, 256, 128)],
+)
+@pytest.mark.usefixtures("setup_logger")
+class TestCircSingle:
     pass

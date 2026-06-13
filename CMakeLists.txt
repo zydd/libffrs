@@ -22,7 +22,7 @@ set_source_files_properties("libffrs/rsi16v_avx512.cpp" PROPERTIES COMPILE_FLAGS
 set_target_properties(pyffrs PROPERTIES OUTPUT_NAME "libffrs")
 target_compile_features(pyffrs PRIVATE cxx_std_20)
 target_compile_definitions(pyffrs PRIVATE VERSION_INFO="0.1.0")
-target_compile_options(pyffrs PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_options(pyffrs PRIVATE -Wall -Wextra -Wpedantic "-ffile-prefix-map=${CMAKE_SOURCE_DIR}/=")
 
 
 add_custom_command(TARGET pyffrs POST_BUILD
