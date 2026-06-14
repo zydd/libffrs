@@ -1,0 +1,6 @@
+libffrs.set\_logger
+===================
+
+.. currentmodule:: libffrs
+
+.. autofunction:: set_logger

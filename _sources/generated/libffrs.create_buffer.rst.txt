@@ -1,0 +1,6 @@
+libffrs.create\_buffer
+======================
+
+.. currentmodule:: libffrs
+
+.. autofunction:: create_buffer

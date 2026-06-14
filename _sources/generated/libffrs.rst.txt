@@ -9,6 +9,15 @@
 
    
    
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   
+      create_buffer
+      set_logger
+   
    
 
    

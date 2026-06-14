@@ -37,11 +37,11 @@ libffrs.CIRC16
         CIRC16.inner_ecc_size
         CIRC16.inner_message_len
         CIRC16.inner_message_size
+        CIRC16.interleave
         CIRC16.message_len
         CIRC16.message_size
         CIRC16.outer_block_len
         CIRC16.outer_ecc_len
-        CIRC16.outer_interleave
         CIRC16.outer_message_len
         CIRC16.rsi
         CIRC16.rso

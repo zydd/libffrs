@@ -17,6 +17,7 @@ libffrs.RSi16
         
         RSi16.__init__
         RSi16.encode
+        RSi16.rbo
         RSi16.repair
         RSi16.synd
     
@@ -56,6 +57,9 @@ libffrs.RSi16
 
         
     .. automethod:: RSi16.encode
+
+        
+    .. automethod:: RSi16.rbo
 
         
     .. automethod:: RSi16.repair

@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" />
 
     <!-- Generated with Sphinx 7.4.7 and Furo 2023.09.10 -->
-        <title>Cross-interleaving - libffrs documentation</title>
+        <title>Normal encoding &amp; interleaving - libffrs documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=135e06be" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=36a5483c" />
@@ -135,7 +135,7 @@
           <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
         </button>
       </div>
-      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
         <div class="visually-hidden">Toggle table of contents sidebar</div>
         <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
       </label>
@@ -174,6 +174,8 @@
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../generated/libffrs.html">libffrs</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of libffrs</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../generated/libffrs.create_buffer.html">libffrs.create_buffer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../generated/libffrs.set_logger.html">libffrs.set_logger</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../generated/libffrs.CIRC16.html">libffrs.CIRC16</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../generated/libffrs.GF256.html">libffrs.GF256</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../generated/libffrs.GFi16.html">libffrs.GFi16</a></li>
@@ -212,58 +214,221 @@
               <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
             </button>
           </div>
-          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
             <div class="visually-hidden">Toggle table of contents sidebar</div>
             <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
           </label>
         </div>
         <article role="main">
-          <section id="cross-interleaving">
+          <section id="normal-encoding-interleaving">
+<h1>Normal encoding &amp; interleaving<a class="headerlink" href="#normal-encoding-interleaving" title="Link to this heading">¶</a></h1>
+<p>With normal RS encoding it’s possible to repair up to <code class="docutils literal notranslate"><span class="pre">ecc_len</span></code> errors in known locations.
+or <code class="docutils literal notranslate"><span class="pre">ecc_len/2</span></code> errors in unknown locations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Example<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">RSi16</span><span class="p">(</span><span class="n">block_len</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">ecc_len</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>         block_len
+     ╭───────┴───────╮
+     🟦🟦🟦🟦🟦🟦🟩🟩
+     ╰─────┬────╯╰─┬─╯
+    message_len ecc_len
+
+🟦 = message
+🟩 = parity data
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">RSi16</span></code> interprets the data as 16-bit integers, therefore <code class="docutils literal notranslate"><span class="pre">block_len=8</span></code> corresponds to 16 byte blocks.</p>
+<p>The encoding above is able to recover 1 random error per 16-byte block (12 message bytes + 4 parity bytes).</p>
+<hr class="docutils" />
+<dl class="field-list simple">
+<dt class="field-odd">Example<span class="colon">:</span></dt>
+<dd class="field-odd"><p>6 random errors over 96 16-bit symbols (192 bytes) encoded with <code class="docutils literal notranslate"><span class="pre">RSi16(block_len=8,</span> <span class="pre">ecc_len=2)</span></code>:</p>
+</dd>
+</dl>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟥🟦🟦🟦🟧🟧 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟥🟧🟧 🟦🟦🟦🟦🟦🟦🟩🟩
+🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟥🟧 🟦🟦🟦🟦🟦🟦🟩🟩
+🟦🟦🟦🟦🟦🟦🟧🟥 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟥🟦🟦🟦🟧🟧 🟦🟦🟦🟦🟥🟦🟧🟧
+🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩
+
+🟥 = corrupted
+🟧 = parity check fail
+</pre></div>
+</div>
+<p>✅ Recovery possible</p>
+<hr class="docutils" />
+<dl class="field-list simple">
+<dt class="field-odd">This encoding is weak against sequential errors which is a common data loss pattern<span class="colon">:</span></dt>
+<dd class="field-odd"><p>6 sequential errors over 96 × 16-bit symbols (192 bytes) encoded with <code class="docutils literal notranslate"><span class="pre">RSi16(block_len=8,</span> <span class="pre">ecc_len=2)</span></code>:</p>
+</dd>
+</dl>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟦🟦🟦🟩🟩 🟥🟥🟥🟥🟥🟥🟧🟧 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩
+🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩
+🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩
+🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩
+</pre></div>
+</div>
+<p>❌ Cannot be recovered</p>
+<hr class="docutils" />
+<section id="interleaved-encoding">
+<h2>Interleaved encoding<a class="headerlink" href="#interleaved-encoding" title="Link to this heading">¶</a></h2>
+<p>If we <a class="reference external" href="https://en.wikipedia.org/wiki/Burst_error-correcting_code#Interleaved_codes">interleave</a> the codec,
+i.e.: encode over columns instead of sequentially, it becomes more robust against sequential errors.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">RSi16</span><span class="p">(</span><span class="n">block_len</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">ecc_len</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">interleave</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>              interleave
+╭─────────────────┴─────────────────╮
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 ⎫
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 ⎪
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 ⎪
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 ⎪
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 ⎬ block_len
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 ⎪
+🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 ⎪ ⎫ ecc_len
+🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 ⎭ ⎭
+</pre></div>
+</div>
+<p>With this setup, sequential errors appear in different blocks allowing recovery of up to <code class="docutils literal notranslate"><span class="pre">interleave</span></code> symbols with the same amount of parity data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Example<span class="colon">:</span></dt>
+<dd class="field-odd"><p>6 sequential errors over 96 × 16-bit symbols (192 bytes) encoded with <code class="docutils literal notranslate"><span class="pre">RSi16(block_len=8,</span> <span class="pre">ecc_len=2,</span> <span class="pre">interleave=16)</span></code>:</p>
+</dd>
+</dl>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟦 🟦🟦🟥🟥 🟥🟥🟥🟥 🟦🟦🟦🟦
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+🟩🟩🟩🟩 🟩🟩🟧🟧 🟧🟧🟧🟧 🟩🟩🟩🟩
+🟩🟩🟩🟩 🟩🟩🟧🟧 🟧🟧🟧🟧 🟩🟩🟩🟩
+</pre></div>
+</div>
+<p>✅ Recovery possible</p>
+</section>
+</section>
+<section id="cross-interleaving">
 <h1>Cross-interleaving<a class="headerlink" href="#cross-interleaving" title="Link to this heading">¶</a></h1>
+<p>If we add an extra parity check on each ‘row’ of the interleaved code we can double the interleaved codec’s ability to repair sequential errors. This <em>inner</em>/row parity can be used to locate errors in the <em>outer</em>/column blocks. This is the principle behind <a class="reference external" href="https://en.wikipedia.org/wiki/Cross-interleaved_Reed%E2%80%93Solomon_coding">Cross-interleaved Reed-Solomon coding</a> or CIRC.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">CIRC16</span><span class="p">(</span>
-    <span class="n">inner_block_len</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
+    <span class="n">inner_block_len</span><span class="o">=</span><span class="mi">17</span><span class="p">,</span>
     <span class="n">inner_ecc_len</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">outer_block_len</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
     <span class="n">outer_ecc_len</span><span class="o">=</span><span class="mi">2</span>
 <span class="p">)</span>
 </pre></div>
 </div>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>            inner_block_len          ╭─── inner_ecc_len
-╭──────────────────┴─────────────────╮
-🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦 🟨 ⎫
-🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦 🟨 ⎪
-🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦 🟨 ⎪
-🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦 🟨 ⎪
-🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦 🟨 ⎬ outer_block_len
-🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦 🟨 ⎪
-🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧 🟫 ⎪ ⎫ outer_ecc_len
-🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧 🟫 ⎭ ⎭
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>             inner_block_len          ╭─── inner_ecc_len
+╭───────────────────┴─────────────────╮
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨 ⎫
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨 ⎪
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨 ⎪
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨 ⎪
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨 ⎬ outer_block_len
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨 ⎪
+🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟫 ⎪ ⎫ outer_ecc_len
+🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟫 ⎭ ⎭
 
 🟦 = data
-🟨 = inner ECC parity bytes - 1 per row
-🟧 = outer ECC parity bytes - 2 per column
-🟫 = parity bytes for outer ECC - 1 per ECC row
+🟨 = inner ECC parity data - 1 per row
+🟩 = outer ECC parity data - 2 per column
+🟫 = parity data for outer ECC - 1 per ECC row
 </pre></div>
 </div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟥🟥🟥🟥 🟥🟥🟥🟥 🟥🟥🟥🟥 🟥🟥🟥🟥 🟧 ─╮ inner parity check indicates error
+🟥🟥🟥🟥 🟥🟥🟥🟥 🟥🟥🟥🟥 🟥🟥🟥🟥 🟧 ─╯ locations in the outer block
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟫 ─ outer blocks can repair
+🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟫   up to 2 errors (ecc_len)
+
+🟥 = corrupted
+🟧 = parity check fail
+</pre></div>
+</div>
+<p>✅ Recovery possible</p>
+<hr class="docutils" />
+<section id="other-data-loss-scenarios">
+<h2>Other data loss scenarios<a class="headerlink" href="#other-data-loss-scenarios" title="Link to this heading">¶</a></h2>
+<section id="few-random-errors">
+<h3>Few random errors:<a class="headerlink" href="#few-random-errors" title="Link to this heading">¶</a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟦🟦🟦🟦 🟦🟥🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟧 ── inner parity check indicates error
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨    locations in the outer block
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟥🟦🟦🟦 🟧 ───╯
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟩🟩🟩🟩 🟩🟧🟩🟩 🟩🟩🟩🟩 🟧🟩🟩🟩 🟫
+🟩🟩🟩🟩 🟩🟧🟩🟩 🟩🟩🟩🟩 🟧🟩🟩🟩 🟫
+
+🟥 = corrupted
+🟧 = parity check fail
+</pre></div>
+</div>
+<p>✅ Recovery possible</p>
 </section>
+<hr class="docutils" />
+<section id="periodic">
+<h3>Periodic:<a class="headerlink" href="#periodic" title="Link to this heading">¶</a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟥🟦🟦🟦 🟦🟦🟥🟦 🟦🟦🟦🟦 🟥🟦🟦🟦 🟧 ⎫
+🟦🟥🟦🟦 🟦🟦🟦🟥 🟦🟦🟦🟦 🟦🟥🟦🟦 🟧 ⎪
+🟦🟦🟥🟦 🟦🟦🟦🟦 🟥🟦🟦🟦 🟦🟦🟥🟦 🟧 ⎬ all inner check failed
+🟦🟦🟦🟥 🟦🟦🟦🟦 🟦🟥🟦🟦 🟦🟦🟦🟥 🟧 ⎪   cannot locate errors
+🟦🟦🟦🟦 🟥🟦🟦🟦 🟦🟦🟥🟦 🟦🟦🟦🟦 🟧 ⎪
+🟦🟦🟦🟦 🟦🟥🟦🟦 🟦🟦🟦🟥 🟦🟦🟦🟦 🟧 ⎭
+🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟫 ⎫ 2 outer parity symbols can still locate
+🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟫 ⎭ and repair up to 1 error (ecc_len/2)
+</pre></div>
+</div>
+<p>✅ Recovery possible</p>
+</section>
+<hr class="docutils" />
+<section id="aligned">
+<h3>Aligned:<a class="headerlink" href="#aligned" title="Link to this heading">¶</a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟥🟥🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟧 ⎫
+🟥🟥🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟧 ⎬ error locations are known but exceed
+🟥🟥🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟧 ⎭ outer code correction ability (outer_ecc_len)
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟧🟧🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟫
+🟧🟧🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟫
+</pre></div>
+</div>
+<p>❌ Cannot be recovered</p>
+</section>
+</section>
+</section>
+<hr class="docutils" />
 <section id="interleaved-circ">
 <h1>Interleaved CIRC<a class="headerlink" href="#interleaved-circ" title="Link to this heading">¶</a></h1>
+<p>We can go one step further and interleave the CIRC blocks. This can bring several advantages:
+- Allows achieving an effective interleaving greater than 65536 on the input data (maximum <code class="docutils literal notranslate"><span class="pre">block_len</span></code> for <code class="docutils literal notranslate"><span class="pre">RSi16</span></code>)
+- More resilience against random errors as the inner codec can also be used for error correction (for <code class="docutils literal notranslate"><span class="pre">inner_ecc_len</span> <span class="pre">&gt;=</span> <span class="pre">2</span></code>)
+- Faster encoding with the same amount of effective interleaving and little additional parity data</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">CIRC16</span><span class="p">(</span>
     <span class="n">inner_block_len</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
     <span class="n">inner_ecc_len</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">outer_block_len</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span>
-    <span class="n">outer_ecc_len</span><span class="o">=</span><span class="mi">2</span>
+    <span class="n">outer_ecc_len</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">interleave</span><span class="o">=</span><span class="mi">5</span>
 <span class="p">)</span>
 </pre></div>
 </div>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
-🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
-🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
-🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
-🟧🟧🟧🟫 🟧🟧🟧🟫 🟧🟧🟧🟫 🟧🟧🟧🟫
-🟧🟧🟧🟫 🟧🟧🟧🟫 🟧🟧🟧🟫 🟧🟧🟧🟫
-╰──────────────────┬─────────────────╯
-    inner_block_len * interleave
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
+🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
+🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
+🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
+🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫
+🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫
+╰─────────────────────┬─────────────────────╯
+      inner_block_len * interleave
 </pre></div>
 </div>
 </section>
@@ -293,8 +458,37 @@
         
       </footer>
     </div>
-    <aside class="toc-drawer no-toc">
+    <aside class="toc-drawer">
       
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Normal encoding &amp; interleaving</a><ul>
+<li><a class="reference internal" href="#interleaved-encoding">Interleaved encoding</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#cross-interleaving">Cross-interleaving</a><ul>
+<li><a class="reference internal" href="#other-data-loss-scenarios">Other data loss scenarios</a><ul>
+<li><a class="reference internal" href="#few-random-errors">Few random errors:</a></li>
+<li><a class="reference internal" href="#periodic">Periodic:</a></li>
+<li><a class="reference internal" href="#aligned">Aligned:</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#interleaved-circ">Interleaved CIRC</a></li>
+</ul>
+
+          </div>
+        </div>
+      </div>
       
       
     </aside>

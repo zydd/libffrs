@@ -174,6 +174,8 @@
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="libffrs.html">libffrs</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of libffrs</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="libffrs.create_buffer.html">libffrs.create_buffer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="libffrs.set_logger.html">libffrs.set_logger</a></li>
 <li class="toctree-l2"><a class="reference internal" href="libffrs.CIRC16.html">libffrs.CIRC16</a></li>
 <li class="toctree-l2"><a class="reference internal" href="libffrs.GF256.html">libffrs.GF256</a></li>
 <li class="toctree-l2"><a class="reference internal" href="libffrs.GFi16.html">libffrs.GFi16</a></li>
@@ -220,52 +222,215 @@
         <article role="main">
           <section id="ffrs-circ16">
 <h1>ffrs.CIRC16<a class="headerlink" href="#ffrs-circ16" title="Link to this heading">¶</a></h1>
+<section id="normal-encoding-interleaving">
+<h2>Normal encoding &amp; interleaving<a class="headerlink" href="#normal-encoding-interleaving" title="Link to this heading">¶</a></h2>
+<p>With normal RS encoding it’s possible to repair up to <code class="docutils literal notranslate"><span class="pre">ecc_len</span></code> errors in known locations.
+or <code class="docutils literal notranslate"><span class="pre">ecc_len/2</span></code> errors in unknown locations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Example<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">RSi16</span><span class="p">(</span><span class="n">block_len</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">ecc_len</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>         block_len
+     ╭───────┴───────╮
+     🟦🟦🟦🟦🟦🟦🟩🟩
+     ╰─────┬────╯╰─┬─╯
+    message_len ecc_len
+
+🟦 = message
+🟩 = parity data
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">RSi16</span></code> interprets the data as 16-bit integers, therefore <code class="docutils literal notranslate"><span class="pre">block_len=8</span></code> corresponds to 16 byte blocks.</p>
+<p>The encoding above is able to recover 1 random error per 16-byte block (12 message bytes + 4 parity bytes).</p>
+<hr class="docutils" />
+<dl class="field-list simple">
+<dt class="field-odd">Example<span class="colon">:</span></dt>
+<dd class="field-odd"><p>6 random errors over 96 16-bit symbols (192 bytes) encoded with <code class="docutils literal notranslate"><span class="pre">RSi16(block_len=8,</span> <span class="pre">ecc_len=2)</span></code>:</p>
+</dd>
+</dl>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟥🟦🟦🟦🟧🟧 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟥🟧🟧 🟦🟦🟦🟦🟦🟦🟩🟩
+🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟥🟧 🟦🟦🟦🟦🟦🟦🟩🟩
+🟦🟦🟦🟦🟦🟦🟧🟥 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟥🟦🟦🟦🟧🟧 🟦🟦🟦🟦🟥🟦🟧🟧
+🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩
+
+🟥 = corrupted
+🟧 = parity check fail
+</pre></div>
+</div>
+<p>✅ Recovery possible</p>
+<hr class="docutils" />
+<dl class="field-list simple">
+<dt class="field-odd">This encoding is weak against sequential errors which is a common data loss pattern<span class="colon">:</span></dt>
+<dd class="field-odd"><p>6 sequential errors over 96 × 16-bit symbols (192 bytes) encoded with <code class="docutils literal notranslate"><span class="pre">RSi16(block_len=8,</span> <span class="pre">ecc_len=2)</span></code>:</p>
+</dd>
+</dl>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟦🟦🟦🟩🟩 🟥🟥🟥🟥🟥🟥🟧🟧 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩
+🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩
+🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩
+🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩 🟦🟦🟦🟦🟦🟦🟩🟩
+</pre></div>
+</div>
+<p>❌ Cannot be recovered</p>
+<hr class="docutils" />
+<section id="interleaved-encoding">
+<h3>Interleaved encoding<a class="headerlink" href="#interleaved-encoding" title="Link to this heading">¶</a></h3>
+<p>If we <a class="reference external" href="https://en.wikipedia.org/wiki/Burst_error-correcting_code#Interleaved_codes">interleave</a> the codec,
+i.e.: encode over columns instead of sequentially, it becomes more robust against sequential errors.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">RSi16</span><span class="p">(</span><span class="n">block_len</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">ecc_len</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">interleave</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>              interleave
+╭─────────────────┴─────────────────╮
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 ⎫
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 ⎪
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 ⎪
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 ⎪
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 ⎬ block_len
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 ⎪
+🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 ⎪ ⎫ ecc_len
+🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 ⎭ ⎭
+</pre></div>
+</div>
+<p>With this setup, sequential errors appear in different blocks allowing recovery of up to <code class="docutils literal notranslate"><span class="pre">interleave</span></code> symbols with the same amount of parity data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Example<span class="colon">:</span></dt>
+<dd class="field-odd"><p>6 sequential errors over 96 × 16-bit symbols (192 bytes) encoded with <code class="docutils literal notranslate"><span class="pre">RSi16(block_len=8,</span> <span class="pre">ecc_len=2,</span> <span class="pre">interleave=16)</span></code>:</p>
+</dd>
+</dl>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟦 🟦🟦🟥🟥 🟥🟥🟥🟥 🟦🟦🟦🟦
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦
+🟩🟩🟩🟩 🟩🟩🟧🟧 🟧🟧🟧🟧 🟩🟩🟩🟩
+🟩🟩🟩🟩 🟩🟩🟧🟧 🟧🟧🟧🟧 🟩🟩🟩🟩
+</pre></div>
+</div>
+<p>✅ Recovery possible</p>
+</section>
+</section>
 <section id="cross-interleaving">
 <h2>Cross-interleaving<a class="headerlink" href="#cross-interleaving" title="Link to this heading">¶</a></h2>
+<p>If we add an extra parity check on each ‘row’ of the interleaved code we can double the interleaved codec’s ability to repair sequential errors. This <em>inner</em>/row parity can be used to locate errors in the <em>outer</em>/column blocks. This is the principle behind <a class="reference external" href="https://en.wikipedia.org/wiki/Cross-interleaved_Reed%E2%80%93Solomon_coding">Cross-interleaved Reed-Solomon coding</a> or CIRC.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">CIRC16</span><span class="p">(</span>
-    <span class="n">inner_block_len</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
+    <span class="n">inner_block_len</span><span class="o">=</span><span class="mi">17</span><span class="p">,</span>
     <span class="n">inner_ecc_len</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">outer_block_len</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
     <span class="n">outer_ecc_len</span><span class="o">=</span><span class="mi">2</span>
 <span class="p">)</span>
 </pre></div>
 </div>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>            inner_block_len          ╭─── inner_ecc_len
-╭──────────────────┴─────────────────╮
-🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦 🟨 ⎫
-🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦 🟨 ⎪
-🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦 🟨 ⎪
-🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦 🟨 ⎪
-🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦 🟨 ⎬ outer_block_len
-🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦 🟨 ⎪
-🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧 🟫 ⎪ ⎫ outer_ecc_len
-🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧 🟫 ⎭ ⎭
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>             inner_block_len          ╭─── inner_ecc_len
+╭───────────────────┴─────────────────╮
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨 ⎫
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨 ⎪
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨 ⎪
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨 ⎪
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨 ⎬ outer_block_len
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨 ⎪
+🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟫 ⎪ ⎫ outer_ecc_len
+🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟫 ⎭ ⎭
 
 🟦 = data
-🟨 = inner ECC parity bytes - 1 per row
-🟧 = outer ECC parity bytes - 2 per column
-🟫 = parity bytes for outer ECC - 1 per ECC row
+🟨 = inner ECC parity data - 1 per row
+🟩 = outer ECC parity data - 2 per column
+🟫 = parity data for outer ECC - 1 per ECC row
 </pre></div>
 </div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟥🟥🟥🟥 🟥🟥🟥🟥 🟥🟥🟥🟥 🟥🟥🟥🟥 🟧 ─╮ inner parity check indicates error
+🟥🟥🟥🟥 🟥🟥🟥🟥 🟥🟥🟥🟥 🟥🟥🟥🟥 🟧 ─╯ locations in the outer block
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟫 ─ outer blocks can repair
+🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟫   up to 2 errors (ecc_len)
+
+🟥 = corrupted
+🟧 = parity check fail
+</pre></div>
+</div>
+<p>✅ Recovery possible</p>
+<hr class="docutils" />
+<section id="other-data-loss-scenarios">
+<h3>Other data loss scenarios<a class="headerlink" href="#other-data-loss-scenarios" title="Link to this heading">¶</a></h3>
+<section id="few-random-errors">
+<h4>Few random errors:<a class="headerlink" href="#few-random-errors" title="Link to this heading">¶</a></h4>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟦🟦🟦🟦 🟦🟥🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟧 ── inner parity check indicates error
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨    locations in the outer block
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟥🟦🟦🟦 🟧 ───╯
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟩🟩🟩🟩 🟩🟧🟩🟩 🟩🟩🟩🟩 🟧🟩🟩🟩 🟫
+🟩🟩🟩🟩 🟩🟧🟩🟩 🟩🟩🟩🟩 🟧🟩🟩🟩 🟫
+
+🟥 = corrupted
+🟧 = parity check fail
+</pre></div>
+</div>
+<p>✅ Recovery possible</p>
 </section>
+<hr class="docutils" />
+<section id="periodic">
+<h4>Periodic:<a class="headerlink" href="#periodic" title="Link to this heading">¶</a></h4>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟥🟦🟦🟦 🟦🟦🟥🟦 🟦🟦🟦🟦 🟥🟦🟦🟦 🟧 ⎫
+🟦🟥🟦🟦 🟦🟦🟦🟥 🟦🟦🟦🟦 🟦🟥🟦🟦 🟧 ⎪
+🟦🟦🟥🟦 🟦🟦🟦🟦 🟥🟦🟦🟦 🟦🟦🟥🟦 🟧 ⎬ all inner check failed
+🟦🟦🟦🟥 🟦🟦🟦🟦 🟦🟥🟦🟦 🟦🟦🟦🟥 🟧 ⎪   cannot locate errors
+🟦🟦🟦🟦 🟥🟦🟦🟦 🟦🟦🟥🟦 🟦🟦🟦🟦 🟧 ⎪
+🟦🟦🟦🟦 🟦🟥🟦🟦 🟦🟦🟦🟥 🟦🟦🟦🟦 🟧 ⎭
+🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟫 ⎫ 2 outer parity symbols can still locate
+🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟧🟧🟧🟧 🟫 ⎭ and repair up to 1 error (ecc_len/2)
+</pre></div>
+</div>
+<p>✅ Recovery possible</p>
+</section>
+<hr class="docutils" />
+<section id="aligned">
+<h4>Aligned:<a class="headerlink" href="#aligned" title="Link to this heading">¶</a></h4>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟥🟥🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟧 ⎫
+🟥🟥🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟧 ⎬ error locations are known but exceed
+🟥🟥🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟧 ⎭ outer code correction ability (outer_ecc_len)
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
+🟧🟧🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟫
+🟧🟧🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟩🟩🟩🟩 🟫
+</pre></div>
+</div>
+<p>❌ Cannot be recovered</p>
+</section>
+</section>
+</section>
+<hr class="docutils" />
 <section id="interleaved-circ">
 <h2>Interleaved CIRC<a class="headerlink" href="#interleaved-circ" title="Link to this heading">¶</a></h2>
+<p>We can go one step further and interleave the CIRC blocks. This can bring several advantages:
+- Allows achieving an effective interleaving greater than 65536 on the input data (maximum <code class="docutils literal notranslate"><span class="pre">block_len</span></code> for <code class="docutils literal notranslate"><span class="pre">RSi16</span></code>)
+- More resilience against random errors as the inner codec can also be used for error correction (for <code class="docutils literal notranslate"><span class="pre">inner_ecc_len</span> <span class="pre">&gt;=</span> <span class="pre">2</span></code>)
+- Faster encoding with the same amount of effective interleaving and little additional parity data</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">CIRC16</span><span class="p">(</span>
     <span class="n">inner_block_len</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
     <span class="n">inner_ecc_len</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">outer_block_len</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span>
-    <span class="n">outer_ecc_len</span><span class="o">=</span><span class="mi">2</span>
+    <span class="n">outer_ecc_len</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">interleave</span><span class="o">=</span><span class="mi">5</span>
 <span class="p">)</span>
 </pre></div>
 </div>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
-🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
-🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
-🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
-🟧🟧🟧🟫 🟧🟧🟧🟫 🟧🟧🟧🟫 🟧🟧🟧🟫
-🟧🟧🟧🟫 🟧🟧🟧🟫 🟧🟧🟧🟫 🟧🟧🟧🟫
-╰──────────────────┬─────────────────╯
-    inner_block_len * interleave
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
+🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
+🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
+🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨 🟦🟦🟦🟨
+🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫
+🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫
+╰─────────────────────┬─────────────────────╯
+      inner_block_len * interleave
 </pre></div>
 </div>
 <dl class="py class">
@@ -281,11 +446,17 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#ffrs.CIRC16.check" title="ffrs.CIRC16.check"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.check</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.CIRC16.encode" title="ffrs.CIRC16.encode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.encode</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.CIRC16.deserialize" title="ffrs.CIRC16.deserialize"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.deserialize</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.CIRC16.encode" title="ffrs.CIRC16.encode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.encode</span></code></a></p></td>
 <td><p>Encode data</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.CIRC16.repair" title="ffrs.CIRC16.repair"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.repair</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#ffrs.CIRC16.repair" title="ffrs.CIRC16.repair"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.repair</span></code></a></p></td>
 <td><p>Repair data</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#ffrs.CIRC16.serialize" title="ffrs.CIRC16.serialize"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.serialize</span></code></a></p></td>
+<td><p></p></td>
 </tr>
 </tbody>
 </table>
@@ -324,19 +495,19 @@
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.inner_message_size</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.message_len</span></code></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.interleave</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.message_size</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.message_len</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.outer_block_len</span></code></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.message_size</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.outer_ecc_len</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.outer_block_len</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.outer_interleave</span></code></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.outer_ecc_len</span></code></p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">CIRC16.outer_message_len</span></code></p></td>
@@ -353,13 +524,18 @@
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="ffrs.CIRC16.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="libffrs.CIRC16.html#libffrs.CIRC16" title="libffrs.CIRC16"><span class="pre">libffrs.CIRC16</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">inner_block_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inner_ecc_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outer_block_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outer_ecc_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outer_interleave</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primitive</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">simd_x4</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">simd_x8</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">simd_x16</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#ffrs.CIRC16.__init__" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="libffrs.CIRC16.html#libffrs.CIRC16" title="libffrs.CIRC16"><span class="pre">libffrs.CIRC16</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">inner_block_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inner_ecc_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outer_block_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">outer_ecc_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interleave</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primitive</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">simd_x4</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">simd_x8</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">simd_x16</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#ffrs.CIRC16.__init__" title="Link to this definition">¶</a></dt>
 <dd><p>Cross-interleaved Reed-Solomon coder</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="ffrs.CIRC16.check">
 <span class="sig-name descname"><span class="pre">check</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ecc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">synd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ffrs.CIRC16.check" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ffrs.CIRC16.deserialize">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">deserialize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">buf</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ffrs.CIRC16.deserialize" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py method">
@@ -373,6 +549,11 @@
 <span class="sig-name descname"><span class="pre">repair</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="libffrs.CIRC16.html#libffrs.CIRC16" title="libffrs.CIRC16"><span class="pre">libffrs.CIRC16</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">collections.abc.Buffer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ecc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">collections.abc.Buffer</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#ffrs.CIRC16.repair" title="Link to this definition">¶</a></dt>
 <dd><p>Repair data</p>
 </dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ffrs.CIRC16.serialize">
+<span class="sig-name descname"><span class="pre">serialize</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ffrs.CIRC16.serialize" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
 
 </dd></dl>
 
@@ -435,13 +616,27 @@
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">ffrs.CIRC16</a><ul>
-<li><a class="reference internal" href="#cross-interleaving">Cross-interleaving</a></li>
+<li><a class="reference internal" href="#normal-encoding-interleaving">Normal encoding &amp; interleaving</a><ul>
+<li><a class="reference internal" href="#interleaved-encoding">Interleaved encoding</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#cross-interleaving">Cross-interleaving</a><ul>
+<li><a class="reference internal" href="#other-data-loss-scenarios">Other data loss scenarios</a><ul>
+<li><a class="reference internal" href="#few-random-errors">Few random errors:</a></li>
+<li><a class="reference internal" href="#periodic">Periodic:</a></li>
+<li><a class="reference internal" href="#aligned">Aligned:</a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li><a class="reference internal" href="#interleaved-circ">Interleaved CIRC</a><ul>
 <li><a class="reference internal" href="#ffrs.CIRC16"><code class="docutils literal notranslate"><span class="pre">CIRC16</span></code></a><ul>
 <li><a class="reference internal" href="#ffrs.CIRC16.__init__"><code class="docutils literal notranslate"><span class="pre">CIRC16.__init__()</span></code></a></li>
 <li><a class="reference internal" href="#ffrs.CIRC16.check"><code class="docutils literal notranslate"><span class="pre">CIRC16.check()</span></code></a></li>
+<li><a class="reference internal" href="#ffrs.CIRC16.deserialize"><code class="docutils literal notranslate"><span class="pre">CIRC16.deserialize()</span></code></a></li>
 <li><a class="reference internal" href="#ffrs.CIRC16.encode"><code class="docutils literal notranslate"><span class="pre">CIRC16.encode()</span></code></a></li>
 <li><a class="reference internal" href="#ffrs.CIRC16.repair"><code class="docutils literal notranslate"><span class="pre">CIRC16.repair()</span></code></a></li>
+<li><a class="reference internal" href="#ffrs.CIRC16.serialize"><code class="docutils literal notranslate"><span class="pre">CIRC16.serialize()</span></code></a></li>
 </ul>
 </li>
 </ul>

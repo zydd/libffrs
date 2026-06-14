@@ -3,10 +3,10 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="libffrs.RSi16" href="libffrs.RSi16.html" /><link rel="prev" title="libffrs.GFi16" href="libffrs.GFi16.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="libffrs.CIRC16" href="libffrs.CIRC16.html" /><link rel="prev" title="libffrs.create_buffer" href="libffrs.create_buffer.html" />
 
     <!-- Generated with Sphinx 7.4.7 and Furo 2023.09.10 -->
-        <title>libffrs.RS256 - libffrs documentation</title>
+        <title>libffrs.set_logger - libffrs documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=135e06be" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=36a5483c" />
@@ -175,11 +175,11 @@
 </li>
 <li class="toctree-l1 current has-children"><a class="reference internal" href="libffrs.html">libffrs</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of libffrs</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="libffrs.create_buffer.html">libffrs.create_buffer</a></li>
-<li class="toctree-l2"><a class="reference internal" href="libffrs.set_logger.html">libffrs.set_logger</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">libffrs.set_logger</a></li>
 <li class="toctree-l2"><a class="reference internal" href="libffrs.CIRC16.html">libffrs.CIRC16</a></li>
 <li class="toctree-l2"><a class="reference internal" href="libffrs.GF256.html">libffrs.GF256</a></li>
 <li class="toctree-l2"><a class="reference internal" href="libffrs.GFi16.html">libffrs.GFi16</a></li>
-<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">libffrs.RS256</a></li>
+<li class="toctree-l2"><a class="reference internal" href="libffrs.RS256.html">libffrs.RS256</a></li>
 <li class="toctree-l2"><a class="reference internal" href="libffrs.RSi16.html">libffrs.RSi16</a></li>
 </ul>
 </li>
@@ -220,81 +220,12 @@
           </label>
         </div>
         <article role="main">
-          <section id="libffrs-rs256">
-<h1>libffrs.RS256<a class="headerlink" href="#libffrs-rs256" title="Link to this heading">¶</a></h1>
-<dl class="py class">
-<dt class="sig sig-object py" id="libffrs.RS256">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">libffrs.</span></span><span class="sig-name descname"><span class="pre">RS256</span></span><a class="headerlink" href="#libffrs.RS256" title="Link to this definition">¶</a></dt>
-<dd><p>Reed-Solomon coding over <span class="math notranslate nohighlight">\(GF(2^8)\)</span></p>
-<p class="rubric">Methods</p>
-<div class="table-wrapper autosummary longtable docutils container">
-<table class="autosummary longtable docutils align-default">
-<tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#libffrs.RS256.__init__" title="libffrs.RS256.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.__init__</span></code></a></p></td>
-<td><p>Instantiate a Reed-Solomon encoder with the given configuration</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#libffrs.RS256.encode" title="libffrs.RS256.encode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.encode</span></code></a></p></td>
-<td><p>Encode message, return ecc</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#libffrs.RS256.repair" title="libffrs.RS256.repair"><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.repair</span></code></a></p></td>
-<td><p>Repair message + ecc</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<p class="rubric">Attributes</p>
-<div class="table-wrapper autosummary longtable docutils container">
-<table class="autosummary longtable docutils align-default">
-<tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.block_len</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.block_size</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.ecc_len</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.ecc_size</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.generator</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.generator_roots</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.gf</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.message_len</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">RS256.message_size</span></code></p></td>
-<td><p></p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<dl class="py method">
-<dt class="sig sig-object py" id="libffrs.RS256.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#libffrs.RS256" title="libffrs.RS256"><span class="pre">libffrs.RS256</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">block_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ecc_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primitive</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">polynomial</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SupportsInt</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SupportsIndex</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">285</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#libffrs.RS256.__init__" title="Link to this definition">¶</a></dt>
-<dd><p>Instantiate a Reed-Solomon encoder with the given configuration</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="libffrs.RS256.encode">
-<span class="sig-name descname"><span class="pre">encode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#libffrs.RS256" title="libffrs.RS256"><span class="pre">libffrs.RS256</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">collections.abc.Buffer</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bytearray</span></span></span><a class="headerlink" href="#libffrs.RS256.encode" title="Link to this definition">¶</a></dt>
-<dd><p>Encode message, return ecc</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="libffrs.RS256.repair">
-<span class="sig-name descname"><span class="pre">repair</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#libffrs.RS256" title="libffrs.RS256"><span class="pre">libffrs.RS256</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">collections.abc.Buffer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ecc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">collections.abc.Buffer</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#libffrs.RS256.repair" title="Link to this definition">¶</a></dt>
-<dd><p>Repair message + ecc</p>
-</dd></dl>
-
-</dd></dl>
+          <section id="libffrs-set-logger">
+<h1>libffrs.set_logger<a class="headerlink" href="#libffrs-set-logger" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="libffrs.set_logger">
+<span class="sig-prename descclassname"><span class="pre">libffrs.</span></span><span class="sig-name descname"><span class="pre">set_logger</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">arg0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">object</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#libffrs.set_logger" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
 
 </section>
 
@@ -303,23 +234,23 @@
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="libffrs.RSi16.html">
+          <a class="next-page" href="libffrs.CIRC16.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">libffrs.RSi16</div>
+                <div class="title">libffrs.CIRC16</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="libffrs.GFi16.html">
+          <a class="prev-page" href="libffrs.create_buffer.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">libffrs.GFi16</div>
+                <div class="title">libffrs.create_buffer</div>
                 
               </div>
             </a>
@@ -353,13 +284,8 @@
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">libffrs.RS256</a><ul>
-<li><a class="reference internal" href="#libffrs.RS256"><code class="docutils literal notranslate"><span class="pre">RS256</span></code></a><ul>
-<li><a class="reference internal" href="#libffrs.RS256.__init__"><code class="docutils literal notranslate"><span class="pre">RS256.__init__()</span></code></a></li>
-<li><a class="reference internal" href="#libffrs.RS256.encode"><code class="docutils literal notranslate"><span class="pre">RS256.encode()</span></code></a></li>
-<li><a class="reference internal" href="#libffrs.RS256.repair"><code class="docutils literal notranslate"><span class="pre">RS256.repair()</span></code></a></li>
-</ul>
-</li>
+<li><a class="reference internal" href="#">libffrs.set_logger</a><ul>
+<li><a class="reference internal" href="#libffrs.set_logger"><code class="docutils literal notranslate"><span class="pre">set_logger()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -375,6 +301,5 @@
     <script src="../_static/doctools.js?v=9a2dae69"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=32e29ea5"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     </body>
 </html>

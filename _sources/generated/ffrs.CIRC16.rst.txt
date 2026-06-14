@@ -1,4 +1,4 @@
-ffrs.CIRC16
+﻿ffrs.CIRC16
 ===========
 
 
@@ -19,8 +19,10 @@ ffrs.CIRC16
         
         CIRC16.__init__
         CIRC16.check
+        CIRC16.deserialize
         CIRC16.encode
         CIRC16.repair
+        CIRC16.serialize
     
 
 
@@ -40,11 +42,11 @@ ffrs.CIRC16
         CIRC16.inner_ecc_size
         CIRC16.inner_message_len
         CIRC16.inner_message_size
+        CIRC16.interleave
         CIRC16.message_len
         CIRC16.message_size
         CIRC16.outer_block_len
         CIRC16.outer_ecc_len
-        CIRC16.outer_interleave
         CIRC16.outer_message_len
         CIRC16.rsi
         CIRC16.rso
@@ -58,9 +60,15 @@ ffrs.CIRC16
     .. automethod:: CIRC16.check
 
         
+    .. automethod:: CIRC16.deserialize
+
+        
     .. automethod:: CIRC16.encode
 
         
     .. automethod:: CIRC16.repair
+
+        
+    .. automethod:: CIRC16.serialize
 
         

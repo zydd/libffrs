@@ -12,7 +12,7 @@
              ╭───────┴───────╮
              🟦🟦🟦🟦🟦🟦🟨🟨
              ╰─────┬────╯╰─┬─╯
-            message_len  ecc_len
+            message_len ecc_len
 
 :Parameters:
     - block_len
