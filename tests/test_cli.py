@@ -28,20 +28,24 @@ from ffrs.reference.util import randbytes
 ffrs.par.cli.log.setLevel(logging.DEBUG)
 
 
+def run(*args):
+    return ffrs.par.cli.cli_main("ffrs.par", "", ffrs.par.__main__.cli_config, ffrs.par.__main__.main, args)
+
+
 class TestCli:
     def test_main_help(self, capsys, caplog):
         with pytest.raises(SystemExit) as exc:
-            ffrs.par.__main__.main("-h")
+            run("-h")
         assert exc.value.code == 0
         captured = capsys.readouterr()
-        assert captured.out.startswith("usage: ffrs.par")
+        assert captured.out.startswith("usage: ffrs.par"), captured
         assert captured.err == ""
         assert all(record.levelno < logging.WARNING for record in caplog.records)
 
     @pytest.mark.parametrize("module", ffrs.par.__main__.CLI_MODULES.keys())
     def test_module_help(self, module, capsys, caplog):
         with pytest.raises(SystemExit) as exc:
-            ffrs.par.__main__.main(module, "-h")
+            run(module, "-h")
         assert exc.value.code == 0
         captured = capsys.readouterr()
         assert captured.out.startswith(f"usage: ffrs.par {module}")
@@ -50,9 +54,7 @@ class TestCli:
 
     @pytest.mark.parametrize("input_size", ["128k", "1000000", "1m", "1m256k", "3000k", "3m"])
     def test_benchmark(self, input_size, caplog):
-        result = ffrs.par.__main__.main(
-            "benchmark", "encode", "--input-size", input_size, "--cooldown=0", "--duration=0"
-        )
+        result = run("benchmark", "encode", "--input-size", input_size, "--cooldown=0", "--duration=0")
         assert result == 0
         assert list(filter(lambda record: record.levelno >= logging.WARNING, caplog.records)) == []
 
@@ -63,7 +65,7 @@ class TestCliBackupRepair:
         input_size_value = ffrs.par.cli.parse_size(input_size)
         input_file = tmp_path / "input.bin"
         input_file.write_bytes(randbytes(input_size_value))
-        assert ffrs.par.__main__.main("backup", str(input_file)) == 0
+        assert run("backup", str(input_file)) == 0
 
         output_file = input_file.with_suffix(input_file.suffix + ".ffrs")
         assert output_file.exists()
@@ -82,7 +84,7 @@ class TestCliBackupRepair:
         input_file_mtime = input_file.stat().st_mtime_ns
         input_file_hash = hashlib.blake2b(input_file.read_bytes()).digest()
 
-        assert ffrs.par.__main__.main("repair", str(output_file)) == 0
+        assert run("repair", str(output_file)) == 0
 
         assert input_file.stat().st_mtime_ns == input_file_mtime
         assert hashlib.blake2b(input_file.read_bytes()).digest() == input_file_hash
@@ -100,7 +102,7 @@ class TestCliBackupRepair:
         os.utime(input_file, ns=(input_file.stat().st_atime_ns, input_file_mtime))
         assert hashlib.blake2b(input_file.read_bytes()).digest() != input_file_hash
 
-        assert ffrs.par.__main__.main("repair", str(output_file)) == 0
+        assert run("repair", str(output_file)) == 0
 
         assert input_file.stat().st_mtime_ns == input_file_mtime
         assert hashlib.blake2b(input_file.read_bytes()).digest() == input_file_hash

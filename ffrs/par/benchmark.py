@@ -112,13 +112,14 @@ def main(args):
     return 0
 
 
-def arg_parser(parser):
-    # Add module group first
-    benchmark = parser.add_argument_group("benchmark")
+def cli_config(cli_parser):
+    from .common_args import add_common_args
 
-    cli_parser = cli.CLI(parser, main)
-    cli_parser.parser.add_argument("function", metavar="func")
+    add_common_args(cli_parser)
 
+    benchmark = cli_parser.parser.add_argument_group("benchmark")
+
+    benchmark.add_argument("function", metavar="func")
     benchmark.add_argument(
         "-s",
         "--input-size",
@@ -164,7 +165,6 @@ def arg_parser(parser):
         default=cli.DEFAULT(1),
         help="Interval to print current throughput to stdout",
     )
-    return cli_parser
 
 
 if __name__ == "__main__":

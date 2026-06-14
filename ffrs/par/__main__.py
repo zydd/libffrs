@@ -16,8 +16,6 @@
 
 """File parity tools"""
 
-import sys
-
 import ffrs
 import ffrs.par
 
@@ -37,29 +35,24 @@ CLI_MODULES = {
 }
 
 
-def main(*argv):
-    parser = cli.new_parser(__package__, __doc__)
+def main(args):
+    return args.cli_main.get()(args)
 
-    subparsers = parser.add_subparsers(dest="command", required=True)
+
+def cli_config(cli_parser):
+    subparsers = cli_parser.parser.add_subparsers(dest="command", required=True)
     for name, module in CLI_MODULES.items():
         subparser = subparsers.add_parser(
             name,
             help=module.__doc__.lstrip().split("\n", 1)[0],
             description=module.__doc__,
-            formatter_class=parser.formatter_class,
+            formatter_class=cli_parser.parser.formatter_class,
         )
-        module.arg_parser(subparser)
+        module.cli_config(cli.CLI(subparser))
+        subparser.set_defaults(cli_main=module.main)
 
-    args = parser.parse_args(argv)
-    return args.cli_main(args)
+    return cli_parser
 
 
 if __name__ == "__main__":
-    try:
-        ffrs.set_logger(ffrs.par.log.getChild("rs"))
-        quit(main(*sys.argv[1:]))
-    except ffrs.par.FfrsParException as e:
-        log.critical("%s", e)
-    except Exception:
-        log.exception("unexpected error")
-        quit(1)
+    cli.main(prog=__package__)

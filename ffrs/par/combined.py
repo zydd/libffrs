@@ -23,9 +23,6 @@ import json
 import multiprocessing.managers
 import re
 
-import ffrs
-import ffrs.util
-
 from . import cli, format, fs, opt
 from .cli import log
 
@@ -153,13 +150,16 @@ def main(args):
     return 0
 
 
-def arg_parser(parser):
-    cli_parser = cli.CLI(parser, main)
+def cli_config(cli_parser):
+    from .common_args import add_common_args
+
+    add_common_args(cli_parser)
+
     combined = cli_parser.parser.add_argument_group("combined parity")
+
     combined.add_argument("input_path", metavar="path")
     combined.add_argument("--exclude-rules", metavar="file", default=cli.DEFAULT(".gitignore"))
     combined.add_argument("-o", "--output", metavar="file", help="output file for combined parity data")
-    return cli_parser
 
 
 if __name__ == "__main__":

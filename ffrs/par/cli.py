@@ -121,199 +121,9 @@ class HelpFormatter(argparse.HelpFormatter):
 class CLI:
     DEFAULT = globals()["DEFAULT"]
 
-    def __init__(self, parser, main_function):
+    def __init__(self, parser: argparse.ArgumentParser):
         self.checks = []
         self.parser = parser
-        self.main_function = main_function
-
-        self.parser.set_defaults(cli_main=self.main)
-
-        self.parser.add_argument(
-            "-v",
-            "--verbosity",
-            metavar="level",
-            action="append",
-            nargs="?",
-            default=DEFAULT("info", lambda a: [a]),
-            help="Increase/set verbosity level",
-        )
-
-        codec_args = self.parser.add_argument_group("codec")
-        codec_args.add_argument(
-            "--codec",
-            action="store",
-            default="circ16",
-            choices=["rsi16", "circ16"],
-            help="Method use to compute parity",
-        )
-
-        self.check(lambda args: args.codec != "rsi16" or self.check_either(args, "--block", "--message"))
-        self.check(self.check_either, "--block", "--message")
-        # self.check(self.check_mutually_exclusive, "--block", "--message")
-        codec_args.add_argument(
-            "-b",
-            "--block",
-            metavar="size",
-            action="store",
-            type=parse_size_list,
-            help="Block size to use when encoding. block = message + ecc",
-        )
-        codec_args.add_argument(
-            "-m",
-            "--message",
-            metavar="size",
-            action="store",
-            type=parse_size_list,
-            help="Payload size in a parity block",
-        )
-
-        self.check(self.check_mutually_exclusive, "--ecc", "--ecc-ratio")
-        codec_args.add_argument(
-            "-e",
-            "--ecc",
-            metavar="size",
-            action="store",
-            type=parse_size_list,
-            help="ECC size in a parity block",
-        )
-        codec_args.add_argument(
-            "-r",
-            "--ecc-ratio",
-            metavar="ratio",
-            action="store",
-            default=DEFAULT("1/15,1/16", parse_ratio_list),
-            type=parse_ratio_list,
-            help="ECC size as a fraction of the message size",
-        )
-
-        codec_args.add_argument(
-            "--interleave",
-            metavar="size",
-            action="store",
-            # default=DEFAULT("1", parse_size_list),
-            type=parse_size_list,
-            help="Interleave multiple blocks",
-        )
-
-        codec_args.add_argument(
-            "--primitive",
-            metavar="int",
-            action="store",
-            default=DEFAULT(3),
-            type=int,
-            help="Primitive n-th root of unity used to generate GF(65537)",
-        )
-
-        self.arg_circ()
-        self.arg_simd()
-
-    def arg_simd(self):
-        simd = self.parser.add_argument_group("simd")
-        simd_choices = ["x4", "x8", "x16", "sse", "avx2", "avx512"]
-        self.check(self.check_mutually_exclusive, "--simd", "--no-simd")
-        simd.add_argument(
-            "--simd",
-            metavar="simd",
-            nargs="?",
-            const="auto",
-            default=DEFAULT("auto"),
-            type=parse_choice_list(["auto"] + simd_choices),
-            help="Enable SIMD optimizations",
-        )
-        simd.add_argument(
-            "--no-simd",
-            metavar="simd",
-            nargs="?",
-            const="*",
-            type=parse_choice_list(["*"] + simd_choices),
-            help="Disable SIMD optimizations",
-        )
-
-    def arg_circ(self):
-        circ = self.parser.add_argument_group("circ16")
-
-        def add_circ_arg(*args, **kwargs):
-            if "dest" in kwargs:
-                dest = kwargs["dest"]
-            else:
-                assert args[-1].startswith("--")
-                dest = args[-1][2:].replace("-", "_")
-
-            self.check(
-                self.warn,
-                lambda args: args.codec.get() == "circ16" or getattr(args, dest).is_default(),
-                "circ16 options have no effect when codec != circ16",
-            )
-            circ.add_argument(*args, **kwargs)
-
-        add_circ_arg(
-            "--inner-block",
-            metavar="size",
-            action="store",
-            type=parse_size_list,
-            help="Block size used by the inner codec",
-        )
-        add_circ_arg(
-            "--inner-message",
-            metavar="size",
-            action="store",
-            default=DEFAULT("508,512,1020,1024,2040,2048,4088,4096", parse_size_list),
-            type=parse_size_list,
-            help="Payload size used by the inner codec",
-        )
-        add_circ_arg(
-            "--inner-ecc",
-            metavar="size",
-            action="store",
-            default=DEFAULT("4,8", parse_size_list),
-            type=parse_size_list,
-            help="ECC size of the inner codec",
-        )
-        add_circ_arg(
-            "--inner-interleaved-ecc",
-            metavar="size",
-            action="store",
-            type=parse_size_list,
-            help="Total ECC size of the inner codec (inner_ecc * outer_block * interleave)",
-        )
-
-        add_circ_arg(
-            "--outer-block",
-            metavar="size",
-            action="store",
-            type=parse_size_list,
-            help="Block size used by the outer codec",
-        )
-        add_circ_arg(
-            "--outer-message",
-            metavar="size",
-            action="store",
-            type=parse_size_list,
-            help="Payload size used by the outer codec",
-        )
-        add_circ_arg(
-            "--outer-ecc",
-            metavar="size",
-            action="store",
-            default=DEFAULT("16,32,64,128,256", parse_size_list),
-            type=parse_size_list,
-            help="ECC size of the outer codec",
-        )
-        add_circ_arg(
-            "--outer-interleaved-ecc",
-            metavar="size",
-            action="store",
-            type=parse_size_list,
-            help="Total ECC size of the outer codec (outer_ecc * inner_message * interleave)",
-        )
-        add_circ_arg(
-            "--outer-interleave",
-            metavar="count",
-            action="store",
-            # default=DEFAULT("1", parse_int_list),
-            type=parse_int_list,
-            help="Number of interleaved blocks of the outer codec",
-        )
 
     def check(self, func, *args):
         self.checks.append((func, args))
@@ -342,9 +152,8 @@ class CLI:
         for func, args in self.checks:
             func(namespace, *args)
 
-    def main(self, args=None):
-        if args is None:
-            args = self.parser.parse_args()
+    def parse_args(self, argv=None):
+        args = self.parser.parse_args(argv)
 
         for key, value in args.__dict__.items():
             if not isinstance(value, Value):
@@ -356,19 +165,7 @@ class CLI:
             # import traceback; traceback.print_exc()
             self.parser.error(str(e))
 
-        set_log_verbosity(args)
-        log.debug(args)
-
-        return self.main_function(args)
-
-
-def new_parser(prog, desc):
-    parser = argparse.ArgumentParser(
-        prog=prog,
-        description=desc,
-        formatter_class=HelpFormatter,
-    )
-    return parser
+        return args
 
 
 def parse_size(size_str: str) -> int:
@@ -503,31 +300,50 @@ def set_log_verbosity(args):
 
 
 class OuterScopeGetter(object):
-    def __getattribute__(self, name):
+    NIL = object()
+
+    def __init__(self):
         frame = inspect.currentframe()
-        if frame is None:
+        if frame is None or frame.f_back is None or frame.f_back.f_back is None:
             raise RuntimeError("cannot inspect stack frames")
-        sentinel = object()
-        frame = frame.f_back.f_back
-        if frame is not None:
-            value = frame.f_locals.get(name, sentinel)
-            if value is sentinel:
-                value = frame.f_globals.get(name, sentinel)
-            if value is not sentinel:
-                return value
-            # frame = frame.f_back
-        raise AttributeError(repr(name) + " not found in outer scope")
+        self.frame = frame.f_back.f_back
+
+    def __getattr__(self, name):
+        # frame = self.frame
+        # while frame is not None:
+
+        value = self.frame.f_locals.get(name, self.NIL)
+        if value is self.NIL:
+            value = self.frame.f_globals.get(name, self.NIL)
+        if value is not self.NIL:
+            return value
+
+        # frame = frame.f_back
+        # raise AttributeError(repr(name) + " not found in outer scope")
 
 
-def main():
+def cli_main(prog, description, cli_config, main_function, argv):
     try:
         ffrs.set_logger(ffrs.par.log.getChild("rs"))
-        outer = OuterScopeGetter()
-        parser = new_parser(outer.__loader__.name, outer.__doc__)
-        cli_parser = outer.arg_parser(parser)
-        quit(cli_parser.main())
+
+        parser = argparse.ArgumentParser(prog=prog, description=description, formatter_class=HelpFormatter)
+        cli = CLI(parser)
+        cli_config(cli)
+        args = cli.parse_args(argv)
+
+        set_log_verbosity(args)
+        log.debug(args)
+
+        return main_function(args)
+
     except ffrs.par.FfrsParException as e:
         log.critical("%s", e)
+        return 1
     except Exception:
         log.exception("unexpected error")
-        quit(1)
+        return 2
+
+
+def main(*, prog=None):
+    outer = OuterScopeGetter()
+    quit(cli_main(prog, outer.__doc__, outer.cli_config, outer.main, sys.argv[1:]))

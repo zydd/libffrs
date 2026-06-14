@@ -17,7 +17,6 @@
 """Repair files using parity data"""
 
 import base64
-import hashlib
 import json
 import os
 import io
@@ -103,11 +102,13 @@ def main(args):
     return 0
 
 
-def arg_parser(parser):
-    cli_parser = cli.CLI(parser, main)
-    repair = parser.add_argument_group("repair")
+def cli_config(cli_parser):
+    from .common_args import add_common_args
+
+    add_common_args(cli_parser)
+
+    repair = cli_parser.parser.add_argument_group("repair")
     repair.add_argument("input_file", metavar="parity_file", help="Parity file (.ffrs)")
-    return cli_parser
 
 
 if __name__ == "__main__":

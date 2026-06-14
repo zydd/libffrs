@@ -16,7 +16,6 @@
 
 """Full backup + optional extra parity"""
 
-import base64
 import hashlib
 import json
 import os
@@ -84,10 +83,13 @@ def main(args):
     return 0
 
 
-def arg_parser(parser):
-    cli_parser = cli.CLI(parser, main)
+def cli_config(cli_parser):
+    from .common_args import add_common_args
+
+    add_common_args(cli_parser)
+
     cli_parser.parser.set_defaults(ecc_ratio="1/1")
-    backup = parser.add_argument_group("backup")
+    backup = cli_parser.parser.add_argument_group("backup")
     backup.add_argument("input_file", metavar="file", nargs="+")
 
     existing = backup.add_mutually_exclusive_group()
@@ -105,7 +107,6 @@ def arg_parser(parser):
         default=cli.DEFAULT("timestamp"),
         help="Update parity files based on timestamp or hash",
     )
-    return cli_parser
 
 
 if __name__ == "__main__":
