@@ -56,7 +56,7 @@ log.addHandler(stderr_handler)
 
 
 _UNSET = object()
-_DEFAULT_MOD_LOG_LEVEL = ffrs.par.log.level
+_DEFAULT_LIB_LOG_LEVEL = ffrs.par.log.level
 _DEFAULT_CLI_LOG_LEVEL = log.level
 
 
@@ -118,12 +118,23 @@ class HelpFormatter(argparse.HelpFormatter):
         return help
 
 
+class UpdateAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        current = getattr(namespace, self.dest, None)
+        if isinstance(current, DEFAULT):
+            current = {}
+        current.update(values)
+        setattr(namespace, self.dest, current)
+
+
 class CLI:
     DEFAULT = globals()["DEFAULT"]
 
     def __init__(self, parser: argparse.ArgumentParser):
         self.checks = []
         self.parser = parser
+        self.cli_verbosity = _DEFAULT_CLI_LOG_LEVEL
+        self.lib_verbosity = _DEFAULT_LIB_LOG_LEVEL
 
     def check(self, func, *args):
         self.checks.append((func, args))
@@ -166,6 +177,60 @@ class CLI:
             self.parser.error(str(e))
 
         return args
+
+    LOG_LEVELS = {
+        "critical": logging.CRITICAL,
+        "warning": logging.WARNING,
+        "info": logging.INFO,
+        "debug": logging.DEBUG,
+    }
+
+    def parse_verbosity(self, arg):
+        log_level_diff = 0
+        par_sub_logs = {l.name[len(ffrs.par.log.name) + 1 :]: l for l in ffrs.par.log.getChildren()}
+
+        if arg == "":
+            # -v -v
+            log_level_diff -= 10
+        elif re.match(r"v+$", arg):
+            # -vv
+            log_level_diff -= 10 * (1 + len(arg))
+        elif arg in CLI.LOG_LEVELS:
+            # -vwarning
+            log_level_diff = CLI.LOG_LEVELS[arg] - _DEFAULT_CLI_LOG_LEVEL
+        else:
+            # -vsolver=10
+            arg_split = arg.split("=")
+            if len(arg_split) != 2:
+                log.warning("could not parse verbosity setting '%s'", arg)
+                return
+
+            log_name, sub_log_level = arg_split
+
+            if sub_log_level in CLI.LOG_LEVELS:
+                sub_log_level = CLI.LOG_LEVELS[sub_log_level]
+            else:
+                try:
+                    sub_log_level = int(sub_log_level)
+                except ValueError:
+                    log.warning("could not parse verbosity setting '%s'", arg)
+                    return
+
+            if log_name not in par_sub_logs:
+                log.warning("unknown log '%s'", arg)
+                return
+
+            par_sub_logs[log_name].setLevel(sub_log_level)
+
+        self.lib_verbosity = max(
+            logging.DEBUG, self.lib_verbosity + min(0, self.cli_verbosity - logging.DEBUG + log_level_diff)
+        )
+        self.cli_verbosity = max(logging.DEBUG, self.cli_verbosity + log_level_diff)
+
+        ffrs.par.log.setLevel(self.lib_verbosity)
+        log.setLevel(max(logging.DEBUG, self.cli_verbosity))
+        ffrs.set_logger(ffrs.par.log.getChild("rs"))
+        return arg
 
 
 def parse_size(size_str: str) -> int:
@@ -248,57 +313,6 @@ def parse_algo(algo):
     return eval("ffrs" + algo)
 
 
-def set_log_verbosity(args):
-    verbosity = args.verbosity.get()
-    levels = {
-        "critical": logging.CRITICAL,
-        "warning": logging.WARNING,
-        "info": logging.INFO,
-        "debug": logging.DEBUG,
-    }
-    log_level_diff = 0
-    par_sub_logs = {l.name[len(ffrs.par.log.name) + 1 :]: l for l in ffrs.par.log.getChildren()}
-    for arg in verbosity:
-        if arg is None:
-            # -v -v
-            log_level_diff -= 10
-        elif re.match(r"v+$", arg):
-            # -vv
-            log_level_diff -= 10 * (1 + len(arg))
-        elif arg in levels:
-            # -vwarning
-            log_level_diff = levels[arg] - _DEFAULT_CLI_LOG_LEVEL
-        else:
-            # -vsolver=10
-            arg_split = arg.split("=")
-            if len(arg_split) != 2:
-                log.warning("could not parse verbosity setting '%s'", arg)
-                continue
-
-            log_name, sub_log_level = arg_split
-
-            if sub_log_level in levels:
-                sub_log_level = levels[sub_log_level]
-            else:
-                try:
-                    sub_log_level = int(sub_log_level)
-                except ValueError:
-                    log.warning("could not parse verbosity setting '%s'", arg)
-                    continue
-
-            if log_name not in par_sub_logs:
-                log.warning("unknown log '%s'", arg)
-                continue
-
-            par_sub_logs[log_name].setLevel(sub_log_level)
-
-    ffrs.par.log.setLevel(
-        max(logging.DEBUG, _DEFAULT_MOD_LOG_LEVEL + min(0, _DEFAULT_CLI_LOG_LEVEL - logging.DEBUG + log_level_diff))
-    )
-    log.setLevel(max(logging.DEBUG, _DEFAULT_CLI_LOG_LEVEL + log_level_diff))
-    ffrs.set_logger(ffrs.par.log.getChild("rs"))
-
-
 class OuterScopeGetter(object):
     NIL = object()
 
@@ -322,16 +336,17 @@ class OuterScopeGetter(object):
         # raise AttributeError(repr(name) + " not found in outer scope")
 
 
-def cli_main(prog, description, cli_config, main_function, argv):
+def create_parser(prog, description, parser=None):
+    parser = parser or argparse.ArgumentParser(prog=prog, description=description, formatter_class=HelpFormatter)
+    return CLI(parser)
+
+
+def cli_main(parser, main_function, argv):
     try:
         ffrs.set_logger(ffrs.par.log.getChild("rs"))
 
-        parser = argparse.ArgumentParser(prog=prog, description=description, formatter_class=HelpFormatter)
-        cli = CLI(parser)
-        cli_config(cli)
-        args = cli.parse_args(argv)
+        args = parser.parse_args(argv)
 
-        set_log_verbosity(args)
         log.debug(args)
 
         return main_function(args)
@@ -344,6 +359,7 @@ def cli_main(prog, description, cli_config, main_function, argv):
         return 2
 
 
-def main(*, prog=None):
+def main():
     outer = OuterScopeGetter()
-    quit(cli_main(prog, outer.__doc__, outer.cli_config, outer.main, sys.argv[1:]))
+    parser = outer.create_parser()
+    quit(cli_main(parser, outer.main, sys.argv[1:]))

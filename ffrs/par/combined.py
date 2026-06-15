@@ -150,16 +150,18 @@ def main(args):
     return 0
 
 
-def cli_config(cli_parser):
+def create_parser(parent=None):
+    parser = cli.create_parser(__loader__.name, __doc__, parent)
     from .common_args import add_common_args
 
-    add_common_args(cli_parser)
+    add_common_args(parser)
 
-    combined = cli_parser.parser.add_argument_group("combined parity")
+    combined = parser.parser.add_argument_group("combined parity")
 
     combined.add_argument("input_path", metavar="path")
     combined.add_argument("--exclude-rules", metavar="file", default=cli.DEFAULT(".gitignore"))
     combined.add_argument("-o", "--output", metavar="file", help="output file for combined parity data")
+    return parser
 
 
 if __name__ == "__main__":

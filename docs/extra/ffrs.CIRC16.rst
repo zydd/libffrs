@@ -164,8 +164,8 @@ If we add an extra parity check on each 'row' of the interleaved code we can dou
 Other data loss scenarios
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Few random errors:
-""""""""""""""""""
+Random errors:
+""""""""""""""
 ::
 
     🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟦🟦🟦🟦 🟨
@@ -246,3 +246,9 @@ We can go one step further and interleave the CIRC blocks. This can bring severa
     🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫 🟩🟩🟩🟫
     ╰─────────────────────┬─────────────────────╯
           inner_block_len * interleave
+
+
+------------------------------------------------------------------------
+
+ffrs.CIRC16
+-----------

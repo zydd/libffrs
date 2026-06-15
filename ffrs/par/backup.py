@@ -83,14 +83,15 @@ def main(args):
     return 0
 
 
-def cli_config(cli_parser):
+def create_parser(parent=None):
+    parser = cli.create_parser(__loader__.name, __doc__, parent)
     from .common_args import add_common_args
 
-    add_common_args(cli_parser)
+    add_common_args(parser)
 
-    cli_parser.parser.set_defaults(ecc_ratio="1/1")
-    backup = cli_parser.parser.add_argument_group("backup")
-    backup.add_argument("input_file", metavar="file", nargs="+")
+    parser.parser.set_defaults(ecc_ratio="1/1")
+    backup = parser.parser.add_argument_group("backup")
+    backup.add_argument("input_file", metavar="file", nargs="+", help="Input file")
 
     existing = backup.add_mutually_exclusive_group()
     existing.add_argument("-f", "--force", action="store_true", help="Overwrite existing parity files")
@@ -107,6 +108,7 @@ def cli_config(cli_parser):
         default=cli.DEFAULT("timestamp"),
         help="Update parity files based on timestamp or hash",
     )
+    return parser
 
 
 if __name__ == "__main__":

@@ -14,6 +14,15 @@ def locator(GF, w, err_pos):
     return poly
 
 
+def poly_roots(GF, w, poly):
+    w = GF(w)
+    roots = []
+    for i in range(GF.field_elements):
+        if poly.eval(w**-i) == GF(0):
+            roots.append(i)
+    return roots
+
+
 def sugiyama(GF, synds):
     R2 = P(GF, [0, 1]) ** len(synds)
     R1 = P(GF, (synds))

@@ -74,8 +74,6 @@ public:
             .def("exp", static_cast<GFT const& (PyGFi16::*)(GFT const&) const>(&PyGFi16::exp), R"(Exponential function: :math:`a^{\text{value}}`)", "value"_a)
             .def("log", static_cast<GFT const& (PyGFi16::*)(GFT const&) const>(&PyGFi16::log), R"(Logarithm: :math:`\log_a (\text{value})`)", "value"_a)
             .def("pow", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::pow), R"(Power: :math:`\text{base}^\text{exponent}`)", "base"_a, "exponent"_a)
-            .doc() = R"(
-            Finite-field operations for prime fields <= 65537
-            )";
+            .doc() = R"(Finite-field operations over :math:`GF(65537)`)";
     }
 };

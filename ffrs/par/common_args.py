@@ -16,26 +16,33 @@
 #  limitations under the License.
 
 
+import argparse
+
 from . import cli
 
 
 def add_common_args(cli_inst: cli.CLI):
-    _generic_args(cli_inst)
-    _circ_args(cli_inst)
-    _simd_args(cli_inst)
+    add_generic_args(cli_inst)
+    add_codec_args(cli_inst)
+    add_circ_args(cli_inst)
+    add_simd_args(cli_inst)
 
 
-def _generic_args(cli_inst: cli.CLI):
+def add_generic_args(cli_inst: cli.CLI):
     cli_inst.parser.add_argument(
         "-v",
         "--verbosity",
         metavar="level",
         action="append",
         nargs="?",
+        const="",
         default=cli.DEFAULT("info", lambda a: [a]),
+        type=cli_inst.parse_verbosity,
         help="Increase/set verbosity level",
     )
 
+
+def add_codec_args(cli_inst: cli.CLI):
     codec_args = cli_inst.parser.add_argument_group("codec")
     codec_args.add_argument(
         "--codec",
@@ -103,30 +110,68 @@ def _generic_args(cli_inst: cli.CLI):
     )
 
 
-def _simd_args(cli_inst: cli.CLI):
+SIMD_MAP = {
+    "x4": "simd_x4",
+    "x8": "simd_x8",
+    "x16": "simd_x16",
+    "sse": "simd_x4",
+    "avx2": "simd_x8",
+    "avx512": "simd_x16",
+}
+
+
+def _parse_simd(enable, choices):
+    def parser(value):
+        if value == "*":
+            return {
+                "simd_x4": enable,
+                "simd_x8": enable,
+                "simd_x16": enable,
+            }
+        elif value == "auto":
+            return {
+                "simd_x4": None,
+                "simd_x8": None,
+                "simd_x16": None,
+            }
+        else:
+            res = dict()
+            for val in value.split(","):
+                res[SIMD_MAP[val]] = enable
+            return res
+
+    parser.choices = choices
+    return parser
+
+
+def add_simd_args(cli_inst: cli.CLI):
     simd = cli_inst.parser.add_argument_group("simd")
-    simd_choices = ["x4", "x8", "x16", "sse", "avx2", "avx512"]
-    cli_inst.check(cli_inst.check_mutually_exclusive, "--simd", "--no-simd")
+    # cli_inst.check(cli_inst.check_mutually_exclusive, "--simd", "--no-simd")
+    enable_choices = ["auto", "*"] + list(SIMD_MAP.keys())
+    disable_choices = ["*"] + list(SIMD_MAP.keys())
     simd.add_argument(
         "--simd",
         metavar="simd",
+        action=cli.UpdateAction,
         nargs="?",
         const="auto",
-        default=cli.DEFAULT("auto"),
-        type=cli.parse_choice_list(["auto"] + simd_choices),
+        default=cli.DEFAULT("auto", _parse_simd(True, enable_choices)),
+        type=_parse_simd(True, enable_choices),
         help="Enable SIMD optimizations",
     )
     simd.add_argument(
         "--no-simd",
         metavar="simd",
+        dest="simd",
+        action=cli.UpdateAction,
         nargs="?",
         const="*",
-        type=cli.parse_choice_list(["*"] + simd_choices),
+        type=_parse_simd(False, disable_choices),
         help="Disable SIMD optimizations",
     )
 
 
-def _circ_args(cli_inst: cli.CLI):
+def add_circ_args(cli_inst: cli.CLI):
     circ = cli_inst.parser.add_argument_group("circ16")
 
     def add_circ_arg(*args, **kwargs):

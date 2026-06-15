@@ -17,14 +17,28 @@
 
 import logging
 import random
-import sys
 
 import pytest
 
 import ffrs
 import ffrs.par
 
-from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted, randbytes
+import ffrs.reference as ref
+import ffrs.reference.rs as ref_rs
+from ffrs.reference.util import randbytes
+
+GF = ref.GF(65537, 1, 3)
+# ref_rs.poly_roots(GF, rs.rsi.root, ref_rs.P(GF, [1, 22353, 3762]))
+
+
+@pytest.fixture(scope="class")
+def setup_logger():
+    level = ffrs.par.log.level
+    ffrs.par.log.setLevel(logging.INFO)
+    ffrs.set_logger(ffrs.par.log)
+    yield
+    ffrs.set_logger(None)
+    ffrs.par.log.setLevel(level)
 
 
 class BaseTestCIRC:
@@ -56,6 +70,7 @@ class BaseTestCIRC:
     def test_properties(self, rs: ffrs.CIRC16):
         assert rs.ecc_len == rs.inner_block_len * rs.outer_block_len * rs.interleave - rs.message_len
         assert rs.block_len == rs.message_len + rs.ecc_len
+        assert rs.outer_interleave == rs.inner_message_len * rs.interleave
 
     def test_circ_encode(self, rs: ffrs.CIRC16):
         buf = randbytes(rs.message_size)
@@ -169,6 +184,7 @@ class BaseTestCIRC:
         assert buf == msg_orig
         assert ecc == ecc_orig
 
+    # @pytest.mark.usefixtures("setup_logger")
     def test_repair_fallback(self, rs: ffrs.CIRC16):
         buf = randbytes(rs.message_size)
         ecc = rs.encode(buf)
@@ -180,11 +196,23 @@ class BaseTestCIRC:
         # Corrupt all rsi ecc
         o = self._rso_ecc_size(rs)
         i = self._rsi_ecc_size(rs)
-        ecc[o : o + i] = bytearray(self._rsi_ecc_size(rs))
+        ecc[o : o + i] = random.randbytes(self._rsi_ecc_size(rs))
 
         err_count = self.add_errors_stride(
             buf, [], rs.inner_message_size + 2, rs.inner_message_len * rs.outer_ecc_len // 2
         )
+
+        # TODO
+        # outer_message_max_errors = min(rs.outer_ecc_len // 2, rs.outer_message_len)
+        # errors = []
+        # for i in range(rs.outer_interleave):
+        #     for j in random.choices(range(rs.outer_message_len), k=outer_message_max_errors):
+        #         # j = random.randrange(outer_message_max_errors)
+        #         # j = i % outer_message_max_errors
+        #         pos = (j * rs.outer_interleave + i) * 2
+        #         assert pos < len(buf)
+        #         buf[pos : pos + 2] = random.randbytes(2)
+        #         errors.append((i, j))
 
         rs.repair(buf, ecc)
 
@@ -207,7 +235,7 @@ class BaseTestCIRC:
 @pytest.mark.parametrize(
     "rs",
     [
-        ffrs.CIRC16(4, 2, 4, 2),
+        # ffrs.CIRC16(4, 2, 4, 2),
         ffrs.CIRC16(8, 2, 8, 2),
         # ffrs.CIRC(8, 2, 65536, 2),  # TODO: validate RSi16 with 64k block
         ffrs.CIRC16(16, 4, 16, 4),

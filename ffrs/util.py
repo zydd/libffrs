@@ -14,6 +14,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import re
+
 import ffrs
 
 _B64HEX_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
@@ -103,11 +105,13 @@ def format_config_args(config) -> str:
     )
 
 
-def instantiate_config(config):
+def instantiate_config(args, config):
     return ffrs.CIRC16(
         next(iter(config["inner_block"])) // 2,
         next(iter(config["inner_ecc"])) // 2,
         next(iter(config["outer_block"])),
         next(iter(config["outer_ecc"])),
         next(iter(config["interleave"])),
+        primitive=args.primitive.get(),
+        **args.simd.get(),
     )

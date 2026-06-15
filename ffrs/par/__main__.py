@@ -39,20 +39,21 @@ def main(args):
     return args.cli_main.get()(args)
 
 
-def cli_config(cli_parser):
-    subparsers = cli_parser.parser.add_subparsers(dest="command", required=True)
+def create_parser(parent=None):
+    parser = cli.create_parser(__package__, __doc__, parent)
+    subparsers = parser.parser.add_subparsers(dest="command", required=True)
     for name, module in CLI_MODULES.items():
         subparser = subparsers.add_parser(
             name,
             help=module.__doc__.lstrip().split("\n", 1)[0],
             description=module.__doc__,
-            formatter_class=cli_parser.parser.formatter_class,
+            formatter_class=parser.parser.formatter_class,
         )
-        module.cli_config(cli.CLI(subparser))
+        module.create_parser(subparser)
         subparser.set_defaults(cli_main=module.main)
 
-    return cli_parser
+    return parser
 
 
 if __name__ == "__main__":
-    cli.main(prog=__package__)
+    cli.main()

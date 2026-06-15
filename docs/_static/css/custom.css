@@ -5,3 +5,6 @@
 .sidebar-tree label {
     display: none;
 }
+.monospace {
+    font-family: monospace;
+}

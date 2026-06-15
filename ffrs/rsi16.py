@@ -16,52 +16,11 @@
 
 import libffrs
 
-import ffrs.reference as ref
-from ffrs.reference.util import to_int_list, to_bytearray, rbo, rbo_sorted
-
-GF = ref.GF(65537, 1, 3)
-ntt = lambda w, x: to_int_list(ref.ntt.ntt(GF, w, rbo_sorted(x)))
-intt = lambda w, x: rbo_sorted(to_int_list(ref.ntt.intt(GF, w, x)))
-
 
 class RSi16(libffrs.RSi16):
-    def _mix_ecc(self, ecc):
-        i = rbo(self.block_len, self.block_len - self.ecc_len)
-        w_i = self.gf.pow(self.gf.inv(self.root), i)
+    __doc__ = libffrs.RSi16.__doc__
 
-        ecc_mix = [self.gf.mul(s, self.gf.sub(0, self.gf.pow(w_i, j))) for j, s in enumerate(ecc)]
-
-        # ecc_root = GF(self.root) ** (self.block_size // self.ecc_size)
-        ecc_root = GF(self.gf.exp(self.gf.div(self.gf.log(1), self.ecc_len)))
-        ecc_mix = intt(ecc_root, ecc_mix)
-
-        return ecc_mix
-
-    def find_errors(self, msg1: bytearray):
-        w = GF(self.root)
-
-        msg1_list = to_int_list(msg1, 2)
-        synds = ntt(w, msg1_list)[: self.ecc_len]
-
-        if all(s == 0 for s in synds):
-            return []
-
-        # print("synds:    ", synds)
-        synds = GF(synds)
-
-        for err_count in range(self.ecc_len // 2, 0, -1):
-            mat = [synds[i : i + err_count] for i in range(err_count)]
-
-            err_loc_coefs = ref.linalg.gaussian_elim(mat, [GF(0) - s for s in synds[err_count : 2 * err_count]])
-            lm = ref.P(GF, [1] + err_loc_coefs[::-1])
-
-            err_pos_rbo = [i for i in range(self.codeword_len) if int(lm.eval(w.inv().pow(i))) == 0]
-            if err_pos_rbo:
-                break
-        else:
-            raise RuntimeError("Decoding failed")
-
-        return [rbo(self.codeword_len, pos) for pos in err_pos_rbo]
+    """ + libffrs.CIRC16.__doc__"""
 
     def __repr__(self):
-        return f"RSi16({self.rs_block_len}, ecc_len={self.rs_ecc_len}{f", interleave={self.interleave}" if self.interleave != 1 else ""})"
+        return f"RSi16(block_len={self.rs_block_len}, ecc_len={self.rs_ecc_len}{f", interleave={self.interleave}" if self.interleave != 1 else ""})"

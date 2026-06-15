@@ -322,6 +322,7 @@ public:
     /**
      * partial iNTT
      * computes the full iNTT from the first `ecc_len` symbols of `block`
+     * normal order input, RBO output
      */
     inline void pintt_ecc(GFT *const ntt_block) const {
         for (size_t i = 1; i < block_len / ecc_len; ++i) {
@@ -339,24 +340,36 @@ public:
     }
 
     inline void repair(GFT *const block, GFT *const temp_ntt1_ecc6) const {
+        r_print("repair unknown >");
         // temp_ntt1_ecc6 = ntt_len + ecc_len * 6
 
         // compute synds
         auto synds = &temp_ntt1_ecc6[ecc_len * 0];
         std::copy_n(&block[0], block_len, &synds[0]);
         pntt(&synds[0]);
+        r_print_vec("synds", synds, ecc_len);
+
+        // stop if all synds are zero
+        if (std::all_of(&synds[0], &synds[ecc_len], [](const GFT& v) { return vec_max(v) == 0; })) {
+            r_print("no errors detected");
+            return;
+        }
 
         // init evaluator_poly with synds
         auto evaluator_poly = &synds[0];
 
         auto locator_poly = &temp_ntt1_ecc6[ecc_len * 1];
         auto locator_poly_len = sugiyama(&locator_poly[0], &evaluator_poly[0], &temp_ntt1_ecc6[ecc_len * 2]);
+        r_print_vec("locator_poly", locator_poly, ecc_len);
+        r_print_vec("locator_poly_len", &locator_poly_len, 1);
+        r_print_vec("evaluator_poly", evaluator_poly, ecc_len);
 
         auto evaluator_poly_len = ::GFT(ecc_len) - locator_poly_len + 1;
 
         auto locator_poly_deriv = &temp_ntt1_ecc6[ecc_len * 2];
         std::copy_n(&locator_poly[0], ecc_len, &locator_poly_deriv[0]);
         _deriv(locator_poly_deriv, ecc_len);
+        r_print_vec("locator_poly_deriv", locator_poly_deriv, ecc_len);
         auto locator_poly_deriv_len = _get_vec_size(&locator_poly_deriv[0], ecc_len);
 
         auto roots = &temp_ntt1_ecc6[ecc_len * 3];
@@ -367,9 +380,11 @@ public:
             &evaluator_poly[0], evaluator_poly_len,
             &roots[0]
         );
+        r_print("repair <");
     }
 
     inline void repair(GFT *const block, const size_t *const error_pos_rbo, size_t error_count, GFT *const temp_ntt1_ecc6) const {
+        r_print("repair known >");
         // temp_ntt1_ecc6 = ntt_len + ecc_len * 6
 
         // compute synds
@@ -423,6 +438,7 @@ public:
 
             block[pos] = gf.add(block[pos], error);
         }
+        r_print("repair <");
     }
 
     inline void repair_ntt(GFT *const block, const size_t *const error_pos_rbo, size_t error_count, GFT *const temp_ntt1_ecc6) const {
@@ -533,7 +549,7 @@ protected:
     }
 
     /**
-     * Normal order input, RBO output
+     * normal order input, RBO output
      */
     inline void gs_butterfly(const ::GFT *const roots, GFT *const block, size_t ntt_len, size_t end) const {
         for (size_t stride = ntt_len / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
@@ -761,9 +777,7 @@ protected:
     ) const {
         auto x_inv = GFT{} + gf.inv(x);
         auto numerator = _eval(evaluator_poly, evaluator_poly_len, x_inv);
-        r_print_vec("evaluator_poly(x**-1)", &numerator, 1);
         auto denominator = _eval(locator_poly_deriv, locator_poly_deriv_len, x_inv);
-        r_print_vec("locator_poly_deriv(x**-1)", &denominator, 1);
 
         auto error = gf.mul(gf.div(numerator, denominator), x);
         return error;
@@ -960,7 +974,7 @@ protected:
             auto i_rbo = rbo(i);
             // auto x = gf.pow(root, i_rbo);
             ::GFT x = _roots_ntt[i_rbo];
-            GFT root_locations = ((roots[i] | !lanes) == 0);
+            GFT root_locations = (roots[i] == 0) & lanes;
 
             if (vec_any(root_locations)) {
                 GFT error = forney(
@@ -972,11 +986,8 @@ protected:
                 if constexpr (!std::is_integral_v<GFT>)
                     error &= root_locations;
 
-                // py::print("\nError location:", i);
-                // auto error_neg = gf.neg(error);
-                // print_vec(&error_neg, 1);
-                // auto blk = block[i];
-                // print_vec(&blk, 1);
+                r_print("i:", i, "rbo(i):", i_rbo);
+                r_print_vec("error", &error, 1);
 
                 block[i] = gf.add(block[i], error);
             }

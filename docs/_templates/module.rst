@@ -2,30 +2,18 @@
 
 .. automodule:: {{ fullname }}
 
-   {% block attributes %}
-   {% if attributes %}
-   .. rubric:: Module attributes
-
+   {% block modules %}
+   {% if modules %}
    .. autosummary::
       :toctree:
-   {% for item in attributes %}
+      :template: module.rst
+      :recursive:
+   {% for item in modules %}
       {{ item }}
    {%- endfor %}
    {% endif %}
    {% endblock %}
 
-   {% block functions %}
-   {% if functions %}
-   .. rubric:: {{ _('Functions') }}
-
-   .. autosummary::
-      :toctree:
-      :nosignatures:
-   {% for item in functions %}
-      {{ item }}
-   {%- endfor %}
-   {% endif %}
-   {% endblock %}
 
    {% block classes %}
    {% if classes %}
@@ -53,14 +41,28 @@
    {% endif %}
    {% endblock %}
 
-{% block modules %}
-{% if modules %}
-.. autosummary::
-   :toctree:
-   :template: module.rst
-   :recursive:
-{% for item in modules %}
-   {{ item }}
-{%- endfor %}
-{% endif %}
-{% endblock %}
+
+   {% block attributes %}
+   {% if attributes %}
+   .. rubric:: Module attributes
+
+   .. autosummary::
+      :toctree:
+   {% for item in attributes %}
+      {{ item }}
+   {%- endfor %}
+   {% endif %}
+   {% endblock %}
+
+   {% block functions %}
+   {% if functions %}
+   .. rubric:: {{ _('Functions') }}
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   {% for item in functions %}
+      {{ item }}
+   {%- endfor %}
+   {% endif %}
+   {% endblock %}

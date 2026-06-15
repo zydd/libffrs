@@ -37,15 +37,6 @@ private:
         size_t ecc_len;
     };
 
-    const PyGFi16 gf;
-    const RSi16v<1> rs16;
-    const RSi16v<4> rs16x4;
-    const RSi16v<8> rs16x8;
-    const RSi16v<16> rs16x16;
-    bool simd_x4;
-    bool simd_x8;
-    bool simd_x16;
-
     inline PyRSi16(
         rs_data&& args,
         size_t interleave,
@@ -92,6 +83,15 @@ private:
     }
 
 public:
+    const PyGFi16 gf;
+    const RSi16v<1> rs16;
+    const RSi16v<4> rs16x4;
+    const RSi16v<8> rs16x8;
+    const RSi16v<16> rs16x16;
+    bool simd_x4;
+    bool simd_x8;
+    bool simd_x16;
+
     const size_t block_len;
     const size_t message_len;
     const size_t ecc_len;
@@ -216,37 +216,27 @@ public:
         using namespace pybind11::literals;
 
         py::class_<PyRSi16>(m, "RSi16")
-            .def_property_readonly("block_len", [](PyRSi16& self) { return self.interleaved_block_len; })
-            .def_property_readonly("block_size", [](PyRSi16& self) { return self.interleaved_block_len * sizeof(uint16_t); })
-            .def_property_readonly("message_len", [](PyRSi16& self) { return self.interleaved_message_len; })
-            .def_property_readonly("message_size", [](PyRSi16& self) { return self.interleaved_message_len * sizeof(uint16_t); })
-            .def_property_readonly("ecc_len", [](PyRSi16& self) { return self.interleaved_ecc_len; })
-            .def_property_readonly("ecc_size", [](PyRSi16& self) { return self.interleaved_ecc_len * sizeof(uint16_t); })
-            .def_property_readonly("rs_block_len", [](PyRSi16& self) { return self.block_len; })
-            .def_property_readonly("rs_block_size", [](PyRSi16& self) { return self.block_len * sizeof(uint16_t); })
-            .def_property_readonly("rs_message_len", [](PyRSi16& self) { return self.message_len; })
-            .def_property_readonly("rs_message_size", [](PyRSi16& self) { return self.message_len * sizeof(uint16_t); })
-            .def_property_readonly("rs_ecc_len", [](PyRSi16& self) { return self.ecc_len; })
-            .def_property_readonly("rs_ecc_size", [](PyRSi16& self) { return self.ecc_len * sizeof(uint16_t); })
-            .def_property_readonly("ntt_len", [](PyRSi16& self) { return self.rs16.ntt_len; })
-            .def_property_readonly("ntt_size", [](PyRSi16& self) { return self.rs16.ntt_len * sizeof(uint16_t); })
-            .def_property_readonly("root", [](PyRSi16& self) { return self.rs16.root; })
-            .def_property_readonly("gf", [](PyRSi16& self) -> auto const& { return self.gf; })
-            .def_property_readonly("interleave", [](PyRSi16& self) { return self.interleave; },
-                R"(Number of interleaved codewords for block encoding)")
+            .def_property_readonly("block_len", [](PyRSi16& self) { return self.interleaved_block_len; }, R"(Interleaved block length in number of elements)")
+            .def_property_readonly("block_size", [](PyRSi16& self) { return self.interleaved_block_len * sizeof(uint16_t); }, R"(Interleaved block size in bytes)")
+            .def_property_readonly("message_len", [](PyRSi16& self) { return self.interleaved_message_len; }, R"(Interleaved message length in number of elements)")
+            .def_property_readonly("message_size", [](PyRSi16& self) { return self.interleaved_message_len * sizeof(uint16_t); }, R"(Interleaved message size in bytes)")
+            .def_property_readonly("ecc_len", [](PyRSi16& self) { return self.interleaved_ecc_len; }, R"(Interleaved error correction code length in number of elements)")
+            .def_property_readonly("ecc_size", [](PyRSi16& self) { return self.interleaved_ecc_len * sizeof(uint16_t); }, R"(Interleaved error correction code size in bytes)")
+            .def_property_readonly("rs_block_len", [](PyRSi16& self) { return self.block_len; }, R"(Reed-Solomon block length in number of elements)")
+            .def_property_readonly("rs_block_size", [](PyRSi16& self) { return self.block_len * sizeof(uint16_t); }, R"(Reed-Solomon block size in bytes)")
+            .def_property_readonly("rs_message_len", [](PyRSi16& self) { return self.message_len; }, R"(Reed-Solomon message length in number of elements)")
+            .def_property_readonly("rs_message_size", [](PyRSi16& self) { return self.message_len * sizeof(uint16_t); }, R"(Reed-Solomon message size in bytes)")
+            .def_property_readonly("rs_ecc_len", [](PyRSi16& self) { return self.ecc_len; }, R"(Reed-Solomon error correction code length in number of elements)")
+            .def_property_readonly("rs_ecc_size", [](PyRSi16& self) { return self.ecc_len * sizeof(uint16_t); }, R"(Reed-Solomon error correction code size in bytes)")
+            .def_property_readonly("ntt_len", [](PyRSi16& self) { return self.rs16.ntt_len; }, R"(Number theoretic transform length)")
+            .def_property_readonly("ntt_size", [](PyRSi16& self) { return self.rs16.ntt_len * sizeof(uint16_t); }, R"(Number theoretic transform size in bytes)")
+            .def_property_readonly("root", [](PyRSi16& self) { return self.rs16.root; }, R"(:math:`n`-th root of unity used by NTT)")
+            .def_property_readonly("gf", [](PyRSi16& self) -> auto const& { return self.gf; }, R"(:class:`GFi16` instance for :math:`GF(65537)`)")
+            .def_property_readonly("interleave", [](PyRSi16& self) { return self.interleave; }, R"(Number of interleaved columns)")
 
-            .def_property_readonly("simd_x4",
-                [](PyRSi16& self) { return self.simd_x4; },
-                R"(Enable SIMD x4 encoding)"
-            )
-            .def_property_readonly("simd_x8",
-                [](PyRSi16& self) { return self.simd_x8; },
-                R"(Enable SIMD x8 encoding)"
-            )
-            .def_property_readonly("simd_x16",
-                [](PyRSi16& self) { return self.simd_x16; },
-                R"(Enable SIMD x16 encoding)"
-            )
+            .def_property_readonly("simd_x4", [](PyRSi16& self) { return self.simd_x4; }, R"(SIMD x4 encoding enabled (SSE2))")
+            .def_property_readonly("simd_x8", [](PyRSi16& self) { return self.simd_x8; }, R"(SIMD x8 encoding enabled (AVX2))")
+            .def_property_readonly("simd_x16", [](PyRSi16& self) { return self.simd_x16; }, R"(SIMD x16 encoding enabled (AVX512))")
 
             .def(py::init<
                     size_t,    // block_len

@@ -9,4 +9,6 @@ __all__ = [
     "GFi16",
     "RS256",
     "RSi16",
+    "create_buffer",
+    "set_logger",
 ]

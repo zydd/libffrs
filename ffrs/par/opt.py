@@ -81,7 +81,7 @@ CONSTRAINTS = [
 ]
 
 
-def maximize_interleaving(args, file_size):
+def maximize_interleaving(args, file_size) -> ffrs.CIRC16 | ffrs.RSi16:
     t0 = time.time()
     file_size = max(file_size, 8192)
 
@@ -90,7 +90,7 @@ def maximize_interleaving(args, file_size):
         message=None,  # choose based on file_size
         ecc=args.ecc.get(None),
         inner_block=args.inner_block.get(range(2, 65536 + 1, 2)),
-        inner_message=range(2, 65536 + 1, 2),  # choose based on file_size
+        inner_message=args.inner_message.get() if not args.inner_message.is_default() else range(2, 65536 + 1, 2),
         inner_ecc=args.inner_ecc.get(set(2**i for i in range(1, 16))),
         outer_block=args.outer_block.get(range(2, 65536 + 1, 2)),
         outer_message=args.outer_message.get(range(2, 65536 + 1, 2)),
@@ -144,12 +144,15 @@ def maximize_interleaving(args, file_size):
             solver.solve(config2, ["outer_interleave"])
             log.debug(ffrs.util.format_config(config2))
 
+            log.debug("maximize inner_message")
             config2 = solver.maximize(config2, "inner_message")
             log.debug(ffrs.util.format_config(config2))
 
+            log.debug("minimize inner_ecc")
             config2 = solver.minimize(config2, "inner_ecc")
             log.debug(ffrs.util.format_config(config2))
 
+            log.debug("minimize message")
             config2 = solver.minimize(config2, "message")
             log.debug(ffrs.util.format_config(config2))
 
@@ -167,7 +170,7 @@ def maximize_interleaving(args, file_size):
     t1 = time.time() - t0
     if t1 > 10e-3:
         log.warning("time to solve: %.2f [ms]", t1 * 1000)
-    return ffrs.util.instantiate_config(config)
+    return ffrs.util.instantiate_config(args, config)
 
 
 def circ(args):
@@ -246,4 +249,4 @@ def circ(args):
     t1 = time.time() - t0
     if t1 > 10e-3:
         log.warning("time to solve: %.2f [ms]", t1 * 1000)
-    return ffrs.util.instantiate_config(config)
+    return ffrs.util.instantiate_config(args, config)

@@ -15,25 +15,12 @@
 #  limitations under the License.
 
 import libffrs
-from . import rsi16
 
 from .util import b64hex, b64hex_dec
 
 
 class CIRC16(libffrs.CIRC16):
-    def check(self, data, ecc, synd=None):
-        synd = synd or bytearray(self.ecc_size)
-
-        assert len(data) % self.message_size == 0
-        assert len(ecc) % self.ecc_size == 0
-        assert len(data) // self.message_size == len(ecc) // self.ecc_size
-        assert len(synd) == len(ecc)
-
-        inner_ecc_size = self.rsi.ecc_size * self.rso.message_size
-
-        inner_ok = self.rsi.check_blocks(data, ecc[:inner_ecc_size], synd[:inner_ecc_size])
-        outer_ok = self.rso.check_chunk(data, ecc[inner_ecc_size:], synd[inner_ecc_size:])
-        return inner_ok and outer_ok, synd
+    __doc__ = libffrs.CIRC16.__doc__
 
     def __repr__(self):
         return (
@@ -44,7 +31,12 @@ class CIRC16(libffrs.CIRC16):
         )
 
     def serialize(self):
-        # circ16 ip:g01 ig:3 ib:x4 im:x0 ie:4 op:g01 og:3 ob:80 om:40 oe:40 i:1
+        """
+        Serialize CIRC16 config
+
+        Example:
+        circ16 ip:g01 ig:3 ib:x4 im:x0 ie:4 op:g01 og:3 ob:80 om:40 oe:40 i:1
+        """
         return (
             "circ16"
             f" ip:{b64hex(self.rsi.gf.field_elements)} ig:{b64hex(self.rsi.gf.primitive)} ib:{b64hex(self.inner_block_len)} im:{b64hex(self.inner_message_len)} ie:{b64hex(self.inner_ecc_len)}"
@@ -54,6 +46,9 @@ class CIRC16(libffrs.CIRC16):
 
     @staticmethod
     def deserialize(buf):
+        """
+        Create CIRC16 instance from serialized form
+        """
         string = buf.decode("ascii")
         assert string.startswith("circ16 ")
         params = {}

@@ -98,6 +98,8 @@ py::memoryview py_create_buffer(size_t requested_size) {
 
 
 PYBIND11_MODULE(libffrs, m) {
+    using namespace pybind11::literals;
+
     m.attr("__version__") = VERSION_INFO;
 #if defined(__clang__)
     m.attr("compiler_info") = __VERSION__;
@@ -111,10 +113,19 @@ PYBIND11_MODULE(libffrs, m) {
     m.attr("compiler_info") = "unknown";
 #endif
 
-    m.def("create_buffer", &py_create_buffer);
+    m.def("create_buffer", &py_create_buffer, "size"_a, R"(
+        Create a memory buffer of the specified size, backed by hugepages if possible.
+
+        The buffer is returned as a memoryview object that can be used in Python.
+    )");
+
+    m.def("set_logger", [](py::object&& logger) { PyLogger::set_logger(logger); },
+        "logger"_a, R"(
+        Logger object to be used by C++ library or ``None`` to disable logging.
+    )");
 
     m.doc() = R"(
-        FFRS main module
+        FFRS - Fairly Fast & Flexible Reed-Solomon coding
     )";
 
     PyGF256::register_class(m);
@@ -122,6 +133,4 @@ PYBIND11_MODULE(libffrs, m) {
     PyGFi16::register_class(m);
     PyRSi16::register_class(m);
     PyCIRC16::register_class(m);
-
-    m.def("set_logger", [](py::object&& logger) { PyLogger::set_logger(logger); });
 }

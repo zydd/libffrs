@@ -102,13 +102,16 @@ def main(args):
     return 0
 
 
-def cli_config(cli_parser):
-    from .common_args import add_common_args
+def create_parser(parent=None):
+    parser = cli.create_parser(__loader__.name, __doc__, parent)
+    from . import common_args
 
-    add_common_args(cli_parser)
+    common_args.add_generic_args(parser)
+    common_args.add_simd_args(parser)
 
-    repair = cli_parser.parser.add_argument_group("repair")
+    repair = parser.parser.add_argument_group("repair")
     repair.add_argument("input_file", metavar="parity_file", help="Parity file (.ffrs)")
+    return parser
 
 
 if __name__ == "__main__":

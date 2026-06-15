@@ -13,6 +13,7 @@
     :hidden:
 
     front
+    cli
     benchmark
 
 .. autosummary::
@@ -21,7 +22,7 @@
     :recursive:
 
     ffrs
-    libffrs
+    .. libffrs
 
 .. toctree::
     genindex

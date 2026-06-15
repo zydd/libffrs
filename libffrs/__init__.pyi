@@ -7,29 +7,82 @@ from typing import Any
 import libffrs
 
 """
-FFRS main module
+FFRS - Fairly Fast & Flexible Reed-Solomon coding
 """
 
 compiler_info: str
 class CIRC16:
+    """Cross-interleaved Reed-Solomon coding over :math:`GF(65537)`"""
+
     block_len: int
+    """Total block length in number of elements"""
+
     block_size: int
+    """Total block size in bytes"""
+
     ecc_len: int
+    """Total ECC length in number of elements"""
+
     ecc_size: int
+    """Total ECC size in bytes"""
+
     inner_block_len: int
+    """Inner codec block length in number of elements"""
+
     inner_block_size: int
+    """Inner codec block size in bytes"""
+
     inner_ecc_len: int
+    """Inner codec ECC length in number of elements"""
+
     inner_ecc_size: int
+    """Inner codec ECC size in bytes"""
+
     inner_message_len: int
+    """Inner codec message length in number of elements"""
+
     inner_message_size: int
+    """Inner codec message size in bytes"""
+
     interleave: int
+    """Number of interleaved CIRC blocks"""
+
     message_len: int
+    """Total message length in number of elements"""
+
     message_size: int
+    """Total message size in bytes"""
+
     outer_block_len: int
+    """Outer codec block length in number of elements"""
+
     outer_ecc_len: int
+    """Outer codec ECC length in number of elements"""
+
+    outer_interleave: int
+    """Outer codec interleaving (``inner_message_len * interleave``)"""
+
     outer_message_len: int
+    """Outer codec message length in number of elements"""
+
+    primitive: int
+    """Primitive value used to generate the Galois field"""
+
     rsi: libffrs.RSi16
+    """Inner Reed-Solomon codec (:class:`RSi16`)"""
+
     rso: libffrs.RSi16
+    """Outer Reed-Solomon codec (:class:`RSi16`)"""
+
+    simd_x16: bool
+    """SIMD x16 encoding enabled (AVX512)"""
+
+    simd_x4: bool
+    """SIMD x4 encoding enabled (SSE2)"""
+
+    simd_x8: bool
+    """SIMD x8 encoding enabled (AVX2)"""
+
     def __init__(self: libffrs.CIRC16, inner_block_len: typing.SupportsInt | typing.SupportsIndex, inner_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_block_len: typing.SupportsInt | typing.SupportsIndex, outer_ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
         ...
     def encode(self: libffrs.CIRC16, buffer: collections.abc.Buffer) -> bytearray:
@@ -95,7 +148,7 @@ class GF256:
 
 
 class GFi16:
-    """Finite-field operations for prime fields <= 65537"""
+    """Finite-field operations over :math:`GF(65537)`"""
 
     field_elements: int
     """:math:`p`"""
@@ -155,32 +208,64 @@ class RSi16:
     """Reed-Solomon coding over :math:`GF(65537)`"""
 
     block_len: int
+    """Interleaved block length in number of elements"""
+
     block_size: int
+    """Interleaved block size in bytes"""
+
     ecc_len: int
+    """Interleaved error correction code length in number of elements"""
+
     ecc_size: int
+    """Interleaved error correction code size in bytes"""
+
     gf: libffrs.GFi16
+    """:class:`GFi16` instance for :math:`GF(65537)`"""
+
     interleave: int
-    """Number of interleaved codewords for block encoding"""
+    """Number of interleaved columns"""
 
     message_len: int
+    """Interleaved message length in number of elements"""
+
     message_size: int
+    """Interleaved message size in bytes"""
+
     ntt_len: int
+    """Number theoretic transform length"""
+
     ntt_size: int
+    """Number theoretic transform size in bytes"""
+
     root: int
+    """:math:`n`-th root of unity used by NTT"""
+
     rs_block_len: int
+    """Reed-Solomon block length in number of elements"""
+
     rs_block_size: int
+    """Reed-Solomon block size in bytes"""
+
     rs_ecc_len: int
+    """Reed-Solomon error correction code length in number of elements"""
+
     rs_ecc_size: int
+    """Reed-Solomon error correction code size in bytes"""
+
     rs_message_len: int
+    """Reed-Solomon message length in number of elements"""
+
     rs_message_size: int
+    """Reed-Solomon message size in bytes"""
+
     simd_x16: bool
-    """Enable SIMD x16 encoding"""
+    """SIMD x16 encoding enabled (AVX512)"""
 
     simd_x4: bool
-    """Enable SIMD x4 encoding"""
+    """SIMD x4 encoding enabled (SSE2)"""
 
     simd_x8: bool
-    """Enable SIMD x8 encoding"""
+    """SIMD x8 encoding enabled (AVX2)"""
 
     def __init__(self: libffrs.RSi16, block_len: typing.SupportsInt | typing.SupportsIndex, ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
         ...
@@ -194,7 +279,7 @@ class RSi16:
         ...
 
 
-def create_buffer(arg0: typing.SupportsInt | typing.SupportsIndex) -> memoryview:
+def create_buffer(size: typing.SupportsInt | typing.SupportsIndex) -> memoryview:
     ...
-def set_logger(arg0: object) -> None:
+def set_logger(logger: object) -> None:
     ...

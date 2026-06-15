@@ -92,29 +92,35 @@ public:
                 "simd_x16"_a = py::none()
             )
 
-            .def_property_readonly("rsi", [](PyCIRC16& self) -> auto const& { return self.rsi; })
-            .def_property_readonly("rso", [](PyCIRC16& self) -> auto const& { return self.rso; })
+            .def_property_readonly("rsi", [](PyCIRC16& self) -> auto const& { return self.rsi; }, R"(Inner Reed-Solomon codec (:class:`RSi16`))")
+            .def_property_readonly("rso", [](PyCIRC16& self) -> auto const& { return self.rso; }, R"(Outer Reed-Solomon codec (:class:`RSi16`))")
 
-            .def_property_readonly("block_len", [](PyCIRC16& self) { return self.block_len; })
-            .def_property_readonly("block_size", [](PyCIRC16& self) { return self.block_len * sizeof(uint16_t); })
-            .def_property_readonly("message_len", [](PyCIRC16& self) { return self.message_len; })
-            .def_property_readonly("message_size", [](PyCIRC16& self) { return self.message_len * sizeof(uint16_t); })
-            .def_property_readonly("ecc_len", [](PyCIRC16& self) { return self.ecc_len; })
-            .def_property_readonly("ecc_size", [](PyCIRC16& self) { return self.ecc_len * sizeof(uint16_t); })
-            .def_property_readonly("inner_block_len", [](PyCIRC16& self) { return self.rsi.block_len; })
-            .def_property_readonly("inner_block_size", [](PyCIRC16& self) { return self.rsi.block_len * sizeof(uint16_t); })
-            .def_property_readonly("inner_message_len", [](PyCIRC16& self) { return self.rsi.message_len; })
-            .def_property_readonly("inner_message_size", [](PyCIRC16& self) { return self.rsi.message_len * sizeof(uint16_t); })
-            .def_property_readonly("inner_ecc_len", [](PyCIRC16& self) { return self.rsi.ecc_len; })
-            .def_property_readonly("inner_ecc_size", [](PyCIRC16& self) { return self.rsi.ecc_len * sizeof(uint16_t); })
-            .def_property_readonly("outer_block_len", [](PyCIRC16& self) { return self.rso.block_len; })
-            .def_property_readonly("outer_message_len", [](PyCIRC16& self) { return self.rso.message_len; })
-            .def_property_readonly("outer_ecc_len", [](PyCIRC16& self) { return self.rso.ecc_len; })
-            .def_property_readonly("interleave", [](PyCIRC16& self) { return self.interleave; })
-            .def("__sizeof_cpp__", [](PyCIRC16& self) { return sizeof(self); })
+            .def_property_readonly("block_len", [](PyCIRC16& self) { return self.block_len; }, R"(Total block length in number of elements)")
+            .def_property_readonly("block_size", [](PyCIRC16& self) { return self.block_len * sizeof(uint16_t); }, R"(Total block size in bytes)")
+            .def_property_readonly("message_len", [](PyCIRC16& self) { return self.message_len; }, R"(Total message length in number of elements)")
+            .def_property_readonly("message_size", [](PyCIRC16& self) { return self.message_len * sizeof(uint16_t); }, R"(Total message size in bytes)")
+            .def_property_readonly("ecc_len", [](PyCIRC16& self) { return self.ecc_len; }, R"(Total ECC length in number of elements)")
+            .def_property_readonly("ecc_size", [](PyCIRC16& self) { return self.ecc_len * sizeof(uint16_t); }, R"(Total ECC size in bytes)")
+            .def_property_readonly("inner_block_len", [](PyCIRC16& self) { return self.rsi.block_len; }, R"(Inner codec block length in number of elements)")
+            .def_property_readonly("inner_block_size", [](PyCIRC16& self) { return self.rsi.block_len * sizeof(uint16_t); }, R"(Inner codec block size in bytes)")
+            .def_property_readonly("inner_message_len", [](PyCIRC16& self) { return self.rsi.message_len; }, R"(Inner codec message length in number of elements)")
+            .def_property_readonly("inner_message_size", [](PyCIRC16& self) { return self.rsi.message_len * sizeof(uint16_t); }, R"(Inner codec message size in bytes)")
+            .def_property_readonly("inner_ecc_len", [](PyCIRC16& self) { return self.rsi.ecc_len; }, R"(Inner codec ECC length in number of elements)")
+            .def_property_readonly("inner_ecc_size", [](PyCIRC16& self) { return self.rsi.ecc_len * sizeof(uint16_t); }, R"(Inner codec ECC size in bytes)")
+            .def_property_readonly("outer_block_len", [](PyCIRC16& self) { return self.rso.block_len; }, R"(Outer codec block length in number of elements)")
+            .def_property_readonly("outer_message_len", [](PyCIRC16& self) { return self.rso.message_len; }, R"(Outer codec message length in number of elements)")
+            .def_property_readonly("outer_ecc_len", [](PyCIRC16& self) { return self.rso.ecc_len; }, R"(Outer codec ECC length in number of elements)")
+            .def_property_readonly("outer_interleave", [](PyCIRC16& self) { return self.rso.interleave; }, R"(Outer codec interleaving (``inner_message_len * interleave``))")
+            .def_property_readonly("interleave", [](PyCIRC16& self) { return self.interleave; }, R"(Number of interleaved CIRC blocks)")
+            .def_property_readonly("primitive", [](PyCIRC16& self) { return self.rsi.gf.primitive; }, R"(Primitive value used to generate the Galois field)")
+            .def("__sizeof_cpp__", [](PyCIRC16& self) { return sizeof(self); }, R"(Size of object in bytes)")
+            .def_property_readonly("simd_x4", [](PyCIRC16& self) { return self.rsi.simd_x4; }, R"(SIMD x4 encoding enabled (SSE2))")
+            .def_property_readonly("simd_x8", [](PyCIRC16& self) { return self.rsi.simd_x8; }, R"(SIMD x8 encoding enabled (AVX2))")
+            .def_property_readonly("simd_x16", [](PyCIRC16& self) { return self.rsi.simd_x16; }, R"(SIMD x16 encoding enabled (AVX512))")
 
             .def("encode", cast_args(&PyCIRC16::py_encode), R"(Encode data)", "buffer"_a)
             .def("repair", cast_args(&PyCIRC16::py_repair), R"(Repair data)", "message"_a, "ecc"_a)
+            .doc() = R"(Cross-interleaved Reed-Solomon coding over :math:`GF(65537)`)";
             ;
     }
 
@@ -150,7 +156,7 @@ private:
     inline bool py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc) {
         log_debug("message size: %s", message.size);
         log_debug("ecc size: %s", ecc.size);
-        py_assert(message.size == message_len, std::to_string(message.size));
+        py_assert(message.size == message_len, std::to_string(message.size) + " != " + std::to_string(message_len));
         py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
 
         size_t inner_blocks = message.size / rsi.message_len;

@@ -46,11 +46,13 @@ class F:
             x = self.inv().x
             rhs = -rhs
 
-        v = (x**rhs) % self.p
+        # v = (x**rhs) % self.p
+        v = pow(x, rhs, self.p)
         return F(self.p, v)
 
     def pow(self, rhs):
-        v = (self.x**rhs) % self.p
+        # v = (self.x**rhs) % self.p
+        v = pow(self.x, rhs, self.p)
         return F(self.p, v)
 
     def __repr__(self):
