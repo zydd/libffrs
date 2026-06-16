@@ -59,7 +59,7 @@ class BaseTestRS:
         w = ref_gf(rs.root)
         buf_ntt = ref_ntt(w, to_int_list(buf + bytearray(rs.ntt_size - len(buf))))
 
-        ecc_mix = rs._mix_ecc(buf_ntt[: rs.ecc_len])
+        ecc_mix = ref_rs.mix_ecc(rs, ref_gf, buf_ntt[: rs.ecc_len])
 
         assert to_bytearray(ecc_mix) == res
 

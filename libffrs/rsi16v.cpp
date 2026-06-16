@@ -20,26 +20,27 @@
 
 
 #include "rsi16v_impl.hpp"
+#include "simd.hpp"
 
 
 template class RSi16v<1>;
 
 
 template<>
-simd_mask_t RSi16vImpl<GFT>::is_zero(GFT const& vec) {
+simd_mask_t vec<GFT>::is_zero(GFT const& vec) {
     return (vec == 0);
 }
 
 
 template<>
-void RSi16vImpl<GFT>::assign_masked(GFT& vec, GFT const& value, GFT const& condition) const {
+void vec<GFT>::assign_masked(GFT& vec, GFT const& value, GFT const& condition) {
     if (condition)
         vec = value;
 }
 
 
 template<>
-void RSi16vImpl<GFT>::copy_n_masked(const GFT src[], size_t n, GFT dst[], GFT const& condition) const {
+void vec<GFT>::copy_n_masked(const GFT src[], size_t n, GFT dst[], GFT const& condition) {
     for (size_t i = 0; i < n; i++) {
         if (condition)
             dst[i] = src[i];

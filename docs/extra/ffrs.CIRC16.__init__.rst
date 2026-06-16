@@ -16,7 +16,7 @@
     - ``CIRC16(2048+4, 4, 2048+128, 128)``
 
         Creates an encoder with 2048 interleaved blocks of 4 KiB (8 MiB in total)
-        
+
         This codec can repair 500 KiB in the best case scenario.
 
     - ``CIRC16(2048+4, 4, 4096+256, 256, 128)``

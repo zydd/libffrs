@@ -21,6 +21,63 @@
 #include <pybind11/pybind11.h>
 
 
+// #define FFRS_DEBUG_LONG_DIVISION
+// #define FFRS_DEBUG_POLY_DIVISION
+// #define FFRS_DEBUG_REPAIR
+
+
+template<typename Vec, typename = std::enable_if_t<sizeof(Vec) % sizeof(::GFT) == 0>>
+inline void _print_vec(const char *name, const Vec *const v, size_t len) {
+        py::print(name, " (", len, ") = [", py::arg("end") = sizeof(Vec)/sizeof(::GFT) > 1 ? "\n" : "", py::arg("sep") = "");
+        for (size_t i = 0; i < std::min<size_t>(len, 32); ++i) {
+            for (size_t j = 0; j < sizeof(Vec)/sizeof(::GFT); ++j) {
+                auto coeff = *(reinterpret_cast<const ::GFT *>(v + i) + j);
+                char coeff_fmt[20];
+                std::snprintf(coeff_fmt, sizeof(coeff_fmt), sizeof(Vec)/sizeof(::GFT) > 1 ? "%6d" : "%d, ", coeff);
+                py::print(coeff_fmt, py::arg("end") = " ");
+            }
+            if (sizeof(Vec)/sizeof(::GFT) > 1) py::print();
+        }
+        if (len > 32)
+            py::print("   ...");
+        py::print(sizeof(Vec)/sizeof(::GFT) > 1 ? "]" : "\b\b\b]");
+}
+
+
+
+#define print_vec(v, len) _print_vec(#v, (v), (len));
+
+#ifdef FFRS_DEBUG_LONG_DIVISION
+    #define ld_print_vec(name, v, len) _print_vec(name, v, len)
+    #define ld_print_vec_intt(name, v, len) do { inttr(v); _print_vec(name, v, len); nttr(v); } while(0)
+    #define ld_print(...) py::print(__VA_ARGS__)
+#else
+    #define ld_print_vec(...)
+    #define ld_print_vec_intt(...)
+    #define ld_print(...)
+#endif
+
+#ifdef FFRS_DEBUG_POLY_DIVISION
+    #define pd_print_vec(name, v, len) _print_vec(name, v, len)
+    #define pd_print_vec_intt(name, v, len) do { inttr(v); _print_vec(name, v, len); nttr(v); } while(0)
+    #define pd_print(...) py::print(__VA_ARGS__)
+#else
+    #define pd_print_vec(...)
+    #define pd_print_vec_intt(...)
+    #define pd_print(...)
+#endif
+
+#ifdef FFRS_DEBUG_REPAIR
+    #define r_print_vec(name, v, len) _print_vec(name, v, len)
+    #define r_print_vec_intt(name, v, len) do { inttr(v); _print_vec(name, v, len); nttr(v); } while(0)
+    #define r_print(...) py::print(__VA_ARGS__)
+#else
+    #define r_print_vec(...)
+    #define r_print_vec_intt(...)
+    #define r_print(...)
+#endif
+
+
 class PyLogger {
 private:
     py::object _logger;

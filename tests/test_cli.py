@@ -29,7 +29,7 @@ ffrs.par.cli.log.setLevel(logging.DEBUG)
 
 
 def run(*args):
-    return ffrs.par.cli.cli_main("ffrs.par", "", ffrs.par.__main__.cli_config, ffrs.par.__main__.main, args)
+    return ffrs.par.cli.cli_main(ffrs.par.__main__.create_parser(), ffrs.par.__main__.main, args)
 
 
 class TestCli:

@@ -1,5 +1,10 @@
+import ffrs.reference
+import ffrs.reference.ntt
+
 from ffrs.reference import P
-from ffrs.reference.util import rbo
+from ffrs.reference.util import rbo, rbo_sorted, to_int_list
+
+_intt = lambda GF, w, x: rbo_sorted(to_int_list(ffrs.reference.ntt.intt(GF, w, x)))
 
 
 def locator(GF, w, err_pos):
@@ -60,3 +65,16 @@ def forney(size, root, locator, evaluator):
     print("err_pos:", err_pos)
     print("err_val:", list(map(int, err_val)))
     return err_pos, err_val
+
+
+def mix_ecc(rs, GF, ecc):
+    i = rbo(rs.block_len, rs.block_len - rs.ecc_len)
+    w_i = rs.gf.pow(rs.gf.inv(rs.root), i)
+
+    ecc_mix = [rs.gf.mul(s, rs.gf.sub(0, rs.gf.pow(w_i, j))) for j, s in enumerate(ecc)]
+
+    # ecc_root = GF(rs.root) ** (rs.block_size // rs.ecc_size)
+    ecc_root = GF(rs.gf.exp(rs.gf.div(rs.gf.log(1), rs.ecc_len)))
+    ecc_mix = _intt(GF, ecc_root, ecc_mix)
+
+    return ecc_mix

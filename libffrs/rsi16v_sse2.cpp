@@ -20,6 +20,7 @@
 #include <immintrin.h>
 
 #include "rsi16v_impl.hpp"
+#include "simd.hpp"
 
 
 template class RSi16v<4>;
@@ -43,18 +44,7 @@ GFTx4 ffrs::simd_gather_base::gather(const uint32_t vec[], GFTx4 const& i) {
 
 
 template<>
-void RSi16vImpl<GFTx4>::add_masked(GFTx4 vec[], GFTx4 const& i, GFTx4 const& value, GFTx4 const& condition) const {
-    for (int j = 0; j < 4; j++) {
-        if (condition[j]) {
-            auto k = i[j];
-            vec[k][j] = gf.add(vec[k][j], value[j]);
-        }
-    }
-}
-
-
-template<>
-void RSi16vImpl<GFTx4>::assign_masked(GFTx4& vec, GFTx4 const& value, GFTx4 const& condition) const {
+void vec<GFTx4>::assign_masked(GFTx4& vec, GFTx4 const& value, GFTx4 const& condition) {
     for (int j = 0; j < 4; j++)
         if (condition[j])
             vec[j] = value[j];
@@ -62,7 +52,7 @@ void RSi16vImpl<GFTx4>::assign_masked(GFTx4& vec, GFTx4 const& value, GFTx4 cons
 
 
 template<>
-void RSi16vImpl<GFTx4>::copy_n_masked(const GFTx4 src[], size_t n, GFTx4 dst[], GFTx4 const& condition) const {
+void vec<GFTx4>::copy_n_masked(const GFTx4 src[], size_t n, GFTx4 dst[], GFTx4 const& condition) {
     for (size_t i = 0; i < n; i++) {
         for (int j = 0; j < 4; j++)
             if (condition[j])
@@ -72,7 +62,7 @@ void RSi16vImpl<GFTx4>::copy_n_masked(const GFTx4 src[], size_t n, GFTx4 dst[], 
 
 
 template<>
-simd_mask_t RSi16vImpl<GFTx4>::is_zero(GFTx4 const& vec) {
+simd_mask_t vec<GFTx4>::is_zero(GFTx4 const& vec) {
     // return !(vec[0] || vec[1] || vec[2] || vec[3]);
     return _mm_movemask_epi8(_mm_cmpeq_epi32((__m128i) vec, _mm_setzero_si128())) == 0xffff;
 }
