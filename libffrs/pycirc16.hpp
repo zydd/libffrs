@@ -252,7 +252,7 @@ private:
                     if (std::any_of(&rsi_ecc[synd_offset], &rsi_ecc[synd_offset + rsi.ecc_len], [](auto v) { return v == 0; })) {
                         inner_ecc_has_zeros = true;
                         std::copy_n(&synds_rsi[synd_offset], rsi.ecc_len, &repair_temp_rsi[0]);
-                        rsi.ecc_mix(&repair_temp_rsi[0]);
+                        rsi.mix_ecc(&repair_temp_rsi[0]);
 
                         if (std::all_of(&repair_temp_rsi[0], &repair_temp_rsi[rsi.ecc_len], [](auto v) { return (v & 0xffff) == 0; })) {
                             log_info("inner ecc zero: interleave:%d row:%d", k, i);

@@ -24,7 +24,7 @@
 #include <vector>
 
 #include "pygfi16.hpp"
-#include "rsi16v.h"
+#include "rsi16v.hpp"
 #include "ntt.hpp"
 #include "pylogging.hpp"
 

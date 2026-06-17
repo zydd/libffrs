@@ -25,7 +25,7 @@
 
 #include "util.hpp"
 // #include "rsi16v_impl.hpp"
-#include "rsi16v.h"
+#include "rsi16v.hpp"
 
 namespace py = pybind11;
 
@@ -208,8 +208,8 @@ public:
         }
     }
 
-    inline void ecc_mix(uint32_t ecc[]) {
-        rs16.ecc_mix(&ecc[0]);
+    inline void mix_ecc(uint32_t ecc[]) {
+        rs16.mix_ecc(&ecc[0]);
     }
 
     static inline void register_class(py::module &m) {

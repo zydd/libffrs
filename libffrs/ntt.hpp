@@ -29,9 +29,7 @@
 #include "simd.hpp"
 
 
-template<typename GFT>
-class NTT {
-public:
+struct NTT {
     ::GFT root;
     size_t ntt_len;
 
@@ -124,10 +122,15 @@ public:
         }
     }
 
+    uint16_t rbo(uint16_t b) const {
+        return ffrs::detail::rbo16(b) >> _rbo_shift;
+    }
+
     /**
      * partial NTT
      * computes the first ecc_len symbols of the NTT
      */
+    template<typename GFT>
     inline void pntt(GFT *const block) const {
         {
             ct_butterfly(&_roots_ecc[0], &block[0], ecc_len);
@@ -153,6 +156,7 @@ public:
      * computes the first `ecc_len` symbols of the NTT
      * this version assumes the last `ecc_len` symbols of `block` are 0
      */
+    template<typename GFT>
     inline void pntt_message(GFT *const block) const {
         {
             ct_butterfly(&_roots_ecc[0], &block[0], ecc_len);
@@ -173,6 +177,7 @@ public:
         }
     }
 
+    template<typename GFT>
     inline void pntt_message_residue(GFT *const block) const {
         {
             ct_butterfly_residue(&_roots_ecc[0], &block[0], ecc_len);
@@ -198,6 +203,7 @@ public:
      * computes the full iNTT from the first `ecc_len` symbols of `block`
      * normal order input, RBO output
      */
+    template<typename GFT>
     inline void pintt_ecc(GFT *const ntt_block) const {
         for (size_t i = 1; i < block_len / ecc_len; ++i) {
             std::copy_n(&ntt_block[0], ecc_len, &ntt_block[i * ecc_len]);
@@ -213,13 +219,10 @@ public:
         gs_butterfly(&_roots_i_ecc[0], &ntt_block[0], ecc_len, ecc_len);
     }
 
-    uint16_t rbo(uint16_t b) const {
-        return ffrs::detail::rbo16(b) >> _rbo_shift;
-    }
-
     /**
      * RBO input, normal order output
      */
+    template<typename GFT>
     inline void ct_butterfly(const ::GFT *const roots, GFT *const block, size_t ntt_len) const {
         for (size_t stride = 1, exp_f = ntt_len >> 1; stride < ntt_len; stride *= 2, exp_f >>= 1) {
             for (size_t start = 0; start < ntt_len /*input_size*/; start += stride * 2) {
@@ -245,6 +248,7 @@ public:
         }
     }
 
+    template<typename GFT>
     inline void ct_butterfly_residue(const ::GFT *const roots, GFT *const block, size_t ntt_len) const {
         for (size_t stride = 1, exp_f = ntt_len >> 1; stride < ntt_len; stride *= 2, exp_f >>= 1) {
             for (size_t start = 0; start < ntt_len /*input_size*/; start += stride * 2) {
@@ -273,6 +277,7 @@ public:
     /**
      * normal order input, RBO output
      */
+    template<typename GFT>
     inline void gs_butterfly(const ::GFT *const roots, GFT *const block, size_t ntt_len, size_t end) const {
         for (size_t stride = ntt_len / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
             for (size_t start = 0; start < end; start += stride * 2) {
@@ -296,6 +301,7 @@ public:
         }
     }
 
+    template<typename GFT>
     inline void gs_butterfly_residue(const ::GFT *const roots, GFT *const block, size_t ntt_len, size_t end) const {
         for (size_t stride = ntt_len / 2, exp_f = 0; stride > 0; stride /= 2, exp_f += 1) {
             for (size_t start = 0; start < end; start += stride * 2) {
@@ -319,6 +325,7 @@ public:
         }
     }
 
+    template<typename GFT>
     inline GFT _vec_inv_mod_xn(GFT *const g, GFT g0, GFT a_len, GFT *const a) const {
         pd_print("_vec_inv_mod_xn >", py::arg("sep") = "");
         pd_print_vec("n", &a_len, 1);
@@ -361,6 +368,7 @@ public:
         return a_len;
     }
 
+    template<typename GFT>
     inline void _reverse_ntt(GFT *const vec, size_t shift) const {
         // check_le_ecc(shift);
 
@@ -375,6 +383,7 @@ public:
         }
     }
 
+    template<typename GFT>
     inline void _reverse_ntt_vec(GFT *const vec, GFT shift) const {
         for (size_t i = 1; i < ecc_len; ++i) {
             // rbo(ecc_len - rbo(i))
@@ -387,12 +396,14 @@ public:
         }
     }
 
+    template<typename GFT>
     inline GFT poly_mul_ntt(const GFT *const a, GFT a_len, const GFT *const b, GFT b_len, GFT *const r) const {
         for (size_t i = 0; i < ecc_len; ++i)
             r[i] = gf.mul(a[i], b[i]);
         return a_len + b_len - 1;
     }
 
+    template<typename GFT>
     inline GFT poly_div_ntt(const GFT *const f, GFT f_len, const GFT *const g, GFT g_len, GFT f0, GFT g0, GFT *const t, GFT *const q) const {
         GFT q_len = f_len - g_len + 1;
         pd_print("\n_vec_div >");
@@ -448,20 +459,24 @@ public:
     /**
      * normal order input, RBO output
      */
+    template<typename GFT>
     inline void nttr(GFT *const block) const {
         gs_butterfly(&_roots_ecc[0], &block[0], ecc_len, ecc_len);
     }
 
+    template<typename GFT>
     inline void inttr(GFT *const block) const {
         ct_butterfly(&_roots_i_ecc[0], &block[0], ecc_len);
         for (size_t i = 0; i < ecc_len; ++i)
             block[i] = gf.mul(block[i], ecc_len_i);
     }
 
+    template<typename GFT>
     inline void nttr2(GFT *const block) const {
         gs_butterfly(&_roots_ecc2[0], &block[0], ecc_len * 2, ecc_len * 2);
     }
 
+    template<typename GFT>
     inline void inttr2(GFT *const block) const {
         ct_butterfly(&_roots_i_ecc2[0], &block[0], ecc_len * 2);
         for (size_t i = 0; i < ecc_len * 2; ++i)
@@ -471,10 +486,12 @@ public:
     /**
      * RBO input, normal order output
      */
+    template<typename GFT>
     inline void ntt(GFT *const block) const {
         ct_butterfly(&_roots_ntt[0], &block[0], ntt_len);
     }
 
+    template<typename GFT>
     inline void intt(GFT *const block) const {
         gs_butterfly(&_roots_i_ntt[0], &block[0], ntt_len, ntt_len);
         for (size_t i = 0; i < ntt_len; ++i)

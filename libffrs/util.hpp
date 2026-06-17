@@ -81,7 +81,7 @@ using cast_arg_t = typename cast_arg<T>::type;
 template <typename Return, typename Class, typename...Args>
 constexpr auto cast_args(Return (Class::*method)(Args...)) {
     return [method](Class& self, typename detail::cast_arg<Args>::type...args) {
-        return (self.*method)(std::move(args)...);
+        return (self.*method)(std::forward<Args>(args)...);
     };
 }
 
