@@ -93,7 +93,7 @@ RSi16v<W>::~RSi16v() { }
 template<size_t W>
 void RSi16v<W>::_encode(GFT *const block) const {
     ntt.pntt_message_residue(&block[0]);
-    _mix_ecc(&block[0]);
+    _mix_ecc_residue(&block[0]);
 }
 
 
@@ -152,6 +152,8 @@ void RSi16v<W>::_repair(GFT *const block, GFT *const temp_ntt1_ecc6) const {
     r_print_vec("evaluator_poly", evaluator_poly, ecc_len);
 
     auto evaluator_poly_len = ::GFT(ecc_len) - locator_poly_len + 1;
+    if constexpr (!std::is_integral_v<GFT>)
+        evaluator_poly_len &= (locator_poly_len != 0);
 
     auto locator_poly_deriv = &temp_ntt1_ecc6[ecc_len * 2];
     std::copy_n(&locator_poly[0], ecc_len, &locator_poly_deriv[0]);
@@ -195,6 +197,8 @@ void RSi16v<W>::_repair(GFT *const block, const size_t *const error_pos_rbo, siz
     r_print_vec("locator_poly", locator_poly, ecc_len);
 
     auto locator_poly_deg = error_count;
+    r_print_vec("locator_poly_deg", &locator_poly_deg, 1);
+
     _error_evaluator(&locator_poly[0], locator_poly_deg, &evaluator_poly[0], &temp_ntt1_ecc6[ecc_len * 4]);
     r_print_vec("evaluator_poly", evaluator_poly, ecc_len);
 
@@ -399,6 +403,9 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
                 vec<GFT>::copy_n_masked(&q[0], ecc_len, &r1[0], cond);
                 a1_len = t_len;
                 r1_len = q_len;
+
+                if constexpr (!std::is_integral_v<GFT>)
+                    lanes &= cond;
             }
 
             ntt.inttr(r1);
@@ -457,6 +464,9 @@ inline void RSi16v<W>::_find_roots_ntt(
 
     auto locator_poly_deriv_len_max = vec<GFT>::max(locator_poly_deriv_len & lanes);
     auto evaluator_poly_len_max = vec<GFT>::max(evaluator_poly_len & lanes);
+
+    r_print("locator_poly_deriv_len_max", locator_poly_deriv_len_max);
+    r_print("evaluator_poly_len_max", evaluator_poly_len_max);
 
     for (::GFT i = 0; i < block_len; ++i) {
         auto i_rbo = ntt.rbo(i);
