@@ -25,6 +25,7 @@
 #include "pyrs256.hpp"
 #include "pyrsi16.hpp"
 #include "pycirc16.hpp"
+#include "pyntt.hpp"
 
 #include <pybind11/pybind11.h>
 
@@ -133,4 +134,5 @@ PYBIND11_MODULE(libffrs, m) {
     PyGFi16::register_class(m);
     PyRSi16::register_class(m);
     PyCIRC16::register_class(m);
+    NTT::register_class(m);
 }

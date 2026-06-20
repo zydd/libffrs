@@ -137,7 +137,7 @@ void RSi16v<W>::_repair(GFT *const block, GFT *const temp_ntt1_ecc6) const {
     r_print_vec("synds", synds, ecc_len);
 
     // stop if all synds are zero
-    if (std::all_of(&synds[0], &synds[ecc_len], [](const GFT& v) { return vec<GFT>::max(v) == 0; })) {
+    if (std::all_of(&synds[0], &synds[ecc_len], [](const GFT& v) { return vec::max(v) == 0; })) {
         r_print("no errors detected");
         return;
     }
@@ -159,7 +159,7 @@ void RSi16v<W>::_repair(GFT *const block, GFT *const temp_ntt1_ecc6) const {
     std::copy_n(&locator_poly[0], ecc_len, &locator_poly_deriv[0]);
     _deriv(locator_poly_deriv, ecc_len);
     r_print_vec("locator_poly_deriv", locator_poly_deriv, ecc_len);
-    auto locator_poly_deriv_len = _get_vec_size(&locator_poly_deriv[0], ecc_len);
+    auto locator_poly_deriv_len = vec::poly::len(&locator_poly_deriv[0], ecc_len);
 
     auto roots = &temp_ntt1_ecc6[ecc_len * 3];
     _find_roots_ntt(
@@ -185,7 +185,7 @@ void RSi16v<W>::_repair(GFT *const block, const size_t *const error_pos_rbo, siz
     r_print_vec("synds", synds, ecc_len);
 
     // stop if all synds are zero
-    if (std::all_of(&synds[0], &synds[ecc_len], [](const GFT& v) { return vec<GFT>::max(v) == 0; })) {
+    if (std::all_of(&synds[0], &synds[ecc_len], [](const GFT& v) { return vec::max(v) == 0; })) {
         r_print("no errors detected");
         return;
     }
@@ -208,11 +208,11 @@ void RSi16v<W>::_repair(GFT *const block, const size_t *const error_pos_rbo, siz
     // TODO: remove copy_n and add dst array to _deriv
     std::copy_n(&locator_poly[0], ecc_len, &locator_poly_deriv[0]);
     _deriv_shifted(locator_poly_deriv, ecc_len);
-    auto locator_poly_deriv_len = _get_vec_size(&locator_poly_deriv[0], ecc_len);
+    auto locator_poly_deriv_len = vec::poly::len(&locator_poly_deriv[0], ecc_len);
     r_print_vec("locator_poly_deriv", locator_poly_deriv, ecc_len);
 
     // TODO: only need to check one lane
-    auto locator_poly_deriv_len_max = vec<GFT>::max(locator_poly_deriv_len);
+    auto locator_poly_deriv_len_max = vec::max(locator_poly_deriv_len);
 
     for (size_t i = 0; i < error_count; ++i) {
         auto pos_rbo = error_pos_rbo[i];
@@ -237,7 +237,7 @@ void RSi16v<W>::_repair(GFT *const block, const size_t *const error_pos_rbo, siz
 
 template<size_t W>
 void RSi16v<W>::_repair_ntt(GFT *const block, const size_t *const error_pos_rbo, size_t error_count, GFT *const temp_ntt1_ecc6) const {
-        ntt.ntt(block);
+        ntt.ntt(&block[0]);
         auto locator_poly = &temp_ntt1_ecc6[block_len];
         _error_locator_rev(error_pos_rbo, error_count, locator_poly);
 
@@ -262,7 +262,7 @@ void RSi16v<W>::_repair_ntt(GFT *const block, const size_t *const error_pos_rbo,
         //     size_t i = error_pos_rbo[j];
         //     block[i] = gf.div(block[i], ntt_len);
         // }
-        ntt.intt(block);
+        ntt.intt(&block[0]);
 }
 
 template<size_t W>
@@ -288,7 +288,7 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
     std::fill_n(&a2[0], ecc_len, GFT{} + 1);
 
     // TODO test when second-to-last synd is 0
-    auto r1_len = _get_vec_size(&r1[0], ecc_len);
+    auto r1_len = vec::poly::len(&r1[0], ecc_len);
 
     ld_print("\n-----\nInitialize");
 
@@ -306,8 +306,8 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
         // a2 = 0
         // a1 = 1
         // A1 = -Q
-        auto r1h = vec<GFT>::gather(&r1[0], (r1_len - 1) & ::GFT(ecc_len_mask));
-        auto r1h2 = vec<GFT>::gather(&r1[0], GFT(r1_len - 2) & ::GFT(ecc_len_mask));
+        auto r1h = vec::gather(&r1[0], (r1_len - 1) & ::GFT(ecc_len_mask));
+        auto r1h2 = vec::gather(&r1[0], GFT(r1_len - 2) & ::GFT(ecc_len_mask));
 
         a1[1] = gf.neg(gf.inv(r1h));
         a1[0] = gf.mul(r1h2, gf.mul(a1[1], a1[1]));
@@ -318,8 +318,8 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
         for (size_t i = 1; i < ecc_len; ++i)
             r1[i] = gf.add(r1[i], gf.mul(a1[1], r2[i - 1]));
 
-        r1_len = _get_vec_size(r1, ecc_len - 1);
-        vec<GFT>::fill_n(&r1[0], r1_len, ::GFT(ecc_len) - r1_len, GFT{0});
+        r1_len = vec::poly::len(r1, ecc_len - 1);
+        vec::fill_n(&r1[0], r1_len, ::GFT(ecc_len) - r1_len, GFT{0});
 
         ld_print_vec("r1_len", &r1_len, 1);
         ld_print_vec("r1", r1, ecc_len);
@@ -339,13 +339,13 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
     }
 
     ld_print("------\n");
-    if (vec<GFT>::max(r1_len) >= ecc_len / 2) {
+    if (vec::max(r1_len) >= ecc_len / 2) {
         for (size_t i = 1; i < ecc_len / 2; ++i) {
             ld_print("------\nIteration begin");
 
             // auto r1h = r1[r1_len - 1];
             // TODO: mask gather
-            auto r1h = vec<GFT>::gather(&r1[0], (r1_len - 1) & ::GFT(ecc_len_mask));
+            auto r1h = vec::gather(&r1[0], (r1_len - 1) & ::GFT(ecc_len_mask));
             auto r1l = r1[0];
             ntt.nttr(r1);
 
@@ -392,15 +392,15 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
                 GFT cond = (r1_len >= ::GFT(ecc_len / 2));
                 ld_print_vec("update cond", &cond, 1);
 
-                if (vec<GFT>::is_zero(cond)) {
+                if (vec::is_zero(cond)) {
                     ntt.inttr(r1);
                     break;
                 }
 
                 // a1 = t;
                 // r1 = q;
-                vec<GFT>::copy_n_masked(&t[0], ecc_len, &a1[0], cond);
-                vec<GFT>::copy_n_masked(&q[0], ecc_len, &r1[0], cond);
+                vec::copy_n_masked(&t[0], ecc_len, &a1[0], cond);
+                vec::copy_n_masked(&q[0], ecc_len, &r1[0], cond);
                 a1_len = t_len;
                 r1_len = q_len;
 
@@ -410,7 +410,7 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
 
             ntt.inttr(r1);
 
-            r1_len = _get_vec_size(r1, vec<GFT>::max(r1_len & lanes));
+            r1_len = vec::poly::len(r1, vec::max(r1_len & lanes));
             ld_print_vec("r1_len", &r1_len, 1);
             ld_print("------\nIteration end");
         }
@@ -418,7 +418,7 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
 
     ntt.inttr(a1);
 
-    a1_len = _get_vec_size(a1, ecc_len);
+    a1_len = vec::poly::len(a1, ecc_len);
 
     ld_print("------\nFinal values");
     ld_print_vec("a1_len", &a1_len, 1);
@@ -455,15 +455,15 @@ inline void RSi16v<W>::_find_roots_ntt(
     std::fill_n(&roots[0], ntt_len, GFT{0});
     std::copy_n(&locator_poly[0], ecc_len, &roots[0]);
 
-    py_assert(vec<GFT>::max(locator_poly_len) <= ecc_len);
+    py_assert(vec::max(locator_poly_len) <= ecc_len);
     ntt.pintt_ecc(&roots[0]);
 
     GFT lanes = ~GFT{0};
     if constexpr (!std::is_integral_v<GFT>)
         lanes = (locator_poly_len != 0);
 
-    auto locator_poly_deriv_len_max = vec<GFT>::max(locator_poly_deriv_len & lanes);
-    auto evaluator_poly_len_max = vec<GFT>::max(evaluator_poly_len & lanes);
+    auto locator_poly_deriv_len_max = vec::max(locator_poly_deriv_len & lanes);
+    auto evaluator_poly_len_max = vec::max(evaluator_poly_len & lanes);
 
     r_print("locator_poly_deriv_len_max", locator_poly_deriv_len_max);
     r_print("evaluator_poly_len_max", evaluator_poly_len_max);
@@ -474,7 +474,7 @@ inline void RSi16v<W>::_find_roots_ntt(
         ::GFT x = ntt._roots_ntt[i_rbo];
         GFT root_locations = (roots[i] == 0) & lanes;
 
-        if (vec<GFT>::any(root_locations)) {
+        if (vec::any(root_locations)) {
             GFT error = _forney(
                 &locator_poly_deriv[0], locator_poly_deriv_len_max,
                 &evaluator_poly[0], evaluator_poly_len_max,
@@ -576,7 +576,7 @@ inline RSi16v<W>::GFT RSi16v<W>::_vec_sub(const GFT *const a, GFT a_len, GFT *co
     for (size_t i = 0; i < ecc_len; ++i)
         r[i] = gf.sub(a[i], b[i]);
 
-    return vec<GFT>::max(a_len, b_len);
+    return vec::max(a_len, b_len);
 }
 
 
@@ -584,12 +584,12 @@ template<size_t W>
 inline size_t RSi16v<W>::_norm_size_rev(GFT *const r, size_t r_len) const {
     check_le_ecc(r_len);
     size_t start = r_len;
-    while (start < ecc_len && vec<GFT>::is_zero(r[start]))
+    while (start < ecc_len && vec::is_zero(r[start]))
         ++start;
 
     if (start == ecc_len) {
         start = 0;
-        while (start < r_len && vec<GFT>::is_zero(r[start]))
+        while (start < r_len && vec::is_zero(r[start]))
             ++start;
     }
 
@@ -598,31 +598,6 @@ inline size_t RSi16v<W>::_norm_size_rev(GFT *const r, size_t r_len) const {
         return r_len;
     else
         return (r_len - start) & ecc_len_mask;
-}
-
-
-template<size_t W>
-inline RSi16v<W>::GFT RSi16v<W>::_get_vec_size(const GFT *const r, size_t r_len_max) const {
-    check_le_ecc(r_len_max);
-
-    GFT len = GFT{} + ::GFT(r_len_max);
-
-    if constexpr (std::is_integral_v<GFT>) {
-        while (r_len_max > 0 && vec<GFT>::is_zero(r[r_len_max - 1]))
-            --r_len_max;
-        return r_len_max;
-    } else {
-        GFT searching = (len > 0);
-        while (r_len_max > 0) {
-            searching &= (r[r_len_max - 1] == 0);
-            len += searching;
-            searching &= (len > 0);
-            --r_len_max;
-        }
-    }
-
-    check_le_ecc(len);
-    return len;
 }
 
 
@@ -685,3 +660,141 @@ inline void RSi16v<W>::_reverse_ntt_vec(GFT *const vec, GFT shift) const {
         vec[i] = gf.mul(vec[i], gf.gather(&ntt._roots_ecc[0], shift * j & ::GFT(ecc_len_mask)));
     }
 }
+
+
+template<typename GFT, size_t temp_mul = 0>
+inline py::bytearray _py_ntt_io(auto&& function, buffer_ro<uint16_t> input, size_t size, size_t temp_size = 0) {
+    py_assert(input.size == size * sizeof(GFT) / sizeof(::GFT), std::to_string(input.size) + " != " + std::to_string(size * sizeof(GFT) / sizeof(::GFT)));
+
+    auto temp = new_aligned<GFT>(size, sizeof(GFT));
+    auto temp2 = new_aligned<GFT>(temp_size * temp_mul, sizeof(GFT));
+
+    vec::copy_transposed(&input[0], size, reinterpret_cast<::GFT *>(&temp[0]), sizeof(GFT) / sizeof(::GFT));
+
+    GFT *result;
+    if constexpr (temp_mul == 0) {
+        function(&temp[0]);
+        result = &temp[0];
+    } else {
+        result = function(&temp[0], &temp2[0]);
+    }
+
+    auto output = py::bytearray(nullptr, size * sizeof(GFT) / sizeof(::GFT) * sizeof(uint16_t));
+    auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
+    vec::copy_transposed(reinterpret_cast<::GFT *>(&result[0]), sizeof(GFT) / sizeof(::GFT), &output_data[0], size);
+    return output;
+}
+
+
+template<typename GFT>
+inline py::bytearray _py_ntt_io2(auto&& function, buffer_ro<uint16_t> a, buffer_ro<uint16_t> b, size_t size) {
+    py_assert(a.size == size * sizeof(GFT) / sizeof(::GFT), std::to_string(a.size) + " != " + std::to_string(size * sizeof(GFT) / sizeof(::GFT)));
+    py_assert(b.size == size * sizeof(GFT) / sizeof(::GFT), std::to_string(b.size) + " != " + std::to_string(size * sizeof(GFT) / sizeof(::GFT)));
+
+    auto temp_a = new_aligned<GFT>(size, sizeof(GFT));
+    auto temp_b = new_aligned<GFT>(size, sizeof(GFT));
+
+    vec::copy_transposed(&a[0], size, reinterpret_cast<::GFT *>(&temp_a[0]), sizeof(GFT) / sizeof(::GFT));
+    vec::copy_transposed(&b[0], size, reinterpret_cast<::GFT *>(&temp_b[0]), sizeof(GFT) / sizeof(::GFT));
+
+    auto result = function(&temp_a[0], &temp_b[0]);
+
+    auto output = py::bytearray(nullptr, size * sizeof(GFT) / sizeof(::GFT) * sizeof(uint16_t));
+    auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
+    vec::copy_transposed(reinterpret_cast<::GFT *>(&result[0]), sizeof(GFT) / sizeof(::GFT), &output_data[0], size);
+    return output;
+}
+
+
+template<typename GFT>
+py::bytearray NTT::py_ntt(buffer_ro<uint16_t> input) const {
+    return _py_ntt_io<GFT>([this](GFT *block) { ntt(&block[0]); }, std::move(input), ntt_len);
+}
+
+template<typename GFT>
+py::bytearray NTT::py_intt(buffer_ro<uint16_t> input) const {
+    return _py_ntt_io<GFT>([this](GFT *block) { intt(&block[0]); }, std::move(input), ntt_len);
+}
+
+template<typename GFT>
+py::bytearray NTT::py_nttr(buffer_ro<uint16_t> input) const {
+    return _py_ntt_io<GFT>([this](GFT *block) { nttr(&block[0]); }, std::move(input), ntt_len);
+}
+
+template<typename GFT>
+py::bytearray NTT::py_inttr(buffer_ro<uint16_t> input) const {
+    return _py_ntt_io<GFT>([this](GFT *block) { inttr(&block[0]); }, std::move(input), ntt_len);
+}
+
+template<typename GFT>
+py::bytearray NTT::py_poly_mul(buffer_ro<uint16_t> a, buffer_ro<uint16_t> b) const {
+    return _py_ntt_io2<GFT>([this](GFT *a, GFT *b) -> GFT * {
+        nttr(&a[0]);
+        nttr(&b[0]);
+        poly_mul_ntt(a, GFT{} + ::GFT(ecc_len), b, GFT{} + ::GFT(ecc_len), a);
+        inttr(&a[0]);
+        return &a[0];
+    }, std::move(a), std::move(b), ecc_len);
+}
+
+template<typename GFT>
+py::bytearray NTT::py_poly_div(buffer_ro<uint16_t> a, buffer_ro<uint16_t> b) const {
+    py_assert(a.size == ecc_len * sizeof(GFT) / sizeof(::GFT), std::to_string(a.size) + " != " + std::to_string(ecc_len * sizeof(GFT) / sizeof(::GFT)));
+    py_assert(b.size == ecc_len * sizeof(GFT) / sizeof(::GFT), std::to_string(b.size) + " != " + std::to_string(ecc_len * sizeof(GFT) / sizeof(::GFT)));
+
+    auto temp_a = new_aligned<GFT>(ecc_len, sizeof(GFT));
+    auto temp_b = new_aligned<GFT>(ecc_len, sizeof(GFT));
+    auto temp_t = new_aligned<GFT>(ecc_len, sizeof(GFT));
+    auto temp_q = new_aligned<GFT>(ecc_len, sizeof(GFT));
+
+    vec::copy_transposed(&a[0], ecc_len, reinterpret_cast<::GFT *>(&temp_a[0]), sizeof(GFT) / sizeof(::GFT));
+    vec::copy_transposed(&b[0], ecc_len, reinterpret_cast<::GFT *>(&temp_b[0]), sizeof(GFT) / sizeof(::GFT));
+
+    auto a_len = vec::poly::len(&temp_a[0], ecc_len);
+    auto b_len = vec::poly::len(&temp_b[0], ecc_len);
+    auto al = temp_a[0];
+    auto bh = vec::gather(&temp_b[0], (b_len - 1) & ::GFT(ecc_len_mask));
+
+    nttr(&temp_a[0]);
+    nttr(&temp_b[0]);
+
+    poly_div_ntt(
+        &temp_a[0], a_len,
+        &temp_b[0], b_len,
+        al, bh,
+        &temp_t[0], &temp_q[0]
+    );
+
+    inttr(&temp_q[0]);
+
+    auto output = py::bytearray(nullptr, ecc_len * sizeof(GFT) / sizeof(::GFT) * sizeof(uint16_t));
+    auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
+    vec::copy_transposed(reinterpret_cast<::GFT *>(&temp_q[0]), sizeof(GFT) / sizeof(::GFT), &output_data[0], ecc_len);
+    return output;
+}
+
+template<typename GFT>
+py::bytearray NTT::py_poly_inv(buffer_ro<uint16_t> input, size_t n) const {
+    py_assert(input.size == ecc_len * sizeof(GFT) / sizeof(::GFT), std::to_string(input.size) + " != " + std::to_string(ecc_len * sizeof(GFT) / sizeof(::GFT)));
+    return _py_ntt_io<GFT, 1>([this, n](GFT *g, GFT *res) {
+        auto g0 = g[0];
+        auto g_len = vec::poly::len(&g[0], ecc_len);
+        nttr(&g[0]);
+        poly_inv_mod_xn_rev(&g[0], g_len, g0, GFT{} + ::GFT(n), &res[0]);
+        inttr(&res[0]);
+        std::reverse(&res[0], &res[n]);
+        return res;
+    }, std::move(input), ecc_len, ecc_len);
+}
+
+
+#define RSI16V_IMPL_GFT simd_map_t<RSI16V_IMPL_INSTANCE_W>
+
+template class RSi16v<RSI16V_IMPL_INSTANCE_W>;
+template py::bytearray NTT::py_ntt<RSI16V_IMPL_GFT>(buffer_ro<uint16_t> input) const;
+template py::bytearray NTT::py_intt<RSI16V_IMPL_GFT>(buffer_ro<uint16_t> input) const;
+template py::bytearray NTT::py_nttr<RSI16V_IMPL_GFT>(buffer_ro<uint16_t> input) const;
+template py::bytearray NTT::py_inttr<RSI16V_IMPL_GFT>(buffer_ro<uint16_t> input) const;
+template py::bytearray NTT::py_poly_mul<RSI16V_IMPL_GFT>(buffer_ro<uint16_t> a, buffer_ro<uint16_t> b) const;
+template py::bytearray NTT::py_poly_div<RSI16V_IMPL_GFT>(buffer_ro<uint16_t> a, buffer_ro<uint16_t> b) const;
+template py::bytearray NTT::py_poly_inv<RSI16V_IMPL_GFT>(buffer_ro<uint16_t> a, size_t n) const;

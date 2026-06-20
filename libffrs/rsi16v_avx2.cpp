@@ -19,11 +19,10 @@
 #include <cstdint>
 #include <immintrin.h>
 
+#define RSI16V_IMPL_INSTANCE_W 8
 #include "rsi16v_impl.hpp"
+
 #include "simd.hpp"
-
-
-template class RSi16v<8>;
 
 
 template<>
@@ -36,16 +35,16 @@ GFTx8 ffrs::simd_gather_base::gather(const uint32_t vec[], GFTx8 const& i) {
 }
 
 
-template<>
-void vec<GFTx8>::assign_masked(GFTx8& vec, GFTx8 const& value, GFTx8 const& condition) {
-    for (int j = 0; j < 8; j++)
-        if (condition[j])
-            vec[j] = value[j];
-}
+// template<>
+// void vec::assign_masked<GFTx8>(GFTx8& vec, GFTx8 const& value, GFTx8 const& condition) {
+//     for (int j = 0; j < 8; j++)
+//         if (condition[j])
+//             vec[j] = value[j];
+// }
 
 
 template<>
-void vec<GFTx8>::copy_n_masked(const GFTx8 src[], size_t n, GFTx8 dst[], GFTx8 const& condition) {
+void vec::copy_n_masked<GFTx8>(const GFTx8 src[], size_t n, GFTx8 dst[], GFTx8 const& condition) {
     // TODO: test if copying columns perform better
     for (size_t i = 0; i < n; i++) {
         for (int j = 0; j < 8; j++)
@@ -56,7 +55,7 @@ void vec<GFTx8>::copy_n_masked(const GFTx8 src[], size_t n, GFTx8 dst[], GFTx8 c
 
 
 template<>
-simd_mask_t vec<GFTx8>::is_zero(GFTx8 const& vec) {
+simd_mask_t vec::is_zero<GFTx8>(GFTx8 const& vec) {
     // return std::all_of(
     //     reinterpret_cast<const uint32_t *>(&vec),
     //     reinterpret_cast<const uint32_t *>(&vec) + 8,

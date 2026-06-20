@@ -326,49 +326,6 @@ struct NTT {
     }
 
     template<typename GFT>
-    inline GFT _vec_inv_mod_xn(GFT *const g, GFT g0, GFT a_len, GFT *const a) const {
-        pd_print("_vec_inv_mod_xn >", py::arg("sep") = "");
-        pd_print_vec("n", &a_len, 1);
-        pd_print_vec("rev_g[0]", &g0, 1);
-        // check_le_ecc(a_len);
-
-        size_t l = 1;
-
-        // a = P([g.x[0].inv()])
-        std::fill_n(&a[0], ecc_len, gf.inv(g0));
-
-        auto a_max = vec<GFT>::max(a_len);
-        while (l < a_max) {
-            pd_print("inverse modulo", l);
-
-            // A = [a * (GF(2) - a * g) for a, g in zip(A, G)]
-            for (size_t i = 0; i < ecc_len; ++i) {
-                GFT a_i = a[i];
-                GFT ag = gf.mul(a_i, g[i]);
-                a[i] = gf.mul(a_i, gf.sub(GFT{} + 2, ag));
-            }
-
-            inttr(a);
-            // A = A % x**a_len
-            // std::fill_n(&a[a_len], ecc_len - a_len, GFT{0});
-            vec<GFT>::fill_n(&a[0], a_len, ::GFT(ecc_len) - a_len, GFT{0});
-            pd_print_vec("a", a, ecc_len);
-
-            // Reverse result in last iteration
-            if (l * 2 >= a_max) {
-                std::reverse(&a[0], &a[a_max]);
-                vec<GFT>::copy_n(&a[0], a_max - a_len, a_len, &a[0], GFT{0});
-                vec<GFT>::fill_n(&a[0], a_len, ::GFT(ecc_len) - a_len, GFT{0});
-            }
-            nttr(a);
-
-            l *= 2;
-        }
-
-        return a_len;
-    }
-
-    template<typename GFT>
     inline void _reverse_ntt(GFT *const vec, size_t shift) const {
         // check_le_ecc(shift);
 
@@ -404,19 +361,110 @@ struct NTT {
     }
 
     template<typename GFT>
+    inline GFT poly_inv_mod_xn_rev(GFT *g, GFT g_len, GFT g0, GFT a_len, GFT *const a) const {
+        pd_print("poly_inv_mod_xn_rev >", py::arg("sep") = "");
+        pd_print_vec("n", &a_len, 1);
+        pd_print_vec("rev_g[0]", &g0, 1);
+        // check_le_ecc(a_len);
+
+        // a = P([g.x[0].inv()])
+        auto a0 = gf.inv(g0);
+        std::fill_n(&a[0], ecc_len, a0);
+
+        size_t l = 2;
+        auto a_max = vec::max(a_len);
+        while (l < a_max) {
+            pd_print("inverse modulo", l);
+            pd_print_vec_intt("g", g, ecc_len);
+            pd_print_vec_intt("a", a, ecc_len);
+
+            // A = [a * (GF(2) - a * g) for a, g in zip(A, G)]
+            py_assert(
+                vec::max(g_len) + l - 2 <= ecc_len,
+                std::to_string(vec::max(g_len)) + " + " + std::to_string(l) + " - 2 > " + std::to_string(ecc_len)
+            );
+            for (size_t i = 0; i < ecc_len; ++i) {
+                GFT a_i = a[i];
+                GFT ag = gf.mul(a_i, g[i]);
+                a[i] = gf.mul(a_i, gf.sub(GFT{} + 2, ag));
+            }
+
+            inttr(a);
+
+            // A = A % x**a_len
+            std::fill_n(&a[l], ::GFT(ecc_len - l), GFT{0});
+
+            pd_print_vec("a", a, ecc_len);
+
+            nttr(a);
+
+            l *= 2;
+        }
+
+        // last iteration
+        {
+            pd_print("inverse modulo", l);
+            pd_print_vec_intt("g", g, ecc_len);
+            pd_print_vec_intt("a", a, ecc_len);
+
+            // // A = [a * (GF(2) - a * g) for a, g in zip(A, G)]
+            // for (size_t i = 0; i < ecc_len; ++i) {
+            //     GFT a_i = a[i];
+            //     GFT ag = gf.mul(a_i, g[i]);
+            //     a[i] = gf.mul(a_i, gf.sub(GFT{} + 2, ag));
+            // }
+            // // Fix aliasing
+            // a[0] = a0;
+            for (size_t i = 0; i < ecc_len; ++i) {
+                GFT ag = gf.mul(a[i], g[i]);
+                g[i] = gf.sub(GFT{} + 2, ag);
+            }
+            pd_print_vec_intt("2 - ag", g, ecc_len);
+            for (size_t i = 0; i < ecc_len; ++i)
+                g[i] = gf.mul(a[i], g[i]);
+
+            inttr(a);
+            inttr(g);
+            std::copy_n(&g[l / 2], ecc_len - l / 2, &a[l / 2]);
+
+            // A = A % x**a_len
+            std::fill_n(&a[l], ::GFT(ecc_len - l), GFT{0});
+
+            pd_print_vec("a", a, ecc_len);
+
+            // poly_div expects the result to be reversed
+            std::reverse(&a[0], &a[a_max]);
+            vec::copy_n(&a[0], a_max - a_len, a_len, &a[0], GFT{0});
+            vec::fill_n(&a[0], a_len, ::GFT(ecc_len) - a_len, GFT{0});
+
+            pd_print_vec("a_rev", a, ecc_len);
+
+            nttr(a);
+        }
+
+        return a_len;
+    }
+
+    template<typename GFT>
     inline GFT poly_div_ntt(const GFT *const f, GFT f_len, const GFT *const g, GFT g_len, GFT f0, GFT g0, GFT *const t, GFT *const q) const {
+        pd_print("\npoly_div >");
+        pd_print_vec("f_len (init)", &f_len, 1);
+        pd_print_vec("g_len (init)", &g_len, 1);
         GFT q_len = f_len - g_len + 1;
-        pd_print("\n_vec_div >");
         pd_print_vec("q_len (init)", &q_len, 1);
+        pd_print_vec("f[0]", &f0, 1);
+        pd_print_vec("g[-1]", &g0, 1);
 
         if constexpr (std::is_integral_v<GFT>) {
-            if (f_len <= g_len) {
+            py_assert(g_len > 0);
+            if (f_len < g_len) {
                 std::fill_n(&q[0], ecc_len, GFT{0});
                 return 0;
             }
         } else {
+            py_assert(!vec::any((g_len == 0) && (f_len > 0)));
             // guard against empty lanes
-            q_len &= (g_len != 0) & (f_len > g_len);
+            q_len &= (g_len != 0) & (f_len >= g_len);
         }
 
         pd_print_vec("q_len", &q_len, 1);
@@ -427,26 +475,61 @@ struct NTT {
         _reverse_ntt_vec(t, g_len);
         pd_print_vec_intt("g_rev", t, ecc_len);
 
-        _vec_inv_mod_xn(t, g0, q_len, q);
-        pd_print_vec_intt("rev_g_inv_rev", q, ecc_len);
+        auto g_inv_len = poly_inv_mod_xn_rev(t, g_len, g0, q_len, q);
+        pd_print_vec_intt("g_rev_inv_rev", q, ecc_len);
+        pd_print_vec("g_rev_inv_rev_len", &g_inv_len, 1);
 
         // avoid aliasing: f[0] = 0
         std::copy_n(&f[0], ecc_len, &t[0]);
         pd_print_vec_intt("f", t, ecc_len);
-        for (size_t j = 0; j < ecc_len; ++j)
-            t[j] = gf.sub(t[j], f0);
-        pd_print_vec_intt("f (f[0] = 0)", t, ecc_len);
+        // if constexpr (std::is_integral_v<GFT>) {
+        //     if (f_len > g_len) {
+                for (size_t j = 0; j < ecc_len; ++j)
+                    t[j] = gf.sub(t[j], f0);
+                // inttr(t);
+                // vec::fill_n(&t[0], GFT{0}, f_len - q_len + 1, GFT{0});
+                // nttr(t);
+                pd_print_vec_intt("f (f[0] = 0)", t, ecc_len);
+        //     }
+        // }
 
-        // t = f * rev_g_inv_rev (shifted) % mod
+        // t = f * g_rev_inv_rev (shifted) % mod
         poly_mul_ntt(t, f_len, q, q_len, t);
 
         inttr(t);
-        pd_print_vec("f * rev_g_inv_rev", t, ecc_len);
+        pd_print_vec("f * g_rev_inv_rev", t, ecc_len);
         {
-            auto right_n = vec<GFT>::min(q_len, ::GFT(ecc_len) - g_len);
-            vec<GFT>::copy_n(&t[0], g_len, right_n, &q[0], GFT{0});
-            vec<GFT>::copy_n(&t[0], GFT{0}, q_len - right_n, &q[0], right_n);
-            vec<GFT>::fill_n(&q[0], q_len, ::GFT(ecc_len) - q_len, GFT{0});
+
+            // if constexpr (std::is_integral_v<GFT>) {
+            //     if (f_len > g_len) {
+            //         GFT end = (f_len + g_inv_len - 1) & ecc_len_mask;
+            //         pd_print_vec("end", &end, 1);
+            //         pd_print_vec("q_len", &q_len, 1);
+
+            //         if (end < q_len) {
+            //             vec::copy_n(&t[0], GFT{0}, end, &q[0], q_len - end);
+            //             pd_print_vec("q1", q, ecc_len);
+            //             GFT right = q_len - end;
+            //             vec::copy_n(&t[0], ::GFT(ecc_len) - right, right, &q[0], GFT{0});
+            //         } else if (end > q_len) {
+            //             vec::copy_n(&t[0], end - q_len, q_len, &q[0], GFT{0});
+            //         }
+            //         q[0] = GFT{0};
+            //     } else {
+            //         // f_len - q_len = f_len - (f_len - g_len + 1) = g_len - 1
+            //         auto right_n = vec::min(q_len, ::GFT(ecc_len) - g_len + 1);
+            //         pd_print_vec("right_n", &right_n, 1);
+            //         vec::copy_n(&t[0], g_len - 1, right_n, &q[0], GFT{0});
+            //         vec::copy_n(&t[0], GFT{0}, q_len - right_n, &q[0], right_n);
+            //     }
+            // }
+
+            auto right_n = vec::min(q_len, ::GFT(ecc_len) - g_len);
+            vec::copy_n(&t[0], g_len, right_n, &q[0], GFT{0});
+            vec::copy_n(&t[0], GFT{0}, q_len - right_n, &q[0], right_n);
+            vec::fill_n(&q[0], q_len, ::GFT(ecc_len) - q_len, GFT{0});
+
+            vec::fill_n(&q[0], q_len, ::GFT(ecc_len) - q_len, GFT{0});
         }
         pd_print_vec("q", q, ecc_len);
 
@@ -497,4 +580,21 @@ struct NTT {
         for (size_t i = 0; i < ntt_len; ++i)
             block[i] = gf.mul(block[i], ntt_len_i);
     }
+
+    template<typename GFT>
+    py::bytearray py_ntt(buffer_ro<uint16_t> input) const;
+    template<typename GFT>
+    py::bytearray py_intt(buffer_ro<uint16_t> input) const;
+    template<typename GFT>
+    py::bytearray py_nttr(buffer_ro<uint16_t> input) const;
+    template<typename GFT>
+    py::bytearray py_inttr(buffer_ro<uint16_t> input) const;
+    template<typename GFT>
+    py::bytearray py_poly_mul(buffer_ro<uint16_t> a, buffer_ro<uint16_t> b) const;
+    template<typename GFT>
+    py::bytearray py_poly_div(buffer_ro<uint16_t> a, buffer_ro<uint16_t> b) const;
+    template<typename GFT>
+    py::bytearray py_poly_inv(buffer_ro<uint16_t> a, size_t n) const;
+
+    static void register_class(py::module &m);
 };

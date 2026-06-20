@@ -63,7 +63,7 @@ public:
                 Args:
                     primitive : :math:`a` -- primitive value used to generate the field
                 )",
-                "primitive"_a
+                "primitive"_a = 3
             )
             .def("__sizeof_cpp__", [](PyGFi16& self) { return sizeof(self); })
             .def("mul", static_cast<GFT (PyGFi16::*)(GFT const&, GFT const&) const>(&PyGFi16::mul), R"(Multiplication: :math:`\text{lhs} \times \text{rhs}`)", "lhs"_a, "rhs"_a)

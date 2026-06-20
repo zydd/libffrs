@@ -73,14 +73,17 @@ def gen(obj, instances) -> str:
         if not inspect.isclass(member) and callable(member):
             newline = member.__doc__.find("\n")
             sig = member.__doc__[:newline]
-            doc = member.__doc__[newline + 1 :].strip()
+            if sig.startswith(name):
+                doc = member.__doc__[newline + 1 :].strip()
 
-            method_body = ""
-            if doc:
-                textwrap.indent(format_docstring(doc), "    ")
-
-            method_body += "    ..."
-            lines.append(f"def {sig}:\n{method_body}")
+                method_body = ""
+                if doc:
+                    method_body += textwrap.indent(format_docstring(doc), "    ")
+                else:
+                    method_body += "    ..."
+                lines.append(f"def {sig}:\n{method_body}")
+            else:
+                lines.append(f"def {name}(self, *args, **kwargs) -> Any: ...\n")
 
     return "\n".join(lines)
 
@@ -102,6 +105,7 @@ class_stubs = {
     "GFi16": libffrs.GFi16(3),
     "GF256": libffrs.GF256(),
     "RS256": libffrs.RS256(4, 2),
+    "NTT": libffrs.RSi16(4, 2).ntt,
 }
 
 output_dir = sys.argv[1]

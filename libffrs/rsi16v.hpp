@@ -31,13 +31,13 @@ using GFT = uint32_t;
 
 template<size_t W>
 class RSi16v {
-private:
     const GFi16 &gf;
+
+public:
     const NTT ntt;
     std::vector<::GFT> _ecc_mix;
     std::vector<::GFT> _ecc_mix_i;
 
-public:
     const ::GFT root;
     const size_t ntt_len;
     const size_t block_len;
@@ -47,7 +47,6 @@ public:
     using cGFT = const GFT *const;
     using mGFT = GFT *const;
 
-public:
     RSi16v(GFi16 const& gf, size_t block_len, size_t ecc_len);
     ~RSi16v();
 

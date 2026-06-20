@@ -84,11 +84,14 @@ class CIRC16:
     """SIMD x8 encoding enabled (AVX2)"""
 
     def __init__(self: libffrs.CIRC16, inner_block_len: typing.SupportsInt | typing.SupportsIndex, inner_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_block_len: typing.SupportsInt | typing.SupportsIndex, outer_ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
-        ...
+        """Cross-interleaved Reed-Solomon coder"""
+
     def encode(self: libffrs.CIRC16, buffer: collections.abc.Buffer) -> bytearray:
-        ...
+        """Encode data"""
+
     def repair(self: libffrs.CIRC16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bool:
-        ...
+        """Repair data"""
+
 
 
 class GF256:
@@ -110,41 +113,74 @@ class GF256:
     """Primitive value used to generate the field"""
 
     def __init__(self: libffrs.GF256, primitive: typing.SupportsInt | typing.SupportsIndex = 2, poly1: typing.SupportsInt | typing.SupportsIndex = 285) -> None:
-        ...
+        """
+        Instantiate type for operations over :math:`GF(p^n)/P`
+
+                        Args:
+                            primitive : :math:`a` -- primitive value used to generate the field
+                            polynomial : :math:`P` -- irreducible polynomial used to generate the field
+        """
+
     def add(self: libffrs.GF256, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Addition: :math:`\text{lhs} + \text{rhs}`"""
+
     def div(self: libffrs.GF256, num: typing.SupportsInt | typing.SupportsIndex, den: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Division: :math:`\frac{\text{num}}{\text{den}}`"""
+
     def exp(self: libffrs.GF256, value: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Exponential function: :math:`a^{\text{value}}`"""
+
     def inv(self: libffrs.GF256, value: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Reciprocal: :math:`\frac{1}{\text{value}}`"""
+
     def log(self: libffrs.GF256, value: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Logarithm: :math:`\log_a (\text{value})`"""
+
     def mul(self: libffrs.GF256, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Multiplication: :math:`\text{lhs} \times \text{rhs}`"""
+
     def mul8(self: libffrs.GF256, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
-        ...
+        """Multiply 8 values in a single operation"""
+
     def poly_add(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
-        ...
+        """Add polynomials"""
+
     def poly_divmod(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> tuple:
-        ...
+        """
+        Polynomial quotient and remainder
+
+                            Returns:
+                                (quotient, remainder)
+        """
+
     def poly_eval(self: libffrs.GF256, poly: collections.abc.Buffer, x: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Evaluate polynomial at ``x``"""
+
     def poly_eval8(self: libffrs.GF256, poly: collections.abc.Buffer, xs: collections.abc.Buffer) -> bytearray:
-        ...
+        """Evaluate polynomial at 8 points on a single operation"""
+
     def poly_mod(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
-        ...
+        """Polynomial remainder"""
+
     def poly_mod_x_n(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
-        ...
+        """
+        Shifted polynomial remainder
+
+                            :math:`P \times X^n \mod (X^n + p_2)` where ``n = len(p2)``
+        """
+
     def poly_mul(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
-        ...
+        """Multiply polynomials"""
+
     def poly_sub(self: libffrs.GF256, p1: collections.abc.Buffer, p2: collections.abc.Buffer) -> bytearray:
-        ...
+        """Subtract polynomials"""
+
     def pow(self: libffrs.GF256, base: typing.SupportsInt | typing.SupportsIndex, exponent: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Power: :math:`\text{base}^\text{exponent}`"""
+
     def sub(self: libffrs.GF256, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Subtraction: :math:`\text{lhs} - \text{rhs}`"""
+
 
 
 class GFi16:
@@ -162,24 +198,141 @@ class GFi16:
     primitive: int
     """Primitive value used to generate the field"""
 
-    def __init__(self: libffrs.GFi16, primitive: typing.SupportsInt | typing.SupportsIndex) -> None:
-        ...
+    def __init__(self: libffrs.GFi16, primitive: typing.SupportsInt | typing.SupportsIndex = 3) -> None:
+        """
+        Instantiate type for operations over :math:`GF(65537)`
+
+                        Args:
+                            primitive : :math:`a` -- primitive value used to generate the field
+        """
+
     def add(self: libffrs.GFi16, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Addition: :math:`\text{lhs} + \text{rhs}`"""
+
     def div(self: libffrs.GFi16, num: typing.SupportsInt | typing.SupportsIndex, den: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Division: :math:`\frac{\text{num}}{\text{den}}`"""
+
     def exp(self: libffrs.GFi16, value: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Exponential function: :math:`a^{\text{value}}`"""
+
     def inv(self: libffrs.GFi16, value: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Reciprocal: :math:`\frac{1}{\text{value}}`"""
+
     def log(self: libffrs.GFi16, value: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Logarithm: :math:`\log_a (\text{value})`"""
+
     def mul(self: libffrs.GFi16, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Multiplication: :math:`\text{lhs} \times \text{rhs}`"""
+
     def pow(self: libffrs.GFi16, base: typing.SupportsInt | typing.SupportsIndex, exponent: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Power: :math:`\text{base}^\text{exponent}`"""
+
     def sub(self: libffrs.GFi16, lhs: typing.SupportsInt | typing.SupportsIndex, rhs: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Subtraction: :math:`\text{lhs} - \text{rhs}`"""
+
+
+
+class NTT:
+    block_len: int
+    ecc_len: int
+    ecc_size: int
+    ntt16_size: int
+    ntt4_size: int
+    ntt8_size: int
+    ntt_len: int
+    ntt_size: int
+    def __init__(self: libffrs.NTT, gf: libffrs.GFi16, block_len: typing.SupportsInt | typing.SupportsIndex, ecc_len: typing.SupportsInt | typing.SupportsIndex) -> None:
+        """
+        Args:
+                        gf: :class:`GFi16` instance
+                        block_len: Number of data symbols per block.
+                        ecc_len: Number of ECC symbols per block.
+        """
+
+    def intt(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """Normal order input, RBO output"""
+
+    def intt16(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """Normal order input, RBO output"""
+
+    def intt4(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """Normal order input, RBO output"""
+
+    def intt8(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """Normal order input, RBO output"""
+
+    def inttr(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """RBO input, Normal order output"""
+
+    def inttr16(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """RBO input, Normal order output"""
+
+    def inttr4(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """RBO input, Normal order output"""
+
+    def inttr8(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """RBO input, Normal order output"""
+
+    def ntt(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """RBO input, normal order output"""
+
+    def ntt16(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """RBO input, normal order output"""
+
+    def ntt4(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """RBO input, normal order output"""
+
+    def ntt8(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """RBO input, normal order output"""
+
+    def nttr(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """Normal order input, RBO output"""
+
+    def nttr16(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """Normal order input, RBO output"""
+
+    def nttr4(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """Normal order input, RBO output"""
+
+    def nttr8(self: libffrs.NTT, input: collections.abc.Buffer) -> bytearray:
+        """Normal order input, RBO output"""
+
+    def poly_div(self: libffrs.NTT, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
+        """Polynomial division"""
+
+    def poly_div16(self: libffrs.NTT, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
+        """Polynomial division x16"""
+
+    def poly_div4(self: libffrs.NTT, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
+        """Polynomial division x4"""
+
+    def poly_div8(self: libffrs.NTT, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
+        """Polynomial division x8"""
+
+    def poly_inv(self: libffrs.NTT, a: collections.abc.Buffer, n: typing.SupportsInt | typing.SupportsIndex) -> bytearray:
+        """Polynomial inverse"""
+
+    def poly_inv16(self: libffrs.NTT, a: collections.abc.Buffer, n: typing.SupportsInt | typing.SupportsIndex) -> bytearray:
+        """Polynomial inverse x16"""
+
+    def poly_inv4(self: libffrs.NTT, a: collections.abc.Buffer, n: typing.SupportsInt | typing.SupportsIndex) -> bytearray:
+        """Polynomial inverse x4"""
+
+    def poly_inv8(self: libffrs.NTT, a: collections.abc.Buffer, n: typing.SupportsInt | typing.SupportsIndex) -> bytearray:
+        """Polynomial inverse x8"""
+
+    def poly_mul(self: libffrs.NTT, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
+        """Element wise multiplication"""
+
+    def poly_mul16(self: libffrs.NTT, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
+        """Element wise multiplication x16"""
+
+    def poly_mul4(self: libffrs.NTT, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
+        """Element wise multiplication x4"""
+
+    def poly_mul8(self: libffrs.NTT, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
+        """Element wise multiplication x8"""
+
 
 
 class RS256:
@@ -195,13 +348,17 @@ class RS256:
     message_len: int
     message_size: int
     def __init__(self: libffrs.RS256, block_len: typing.SupportsInt | typing.SupportsIndex | None = None, message_len: typing.SupportsInt | typing.SupportsIndex | None = None, ecc_len: typing.SupportsInt | typing.SupportsIndex | None = None, primitive: typing.SupportsInt | typing.SupportsIndex = 2, polynomial: typing.SupportsInt | typing.SupportsIndex = 285) -> None:
-        ...
+        """Instantiate a Reed-Solomon encoder with the given configuration"""
+
     def _synds(self: libffrs.RS256, buffer: collections.abc.Buffer) -> bytearray:
-        ...
+        """Compute syndromes"""
+
     def encode(self: libffrs.RS256, buffer: collections.abc.Buffer) -> bytearray:
-        ...
+        """Encode message, return ecc"""
+
     def repair(self: libffrs.RS256, buffer: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bool:
-        ...
+        """Repair message + ecc"""
+
 
 
 class RSi16:
@@ -230,6 +387,9 @@ class RSi16:
 
     message_size: int
     """Interleaved message size in bytes"""
+
+    ntt: libffrs.NTT
+    """:class:`NTT` instance"""
 
     ntt_len: int
     """Number theoretic transform length"""
@@ -268,18 +428,29 @@ class RSi16:
     """SIMD x8 encoding enabled (AVX2)"""
 
     def __init__(self: libffrs.RSi16, block_len: typing.SupportsInt | typing.SupportsIndex, ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
-        ...
+        """Instantiate a Reed-Solomon encoder with the given configuration"""
+
     def encode(self: libffrs.RSi16, buffer: collections.abc.Buffer) -> bytearray:
-        ...
+        """Systematic encode"""
+
     def rbo(self: libffrs.RSi16, i: typing.SupportsInt | typing.SupportsIndex) -> int:
-        ...
+        """Reverse Bit Order"""
+
     def repair(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer, error_pos: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex] | None = None) -> None:
-        ...
+        """Repair a block with the given error locations"""
+
     def synd(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bytearray:
-        ...
+        """Calculate syndromes for the given message and ecc buffers"""
+
 
 
 def create_buffer(size: typing.SupportsInt | typing.SupportsIndex) -> memoryview:
-    ...
+    """
+    Create a memory buffer of the specified size, backed by hugepages if possible.
+
+            The buffer is returned as a memoryview object that can be used in Python.
+    """
+
 def set_logger(logger: object) -> None:
-    ...
+    """Logger object to be used by C++ library or ``None`` to disable logging."""
+

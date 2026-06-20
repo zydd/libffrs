@@ -28,14 +28,14 @@ namespace detail {
  * Adaptor to automatically request buffer_info and cast pointer to data
  */
 template<typename T, bool writeable>
-class buffer_adpator {
+class buffer_adaptor {
 public:
     pybind11::buffer buffer;
     pybind11::buffer_info info;
     size_t size = 0;
     T *data = nullptr;
 
-    inline buffer_adpator(const pybind11::buffer& o):
+    inline buffer_adaptor(const pybind11::buffer& o):
         buffer(std::move(o)),
         info(buffer.request(false)),
         size(size_t(info.size) / sizeof(T)),
@@ -57,9 +57,9 @@ public:
 }
 
 template<typename T>
-using buffer_ro = detail::buffer_adpator<const T, false>;
+using buffer_ro = detail::buffer_adaptor<const T, false>;
 template<typename T>
-using buffer_rw = detail::buffer_adpator<T, true>;
+using buffer_rw = detail::buffer_adaptor<T, true>;
 
 
 namespace detail {
@@ -84,6 +84,16 @@ constexpr auto cast_args(Return (Class::*method)(Args...)) {
         return (self.*method)(std::forward<Args>(args)...);
     };
 }
+//mismatched types ‘Return (*)(Args ...)’ and
+// ‘_py_ntt_io<unsigned int>(void (NTT::*)(unsigned int*) const)::<lambda(const NTT&, buffer_ro<short unsigned int>)>’
+
+template <typename Return, typename Class, typename...Args>
+constexpr auto cast_args(Return (Class::*method)(Args...) const) {
+    return [method](Class& self, typename detail::cast_arg<Args>::type...args) {
+        return (self.*method)(std::forward<Args>(args)...);
+    };
+}
+
 
 #define _PY_ASSERT_MSG(c, text) do { if (!(c)) throw std::runtime_error(__FILE__ ":" + std::to_string(__LINE__) + ": Assertion failed: " #c ", " + text); } while(0)
 #define _PY_ASSERT(c)           do { if (!(c)) throw std::runtime_error(__FILE__ ":" + std::to_string(__LINE__) + ": Assertion failed: " #c); } while(0)

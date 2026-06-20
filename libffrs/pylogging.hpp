@@ -59,7 +59,7 @@ inline void _print_vec(const char *name, const Vec *const v, size_t len) {
 
 #ifdef FFRS_DEBUG_POLY_DIVISION
     #define pd_print_vec(name, v, len) _print_vec(name, v, len)
-    #define pd_print_vec_intt(name, v, len) do { ntt.inttr(v); _print_vec(name, v, len); ntt.nttr(v); } while(0)
+    #define pd_print_vec_intt(name, v, len) do { inttr(v); _print_vec(name, v, len); nttr(v); } while(0)
     #define pd_print(...) py::print(__VA_ARGS__)
 #else
     #define pd_print_vec(...)

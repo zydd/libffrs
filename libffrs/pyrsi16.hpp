@@ -26,6 +26,7 @@
 #include "util.hpp"
 // #include "rsi16v_impl.hpp"
 #include "rsi16v.hpp"
+#include "pyntt.hpp"
 
 namespace py = pybind11;
 
@@ -199,12 +200,12 @@ public:
         const size_t SIMD_W = 1;
         for (size_t i = 0; i < interleave; ++i) {
             // std::copy_n(&msg[i * message_len], message_len, &temp[0]);
-            copy_stride(&msg[i * SIMD_W], interleave, &temp[0], SIMD_W, SIMD_W, message_len);
+            vec::copy_stride(&msg[i * SIMD_W], interleave, &temp[0], SIMD_W, SIMD_W, message_len);
             // std::copy_n(&ecc[i * ecc_len], ecc_len, &temp[message_len]);
-            copy_transposed(&ecc[i * ecc_len], ecc_len, &temp[message_len * SIMD_W], SIMD_W);
+            vec::copy_transposed(&ecc[i * ecc_len], ecc_len, &temp[message_len * SIMD_W], SIMD_W);
             rs16.pntt(&temp[0]);
             // std::copy_n(&temp[0], ecc_len, &synds[i * ecc_len]);
-            copy_transposed(&temp[0], SIMD_W, &synds[i * ecc_len * SIMD_W], ecc_len);
+            vec::copy_transposed(&temp[0], SIMD_W, &synds[i * ecc_len * SIMD_W], ecc_len);
         }
     }
 
@@ -231,7 +232,8 @@ public:
             .def_property_readonly("ntt_len", [](PyRSi16& self) { return self.rs16.ntt_len; }, R"(Number theoretic transform length)")
             .def_property_readonly("ntt_size", [](PyRSi16& self) { return self.rs16.ntt_len * sizeof(uint16_t); }, R"(Number theoretic transform size in bytes)")
             .def_property_readonly("root", [](PyRSi16& self) { return self.rs16.root; }, R"(:math:`n`-th root of unity used by NTT)")
-            .def_property_readonly("gf", [](PyRSi16& self) -> auto const& { return self.gf; }, R"(:class:`GFi16` instance for :math:`GF(65537)`)")
+            .def_property_readonly("gf", [](PyRSi16& self) -> auto const * { return &self.gf; }, R"(:class:`GFi16` instance for :math:`GF(65537)`)")
+            .def_property_readonly("ntt", [](PyRSi16& self) -> auto const * { return &self.rs16.ntt; }, R"(:class:`NTT` instance)")
             .def_property_readonly("interleave", [](PyRSi16& self) { return self.interleave; }, R"(Number of interleaved columns)")
 
             .def_property_readonly("simd_x4", [](PyRSi16& self) { return self.simd_x4; }, R"(SIMD x4 encoding enabled (SSE2))")
@@ -283,44 +285,6 @@ public:
     }
 
 private:
-    template<typename Src, typename Dst>
-    inline void copy_transposed(const Src src[], size_t src_cols, Dst dst[], size_t dst_cols) const {
-        for (size_t j = 0; j < src_cols; ++j)
-            for (size_t i = 0; i < dst_cols; ++i)
-                dst[i + j * dst_cols] = src[i * src_cols + j];
-    }
-
-    template<typename Src, typename Dst>
-    inline void copy_transposed(const Src src[], size_t src_stride, size_t src_cols, Dst dst[], size_t dst_stride, size_t dst_cols) const {
-        for (size_t j = 0; j < src_cols; ++j)
-            for (size_t i = 0; i < dst_cols; ++i)
-                dst[i + j * dst_stride] = src[i * src_stride + j];
-    }
-
-    template<bool Prefetch = true, size_t PrefetchDistance = 0, typename Src, typename Dst>
-    inline void copy_stride(const Src *src, size_t src_stride, Dst *dst, size_t dst_stride, size_t cols, size_t count) const {
-        size_t src_i = 0;
-        size_t dst_i = 0;
-        for (size_t i = 0; i < count; ++i) {
-            if constexpr (Prefetch) {
-                auto next = src_i + src_stride;
-                __builtin_prefetch(&src[next]);
-
-                if constexpr (PrefetchDistance)
-                    __builtin_prefetch(&src[next + PrefetchDistance]);
-            }
-            std::copy_n(&src[src_i], cols, &dst[dst_i]);
-            // std::memcpy(&dst[dst_i], &src[src_i], cols * sizeof(T));
-            src_i += src_stride;
-            dst_i += dst_stride;
-        }
-
-        // for (size_t i = 0; i < count; ++i) {
-        //     // std::copy_n(src + i * src_stride, n, dst + i * dst_stride);
-        //     std::memcpy(dst + i * dst_stride, src + i * src_stride, cols * sizeof(T));
-        // }
-    }
-
     template<size_t SIMD_W, typename RS, typename Src, typename Dst>
     inline void _encode_interleaved(RS const& rs, const Src src[], uint32_t temp[], Dst dst[]) {
         // src_size = message_len * interleave
@@ -330,7 +294,7 @@ private:
         // temp_size = block_len * SIMD_W
         size_t vec_cols = interleave / SIMD_W;
         for (size_t i = 0; i < vec_cols; ++i) {
-            copy_stride<true, SIMD_W / 2>(&src[i * SIMD_W], interleave, &temp[0], SIMD_W, SIMD_W, message_len);
+            vec::copy_stride<true, SIMD_W / 2>(&src[i * SIMD_W], interleave, &temp[0], SIMD_W, SIMD_W, message_len);
             std::fill_n(&temp[message_len * SIMD_W], ecc_len * SIMD_W, 0);
             // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(GFT));
 
@@ -338,37 +302,37 @@ private:
             // std::copy_n(&temp[0], ecc_len * SIMD_W, &dst[i * SIMD_W * ecc_len]);
 
             // Sequential ecc
-            // copy_transposed(&temp[0], SIMD_W, &dst[i * ecc_len * SIMD_W], ecc_len);
+            // vec::copy_transposed(&temp[0], SIMD_W, &dst[i * ecc_len * SIMD_W], ecc_len);
 
             // Interleaved ecc
-            copy_stride(&temp[0], SIMD_W, &dst[i * SIMD_W], interleave, SIMD_W, ecc_len);
+            vec::copy_stride(&temp[0], SIMD_W, &dst[i * SIMD_W], interleave, SIMD_W, ecc_len);
         }
         size_t encoded_cols = vec_cols * SIMD_W;
         if (encoded_cols < interleave) {
             size_t remaining_cols = interleave - encoded_cols;
-            copy_stride<true, SIMD_W / 2>(&src[encoded_cols], interleave, &temp[0], SIMD_W, remaining_cols, message_len);
+            vec::copy_stride<true, SIMD_W / 2>(&src[encoded_cols], interleave, &temp[0], SIMD_W, remaining_cols, message_len);
             std::fill_n(&temp[message_len * SIMD_W], ecc_len * SIMD_W, 0);
             // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(GFT));
 
             rs.encode(&temp[0]);
-            // copy_stride(&temp[0], SIMD_W, &dst[encoded_cols], remaining_cols, remaining_cols, ecc_len);
+            // vec::copy_stride(&temp[0], SIMD_W, &dst[encoded_cols], remaining_cols, remaining_cols, ecc_len);
 
             // Sequential ecc
-            // copy_transposed(&temp[0], SIMD_W, remaining_cols, &dst[encoded_cols * ecc_len], ecc_len, ecc_len);
+            // vec::copy_transposed(&temp[0], SIMD_W, remaining_cols, &dst[encoded_cols * ecc_len], ecc_len, ecc_len);
 
             // Interleaved ecc
-            copy_stride(&temp[0], SIMD_W, &dst[encoded_cols], interleave, remaining_cols, ecc_len);
+            vec::copy_stride(&temp[0], SIMD_W, &dst[encoded_cols], interleave, remaining_cols, ecc_len);
         }
     }
 
     template<size_t SIMD_W, typename T, typename Src, typename Dst>
     inline void encode_block(T const& rs, const Src src[], uint32_t temp[], Dst dst[]) {
-        copy_transposed(&src[0], message_len, &temp[0], SIMD_W);
+        vec::copy_transposed(&src[0], message_len, &temp[0], SIMD_W);
         std::fill_n(&temp[message_len * SIMD_W], ecc_len * SIMD_W, 0);
         // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(GFT));
 
         rs.encode(&temp[0]);
-        copy_transposed(&temp[0], SIMD_W, &dst[0], ecc_len);
+        vec::copy_transposed(&temp[0], SIMD_W, &dst[0], ecc_len);
     }
 
     template<size_t SIMD_W, typename T, typename Src, typename Dst>
@@ -376,16 +340,16 @@ private:
         std::fill_n(&temp[0], block_len * SIMD_W, 0);
 
         auto cols = src_size / message_len;
-        copy_transposed(&src[0], message_len, message_len, &temp[0], SIMD_W, cols);
+        vec::copy_transposed(&src[0], message_len, message_len, &temp[0], SIMD_W, cols);
 
         size_t remainder = src_size - cols * message_len;
         if (remainder) {
-            copy_transposed(&src[src_size - remainder], remainder, remainder, &temp[cols], SIMD_W, 1);
+            vec::copy_transposed(&src[src_size - remainder], remainder, remainder, &temp[cols], SIMD_W, 1);
             ++cols;
         }
 
         rs.encode(&temp[0]);
-        copy_transposed(&temp[0], SIMD_W, cols, &dst[0], ecc_len, ecc_len);
+        vec::copy_transposed(&temp[0], SIMD_W, cols, &dst[0], ecc_len, ecc_len);
     }
 
     template<size_t SIMD_W, typename Rs, typename Msg, typename Ecc>
@@ -408,23 +372,23 @@ private:
 
         size_t vec_cols = col_count / SIMD_W;
         for (size_t i = 0; i < vec_cols; ++i) {
-            copy_stride(&message[i * SIMD_W], interleave, &buf[0], SIMD_W, SIMD_W, message_len);
+            vec::copy_stride(&message[i * SIMD_W], interleave, &buf[0], SIMD_W, SIMD_W, message_len);
 
             // Sequential ecc
-            // copy_transposed(&ecc[i * SIMD_W * ecc_len], ecc_len, &buf[message_len * SIMD_W], SIMD_W);
+            // vec::copy_transposed(&ecc[i * SIMD_W * ecc_len], ecc_len, &buf[message_len * SIMD_W], SIMD_W);
 
             // Interleaved ecc
-            copy_stride(&ecc[i * SIMD_W], interleave, &buf[message_len * SIMD_W], SIMD_W, SIMD_W, ecc_len);
+            vec::copy_stride(&ecc[i * SIMD_W], interleave, &buf[message_len * SIMD_W], SIMD_W, SIMD_W, ecc_len);
 
             rs.repair(&buf[0], &temp_ntt1_ecc6[0]);
 
-            copy_stride(&buf[0], SIMD_W, &message[i * SIMD_W], interleave, SIMD_W, message_len);
+            vec::copy_stride(&buf[0], SIMD_W, &message[i * SIMD_W], interleave, SIMD_W, message_len);
 
             // Sequential ecc
-            // copy_transposed(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W * ecc_len], ecc_len);
+            // vec::copy_transposed(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W * ecc_len], ecc_len);
 
             // Interleaved ecc
-            copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W], interleave, SIMD_W, ecc_len);
+            vec::copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W], interleave, SIMD_W, ecc_len);
         }
 
         size_t encoded_cols = vec_cols * SIMD_W;
@@ -432,23 +396,23 @@ private:
             std::fill_n(&buf[0], block_len * SIMD_W, GFT{0});
 
             size_t remaining_cols = col_count - encoded_cols;
-            copy_stride(&message[encoded_cols], interleave, &buf[0], SIMD_W, remaining_cols, message_len);
+            vec::copy_stride(&message[encoded_cols], interleave, &buf[0], SIMD_W, remaining_cols, message_len);
 
             // Sequential ecc
-            // copy_transposed(&ecc[encoded_cols * ecc_len], ecc_len, ecc_len, &buf[message_len * SIMD_W], SIMD_W, remaining_cols);
+            // vec::copy_transposed(&ecc[encoded_cols * ecc_len], ecc_len, ecc_len, &buf[message_len * SIMD_W], SIMD_W, remaining_cols);
 
             // Interleaved ecc
-            copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * SIMD_W], SIMD_W, remaining_cols, ecc_len);
+            vec::copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * SIMD_W], SIMD_W, remaining_cols, ecc_len);
 
             rs.repair(&buf[0], &temp_ntt1_ecc6[0]);
 
-            copy_stride(&buf[0], SIMD_W, &message[encoded_cols], interleave, remaining_cols, message_len);
+            vec::copy_stride(&buf[0], SIMD_W, &message[encoded_cols], interleave, remaining_cols, message_len);
 
             // Sequential ecc
-            // copy_transposed(&buf[message_len * SIMD_W], SIMD_W, remaining_cols, &ecc[encoded_cols * ecc_len], ecc_len, ecc_len);
+            // vec::copy_transposed(&buf[message_len * SIMD_W], SIMD_W, remaining_cols, &ecc[encoded_cols * ecc_len], ecc_len, ecc_len);
 
             // Interleaved ecc
-            copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[encoded_cols], interleave, remaining_cols, ecc_len);
+            vec::copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[encoded_cols], interleave, remaining_cols, ecc_len);
         }
     }
 
@@ -472,23 +436,23 @@ private:
 
         size_t vec_cols = col_count / SIMD_W;
         for (size_t i = 0; i < vec_cols; ++i) {
-            copy_stride(&message[i * SIMD_W], interleave, &buf[0], SIMD_W, SIMD_W, message_len);
+            vec::copy_stride(&message[i * SIMD_W], interleave, &buf[0], SIMD_W, SIMD_W, message_len);
 
             // Sequential ecc
-            // copy_transposed(&ecc[i * SIMD_W * ecc_len], ecc_len, &buf[message_len * SIMD_W], SIMD_W);
+            // vec::copy_transposed(&ecc[i * SIMD_W * ecc_len], ecc_len, &buf[message_len * SIMD_W], SIMD_W);
 
             // Interleaved ecc
-            copy_stride(&ecc[i * SIMD_W], interleave, &buf[message_len * SIMD_W], SIMD_W, SIMD_W, ecc_len);
+            vec::copy_stride(&ecc[i * SIMD_W], interleave, &buf[message_len * SIMD_W], SIMD_W, SIMD_W, ecc_len);
 
             rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
 
-            copy_stride(&buf[0], SIMD_W, &message[i * SIMD_W], interleave, SIMD_W, message_len);
+            vec::copy_stride(&buf[0], SIMD_W, &message[i * SIMD_W], interleave, SIMD_W, message_len);
 
             // Sequential ecc
-            // copy_transposed(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W * ecc_len], ecc_len);
+            // vec::copy_transposed(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W * ecc_len], ecc_len);
 
             // Interleaved ecc
-            copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W], interleave, SIMD_W, ecc_len);
+            vec::copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[i * SIMD_W], interleave, SIMD_W, ecc_len);
         }
 
         size_t encoded_cols = vec_cols * SIMD_W;
@@ -496,23 +460,23 @@ private:
             size_t remaining_cols = col_count - encoded_cols;
             // TODO: fill_stride
             std::fill_n(&buf[0], block_len * SIMD_W, GFT{0});
-            copy_stride(&message[encoded_cols], interleave, &buf[0], SIMD_W, remaining_cols, message_len);
+            vec::copy_stride(&message[encoded_cols], interleave, &buf[0], SIMD_W, remaining_cols, message_len);
 
             // Sequential ecc
-            // copy_transposed(&ecc[encoded_cols * ecc_len], ecc_len, ecc_len, &buf[message_len * SIMD_W], SIMD_W, remaining_cols);
+            // vec::copy_transposed(&ecc[encoded_cols * ecc_len], ecc_len, ecc_len, &buf[message_len * SIMD_W], SIMD_W, remaining_cols);
 
             // Interleaved ecc
-            copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * SIMD_W], SIMD_W, remaining_cols, ecc_len);
+            vec::copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * SIMD_W], SIMD_W, remaining_cols, ecc_len);
 
             rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
 
-            copy_stride(&buf[0], SIMD_W, &message[encoded_cols], interleave, remaining_cols, message_len);
+            vec::copy_stride(&buf[0], SIMD_W, &message[encoded_cols], interleave, remaining_cols, message_len);
 
             // Sequential ecc
-            // copy_transposed(&buf[message_len * SIMD_W], SIMD_W, remaining_cols, &ecc[encoded_cols * ecc_len], ecc_len, ecc_len);
+            // vec::copy_transposed(&buf[message_len * SIMD_W], SIMD_W, remaining_cols, &ecc[encoded_cols * ecc_len], ecc_len, ecc_len);
 
             // Interleaved ecc
-            copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[encoded_cols], interleave, remaining_cols, ecc_len);
+            vec::copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[encoded_cols], interleave, remaining_cols, ecc_len);
         }
     }
 
