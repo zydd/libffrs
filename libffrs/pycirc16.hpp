@@ -183,23 +183,26 @@ private:
             &message[0],
             &rsi_ecc[0],
             rso.message_len * interleave,
-            &rsi_repair_temp[0],
+            &rsi_temp[0],
             &rsi_synd[0]
         );
         rsi.synd_blocks(
             &rso_ecc[0],
             &rsio_ecc[0],
             rso.ecc_len * interleave,
-            &rsi_repair_temp[0],
+            &rsi_temp[0],
             &rsi_synd[rsi_interleaved_ecc_len]
         );
 
-        for (size_t k = 0; k < interleave; ++k)
-            repair_outer_zeros(k, &rsi_ecc[0], &rsi_synd[0], &rsi_temp[0], &rsi_repair_temp[0], &rso_ecc[0]);
-
         std::vector<size_t> outer_error_locations;
         for (size_t k = 0; k < interleave; ++k) {
-            find_outer_error_locations(k, &rsi_ecc[0], &rsi_synd[0], &rsi_repair_temp[0], &rso_ecc[0], outer_error_locations);
+            repair_outer_zeros(k, &rsi_ecc[0], &rsi_synd[0], &rsi_temp[0], &rsi_repair_temp[0], &rso_ecc[0]);
+            repair_inner_zeros(k, &rsi_ecc[0], &rsi_synd[0], &rsi_temp[0], &rso_ecc[0]);
+
+            // Find error locations
+            for (size_t i = 0; i < rso.block_len; ++i)
+                if (any_rsi_synd(&rsi_synd[rsi_ecc_offset(k, i)]))
+                    outer_error_locations.push_back(i);
 
             if (outer_error_locations.empty())
                 continue;
@@ -229,7 +232,7 @@ private:
 
     inline void repair_outer_zeros(
         size_t interleave,
-        const GFT rsi_ecc[],
+        GFT rsi_ecc[],
         GFT rsi_synd[],
         GFT rsi_temp[],
         GFT rsi_repair_temp[],
@@ -269,12 +272,20 @@ private:
             std::copy_n(&rso_ecc[rso_offset], rsi.message_len, &rsi_temp[0]);
             std::copy_n(&rsi_ecc[rsi_offset], rsi.ecc_len, &rsi_temp[rsi.message_len]);
             rsi.repair_block(&rsi_temp[0], inner_zero_locations, &rsi_repair_temp[0]);
-            std::copy_n(&rsi_temp[0], rsi.message_len, &rso_ecc[rso_offset]);
+
+            // TODO: detect failed repair
 
             if (std::all_of(inner_zero_locations.begin(), inner_zero_locations.end(),
                 [&](size_t zero_pos) { return (rsi_temp[zero_pos] & 0xffff) == 0; }))
             {
-                std::fill_n(&rsi_synd[rsi_offset], rsi.ecc_len, 0);
+                std::copy_n(&rsi_temp[0], rsi.message_len, &rso_ecc[rso_offset]);
+                std::copy_n(&rsi_temp[rsi.message_len], rsi.ecc_len, &rsi_ecc[rsi_offset]);
+                rsi.synd_block(&rsi_temp[0]);
+                std::copy_n(&rsi_temp[0], rsi.ecc_len, &rsi_synd[rsi_offset]);
+
+                if (any_rsi_synd(&rsi_synd[rsi_offset])) {
+                    log_error("failed to repair zeros in outer ecc: interleave:%d row:%d", interleave, i);
+                }
             } else {
                 log_warning("could not repair zeros in outer ecc");
                 log_warning(" interleave:%d row:%d", interleave, i);
@@ -284,26 +295,26 @@ private:
         }
     }
 
-    inline void find_outer_error_locations(
+    inline void repair_inner_zeros(
         size_t interleave,
-        const GFT rsi_ecc[],
-        const GFT rsi_synd[],
-        GFT rsi_repair_temp[],
-        const GFT rso_ecc[],
-        std::vector<size_t>& locations
+        GFT rsi_ecc[],
+        GFT rsi_synd[],
+        GFT rsi_temp[],
+        const GFT rso_ecc[]
     ) {
         for (size_t i = 0; i < rso.block_len; ++i) {
             size_t rsi_offset = rsi_ecc_offset(interleave, i);
-            if (std::any_of(&rsi_synd[rsi_offset], &rsi_synd[rsi_offset + rsi.ecc_len], [](auto v) { return v != 0; })) {
-                bool inner_ecc_has_zeros = false;
-                // Repair zeroes in rsi ecc
-                if (std::any_of(&rsi_ecc[rsi_offset], &rsi_ecc[rsi_offset + rsi.ecc_len], [](auto v) { return v == 0; })) {
-                    inner_ecc_has_zeros = true;
-                    std::copy_n(&rsi_synd[rsi_offset], rsi.ecc_len, &rsi_repair_temp[0]);
-                    rsi.mix_ecc(&rsi_repair_temp[0]);
+            bool inner_ecc_synd = any_rsi_synd(&rsi_synd[rsi_offset]);
+            if (inner_ecc_synd) {
+                bool inner_ecc_has_zeros = std::any_of(&rsi_ecc[rsi_offset], &rsi_ecc[rsi_offset + rsi.ecc_len], [](auto v) { return v == 0; });
+                if (inner_ecc_has_zeros) {
+                    std::copy_n(&rsi_synd[rsi_offset], rsi.ecc_len, &rsi_temp[0]);
+                    rsi.mix_ecc(&rsi_temp[0]);
 
-                    if (std::all_of(&rsi_repair_temp[0], &rsi_repair_temp[rsi.ecc_len], [](auto v) { return (v & 0xffff) == 0; })) {
+                    if (std::all_of(&rsi_temp[0], &rsi_temp[rsi.ecc_len], [](auto v) { return (v & 0xffff) == 0; })) {
                         log_info("inner ecc zero: interleave:%d row:%d", interleave, i);
+                        std::copy_n(&rsi_temp[0], rsi.ecc_len, &rsi_ecc[rsi_offset]);
+                        std::fill_n(&rsi_synd[rsi_offset], rsi.ecc_len, GFT{0});
                         continue;
                     } else {
                         log_warning("could not repair zeros in inner ecc");
@@ -326,9 +337,12 @@ private:
                 }
                 log_debug(" ecc: %s", std::vector(&rsi_ecc[rsi_offset], &rsi_ecc[rsi_offset + rsi.ecc_len]));
                 log_debug(" synd: %s", std::vector(&rsi_synd[rsi_offset], &rsi_synd[rsi_offset + rsi.ecc_len]));
-                locations.push_back(i);
             }
         }
+    }
+
+    inline bool any_rsi_synd(const GFT synd[]) {
+        return std::any_of(&synd[0], &synd[rsi.ecc_len], [](auto v) { return v != 0; });
     }
 
     inline size_t message_offset(size_t interleave, size_t row, size_t col = 0) {

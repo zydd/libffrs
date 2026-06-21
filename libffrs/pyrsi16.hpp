@@ -181,6 +181,10 @@ public:
         rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
     }
 
+    inline void synd_block(GFT block[]) {
+        rs16.pntt(&block[0]);
+    }
+
     template<typename Src>
     inline void synd_blocks(const Src msg[], const GFT ecc[], size_t count, GFT temp[], GFT synds[]) {
         // len(temp) == block_len
