@@ -74,6 +74,7 @@ class BaseTestCIRC:
 
     def test_circ_encode(self, rs: ffrs.CIRC16):
         buf = randbytes(rs.message_size)
+
         res = rs.encode(buf)
         assert len(res) == rs.ecc_size
 
@@ -110,50 +111,73 @@ class BaseTestCIRC:
         rsio_size = self._rsi_ecc_size(rs) + self._rso_ecc_size(rs)
         for i in range(rsio_size, rsio_size + rs.inner_ecc_size):
             ecc[i] ^= random.randint(0, 255)
+    
+    def corrupt_outer_rows(self, rs, buf, ecc, n):
+        for row in random.choices(range(rs.outer_block_len), k=n):
+            for interleave in [0]: # range(rs.interleave):
+                if row < rs.outer_message_len:
+                    for col in range(rs.inner_message_len):
+                        # message
+                        offset = 2 * rs.message_offset(interleave, row, col)
+                        buf[offset] ^= random.randint(1, 255)
+                        buf[offset + 1] ^= random.randint(1, 255)
+
+                    for col in range(rs.inner_ecc_len):
+                        # rsi
+                        offset = 2 * rs.rsi_ecc_offset(interleave, row, col)
+                        ecc[offset] ^= random.randint(1, 255)
+                        ecc[offset + 1] ^= random.randint(1, 255)
+                else:
+                    for col in range(rs.inner_message_len):
+                        # rso
+                        offset = 2 * rs.rso_ecc_offset(interleave, row - rs.outer_message_len, col)
+                        ecc[offset] ^= random.randint(1, 255)
+                        ecc[offset + 1] ^= random.randint(1, 255)
+
+                    for col in range(rs.inner_ecc_len):
+                        # rsio
+                        offset = 2 * rs.rsi_ecc_offset(interleave, row, col)
+                        ecc[offset] ^= random.randint(1, 255)
+                        ecc[offset + 1] ^= random.randint(1, 255)
+
 
     def test_circ_repair(self, rs: ffrs.CIRC16):
         buf = randbytes(rs.message_size)
         ecc = rs.encode(buf)
-        assert len(ecc) == rs.ecc_size
 
-        msg_orig = bytearray(buf)
+        buf_orig = bytearray(buf)
         ecc_orig = bytearray(ecc)
 
         self.add_errors_start(rs, buf, ecc)
-
-        # buf_err = bytearray(buf)
-        # ecc_err = bytearray(ecc)
-        # rs2 = ffrs.CIRC16(rs.inner_block_len, rs.inner_ecc_len, rs.outer_block_len, rs.outer_ecc_len, rs.interleave, simd_x16=False, simd_x8=False, simd_x4=False)
-        # rs2.repair(buf_err, ecc_err)
+        # TODO
+        # self.corrupt_outer_rows(rs, buf, ecc, rs.ecc_len)
 
         rs.repair(buf, ecc)
 
-        assert buf == msg_orig
+        assert buf == buf_orig
         assert ecc == ecc_orig
 
     @pytest.mark.parametrize("count", range(1, 10))
     def test_circ_repair_multiple(self, rs: ffrs.CIRC16, count):
         buf = randbytes(rs.message_size)
         ecc = rs.encode(buf)
-        assert len(ecc) == rs.ecc_size
 
-        msg_orig = bytearray(buf)
+        buf_orig = bytearray(buf)
         ecc_orig = bytearray(ecc)
 
         self.add_errors_start(rs, buf, ecc)
 
         rs.repair(buf, ecc)
 
-        assert buf == msg_orig
+        assert buf == buf_orig
         assert ecc == ecc_orig
 
     @pytest.mark.skip
     def test_circ_repair_zeroes(self, rs: ffrs.CIRC16):
         buf = randbytes(rs.message_size)
         ecc = rs.encode(buf)
-        assert len(ecc) == rs.ecc_size
 
-        msg_orig = bytearray(buf)
+        buf_orig = bytearray(buf)
         ecc_orig = bytearray(ecc)
 
         # Corrupt message
@@ -181,55 +205,83 @@ class BaseTestCIRC:
 
         rs.repair(buf, ecc)
 
-        assert buf == msg_orig
+        assert buf == buf_orig
         assert ecc == ecc_orig
 
     # @pytest.mark.usefixtures("setup_logger")
     def test_repair_fallback(self, rs: ffrs.CIRC16):
         buf = randbytes(rs.message_size)
         ecc = rs.encode(buf)
-        assert len(ecc) == rs.ecc_size
 
-        msg_orig = bytearray(buf)
+        buf_orig = bytearray(buf)
         ecc_orig = bytearray(ecc)
 
         # Corrupt all rsi ecc
         o = self._rso_ecc_size(rs)
         i = self._rsi_ecc_size(rs)
-        ecc[o : o + i] = random.randbytes(self._rsi_ecc_size(rs))
+        ecc[o : o + i] = random.randbytes(i)
 
         err_count = self.add_errors_stride(
             buf, [], rs.inner_message_size + 2, rs.inner_message_len * rs.outer_ecc_len // 2
         )
 
-        # TODO
-        # outer_message_max_errors = min(rs.outer_ecc_len // 2, rs.outer_message_len)
-        # errors = []
-        # for i in range(rs.outer_interleave):
-        #     for j in random.choices(range(rs.outer_message_len), k=outer_message_max_errors):
-        #         # j = random.randrange(outer_message_max_errors)
-        #         # j = i % outer_message_max_errors
-        #         pos = (j * rs.outer_interleave + i) * 2
-        #         assert pos < len(buf)
-        #         buf[pos : pos + 2] = random.randbytes(2)
-        #         errors.append((i, j))
+        # TODO: aligned
+        # for interleave in range(rs.interleave):
+        #     # Corrupt `ecc_len // 2` rows
+        #     for row in random.choices(range(rs.outer_message_len), k=rs.outer_ecc_len // 2):
+        #         for col in range(rs.inner_message_len):
+        #             offset = 2 * rs.message_offset(interleave, row, col)
+        #             buf[offset:offset + 2] = randbytes(2)
 
         rs.repair(buf, ecc)
 
-        assert buf == msg_orig
+        assert buf == buf_orig
         assert ecc == ecc_orig
 
     def test_repair_no_errors(self, rs: ffrs.CIRC16):
-        buf = bytearray(randbytes(rs.message_size))
+        buf = randbytes(rs.message_size)
         ecc = rs.encode(buf)
 
-        msg_orig = bytearray(buf)
+        buf_orig = bytearray(buf)
         ecc_orig = bytearray(ecc)
 
         rs.repair(buf, ecc)
 
-        assert buf == msg_orig
+        assert buf == buf_orig
         assert ecc == ecc_orig
+
+    def test_find_errors_diagonal(self, rs: ffrs.CIRC16):
+        buf = randbytes(rs.message_size)
+        ecc = rs.encode(buf)
+
+        for interleave in range(rs.interleave):
+            assert rs._find_outer_error_locations(buf, ecc, interleave) == []
+
+            for i in range(min(rs.inner_message_len, rs.outer_message_len)):
+                offset = 2 * rs.message_offset(interleave, i, i)
+                buf[offset] ^= random.randrange(1, 256)
+                buf[offset + 1] ^= random.randrange(1, 256)
+
+            locations = rs._find_outer_error_locations(buf, ecc, interleave)
+            assert locations == list(range(min(rs.inner_message_len, rs.outer_message_len)))
+
+    def test_find_errors_row(self, rs: ffrs.CIRC16):
+        buf = randbytes(rs.message_size)
+        ecc = rs.encode(buf)
+
+        for row in random.choices(range(rs.outer_message_len), k=min(5, rs.outer_message_len)):
+            msg_err = bytearray(buf)
+            ecc_err = bytearray(ecc)
+            for interleave in random.choices(range(rs.interleave), k=min(5, rs.interleave)):
+                assert rs._find_outer_error_locations(buf, ecc, interleave) == []
+
+                for col in random.choices(range(rs.inner_message_len), k=min(5, rs.inner_message_len)):
+                    offset = 2 * rs.message_offset(interleave, row, col)
+                    msg_err[offset] ^= random.randrange(1, 256)
+                    msg_err[offset + 1] ^= random.randrange(1, 256)
+
+                locations = rs._find_outer_error_locations(msg_err, ecc_err, interleave)
+                assert locations == [row]
 
 
 @pytest.mark.parametrize(

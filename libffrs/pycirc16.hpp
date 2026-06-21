@@ -120,6 +120,8 @@ public:
 
             .def("encode", cast_args(&PyCIRC16::py_encode), R"(Encode data)", "buffer"_a)
             .def("repair", cast_args(&PyCIRC16::py_repair), R"(Repair data)", "message"_a, "ecc"_a)
+            .def("_find_outer_error_locations", cast_args(&PyCIRC16::py_find_outer_error_locations),
+                R"(Find outer codec error locations for a given interleaved block)", "message"_a, "ecc"_a, "interleave"_a)
 
             .def("message_offset", &PyCIRC16::message_offset, R"(Calculate message offset in number of elements)", "interleave"_a, "row"_a, "col"_a)
             .def("rso_ecc_offset", &PyCIRC16::rso_ecc_offset, R"(Calculate outer ECC offset in number of elements)", "interleave"_a, "row"_a, "col"_a)
@@ -178,7 +180,7 @@ private:
             return *this;
         }
 
-        inline void repair_outer_zeros(size_t interleave) {
+        inline CircRepair& repair_outer_zeros(size_t interleave) {
             for (size_t i = rso.message_len; i < rso.block_len; ++i) {
                 std::vector<size_t> inner_zero_locations;
                 size_t rso_offset = circ.rso_ecc_offset(interleave, i - rso.message_len);
@@ -234,9 +236,10 @@ private:
                     log_warning(" synd: %s", std::vector(&rsi_synd[rsi_offset], &rsi_synd[rsi_offset + rsi.ecc_len]));
                 }
             }
+            return *this;
         }
 
-        inline void repair_inner_zeros(size_t interleave) {
+        inline CircRepair& repair_inner_zeros(size_t interleave) {
             for (size_t i = 0; i < rso.block_len; ++i) {
                 size_t rsi_offset = circ.rsi_ecc_offset(interleave, i);
                 bool inner_ecc_synd = any_rsi_synd(&rsi_synd[rsi_offset]);
@@ -274,6 +277,7 @@ private:
                     log_debug(" synd: %s", std::vector(&rsi_synd[rsi_offset], &rsi_synd[rsi_offset + rsi.ecc_len]));
                 }
             }
+            return *this;
         }
 
         inline void find_error_locations(size_t interleave, std::vector<size_t>& locations) {
@@ -368,8 +372,7 @@ private:
         py_assert(inner_blocks == rso.message_len * interleave);
         log_info("rsi blocks: %s", inner_blocks);
 
-        auto repair = CircRepair(*this);
-        repair
+        CircRepair(*this)
             .load_ecc(&ecc[0])
             .compute_rsi_synd(&message[0])
             .repair_all(&message[0])
@@ -380,15 +383,45 @@ private:
         return false;
     }
 
+    inline std::vector<size_t> py_find_outer_error_locations(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, size_t interleave) {
+        log_debug("message size: %s", message.size);
+        log_debug("ecc size: %s", ecc.size);
+        py_assert(message.size == message_len, std::to_string(message.size) + " != " + std::to_string(message_len));
+        py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
+
+        size_t inner_blocks = message.size / rsi.message_len;
+        py_assert(inner_blocks == rso.message_len * this->interleave);
+        log_info("rsi blocks: %s", inner_blocks);
+
+        std::vector<size_t> locations;
+        CircRepair(*this)
+            .load_ecc(&ecc[0])
+            .compute_rsi_synd(&message[0])
+            .repair_outer_zeros(interleave)
+            .repair_inner_zeros(interleave)
+            .find_error_locations(interleave, locations);
+
+        return locations;
+    }
+
     inline size_t message_offset(size_t interleave, size_t row, size_t col = 0) const {
+        py_assert(interleave < this->interleave);
+        py_assert(row < rso.message_len);
+        py_assert(col < rsi.message_len);
         return rso.interleave * row + interleave * rsi.message_len + col;
     }
 
     inline size_t rso_ecc_offset(size_t interleave, size_t row, size_t col = 0) const {
+        py_assert(interleave < this->interleave);
+        py_assert(row < rso.ecc_len);
+        py_assert(col < rsi.message_len);
         return rso.interleave * row + interleave * rsi.message_len + col;
     }
 
     inline size_t rsi_ecc_offset(size_t interleave, size_t row, size_t col = 0) const {
+        py_assert(interleave < this->interleave);
+        py_assert(row < rso.block_len);
+        py_assert(col < rsi.ecc_len);
         return (row * this->interleave + interleave) * rsi.ecc_len + col;
     }
 

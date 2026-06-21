@@ -86,6 +86,9 @@ class CIRC16:
     def __init__(self: libffrs.CIRC16, inner_block_len: typing.SupportsInt | typing.SupportsIndex, inner_ecc_len: typing.SupportsInt | typing.SupportsIndex, outer_block_len: typing.SupportsInt | typing.SupportsIndex, outer_ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
         """Cross-interleaved Reed-Solomon coder"""
 
+    def _find_outer_error_locations(self: libffrs.CIRC16, message: collections.abc.Buffer, ecc: collections.abc.Buffer, interleave: typing.SupportsInt | typing.SupportsIndex) -> list[int]:
+        """Find outer codec errro locations for a given interleaved block"""
+
     def encode(self: libffrs.CIRC16, buffer: collections.abc.Buffer) -> bytearray:
         """Encode data"""
 
