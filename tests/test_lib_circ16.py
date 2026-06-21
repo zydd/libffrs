@@ -113,7 +113,7 @@ class BaseTestCIRC:
             ecc[i] ^= random.randint(0, 255)
 
     def corrupt_outer_rows(self, rs, buf, ecc, n):
-        for row in random.choices(range(rs.outer_block_len), k=n):
+        for row in random.sample(range(rs.outer_block_len), n):
             for interleave in [0]:  # range(rs.interleave):
                 if row < rs.outer_message_len:
                     for col in range(rs.inner_message_len):
@@ -227,7 +227,7 @@ class BaseTestCIRC:
         # TODO: aligned
         # for interleave in range(rs.interleave):
         #     # Corrupt `ecc_len // 2` rows
-        #     for row in random.choices(range(rs.outer_message_len), k=rs.outer_ecc_len // 2):
+        #     for row in random.sample(range(rs.outer_message_len), rs.outer_ecc_len // 2):
         #         for col in range(rs.inner_message_len):
         #             offset = 2 * rs.message_offset(interleave, row, col)
         #             buf[offset:offset + 2] = randbytes(2)
@@ -268,13 +268,13 @@ class BaseTestCIRC:
         buf = randbytes(rs.message_size)
         ecc = rs.encode(buf)
 
-        for row in random.choices(range(rs.outer_message_len), k=min(5, rs.outer_message_len)):
+        for row in random.sample(range(rs.outer_message_len), min(5, rs.outer_message_len)):
             msg_err = bytearray(buf)
             ecc_err = bytearray(ecc)
-            for interleave in random.choices(range(rs.interleave), k=min(5, rs.interleave)):
+            for interleave in random.sample(range(rs.interleave), min(5, rs.interleave)):
                 assert rs._find_outer_error_locations(buf, ecc, interleave) == []
 
-                for col in random.choices(range(rs.inner_message_len), k=min(5, rs.inner_message_len)):
+                for col in random.sample(range(rs.inner_message_len), min(5, rs.inner_message_len)):
                     offset = 2 * rs.message_offset(interleave, row, col)
                     msg_err[offset] ^= random.randrange(1, 256)
                     msg_err[offset + 1] ^= random.randrange(1, 256)
