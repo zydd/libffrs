@@ -89,8 +89,17 @@ class CIRC16:
     def encode(self: libffrs.CIRC16, buffer: collections.abc.Buffer) -> bytearray:
         """Encode data"""
 
+    def message_offset(self: libffrs.CIRC16, interleave: typing.SupportsInt | typing.SupportsIndex, row: typing.SupportsInt | typing.SupportsIndex, col: typing.SupportsInt | typing.SupportsIndex) -> int:
+        """Calculate message offset in number of elements"""
+
     def repair(self: libffrs.CIRC16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bool:
         """Repair data"""
+
+    def rsi_ecc_offset(self: libffrs.CIRC16, interleave: typing.SupportsInt | typing.SupportsIndex, row: typing.SupportsInt | typing.SupportsIndex, col: typing.SupportsInt | typing.SupportsIndex) -> int:
+        """Calculate inner ECC offset in number of elements"""
+
+    def rso_ecc_offset(self: libffrs.CIRC16, interleave: typing.SupportsInt | typing.SupportsIndex, row: typing.SupportsInt | typing.SupportsIndex, col: typing.SupportsInt | typing.SupportsIndex) -> int:
+        """Calculate outer ECC offset in number of elements"""
 
 
 

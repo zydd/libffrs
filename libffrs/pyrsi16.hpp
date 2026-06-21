@@ -41,7 +41,7 @@ private:
     inline PyRSi16(
         rs_data&& args,
         size_t interleave,
-        uint32_t primitive,
+        GFT primitive,
         bool simd_x4,
         bool simd_x8,
         bool simd_x16
@@ -107,7 +107,7 @@ public:
             size_t block_len,
             uint16_t ecc_len,
             size_t interleave,
-            uint32_t primitive,
+            GFT primitive,
             std::optional<bool> simd_x4,
             std::optional<bool> simd_x8,
             std::optional<bool> simd_x16
@@ -173,7 +173,7 @@ public:
         });
     }
 
-    inline void repair_block(uint32_t block[], std::vector<size_t> const& error_pos, uint32_t temp_ntt1_ecc6[]) const {
+    inline void repair_block(GFT block[], std::vector<size_t> const& error_pos, GFT temp_ntt1_ecc6[]) const {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)
             error_pos_rbo[i] = rs16.rbo(error_pos[i]);
@@ -182,7 +182,7 @@ public:
     }
 
     template<typename Src>
-    inline void synd_blocks(const Src msg[], const uint16_t ecc[], size_t count, uint32_t temp[], uint32_t synds[]) {
+    inline void synd_blocks(const Src msg[], const GFT ecc[], size_t count, GFT temp[], GFT synds[]) {
         // len(temp) == block_len
         // len(synds) == count * ecc_len
         for (size_t i = 0; i < count; ++i) {
@@ -193,7 +193,7 @@ public:
         }
     }
 
-    inline void synd_interleaved(const uint16_t msg[], const uint16_t ecc[], uint32_t temp[], uint32_t synds[]) {
+    inline void synd_interleaved(const uint16_t msg[], const uint16_t ecc[], GFT temp[], GFT synds[]) {
         // len(temp) == block_len
         // len(synds) == count * ecc_len
 
@@ -209,8 +209,16 @@ public:
         }
     }
 
-    inline void mix_ecc(uint32_t ecc[]) {
+    inline void mix_ecc(GFT ecc[]) {
         rs16.mix_ecc(&ecc[0]);
+    }
+
+    inline size_t message_offset(size_t interleave, size_t col) {
+        return interleave * message_len + col;
+    }
+
+    inline size_t ecc_offset(size_t interleave, size_t col) {
+        return interleave * ecc_len + col;
     }
 
     static inline void register_class(py::module &m) {
@@ -244,7 +252,7 @@ public:
                     size_t,    // block_len
                     uint16_t,  // ecc_len
                     size_t,    // interleave
-                    uint32_t,  // primitive
+                    GFT,  // primitive
                     std::optional<bool>,
                     std::optional<bool>,
                     std::optional<bool>
@@ -286,7 +294,7 @@ public:
 
 private:
     template<size_t SIMD_W, typename RS, typename Src, typename Dst>
-    inline void _encode_interleaved(RS const& rs, const Src src[], uint32_t temp[], Dst dst[]) {
+    inline void _encode_interleaved(RS const& rs, const Src src[], GFT temp[], Dst dst[]) {
         // src_size = message_len * interleave
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
@@ -326,7 +334,7 @@ private:
     }
 
     template<size_t SIMD_W, typename T, typename Src, typename Dst>
-    inline void encode_block(T const& rs, const Src src[], uint32_t temp[], Dst dst[]) {
+    inline void encode_block(T const& rs, const Src src[], GFT temp[], Dst dst[]) {
         vec::copy_transposed(&src[0], message_len, &temp[0], SIMD_W);
         std::fill_n(&temp[message_len * SIMD_W], ecc_len * SIMD_W, 0);
         // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(GFT));
@@ -336,7 +344,7 @@ private:
     }
 
     template<size_t SIMD_W, typename T, typename Src, typename Dst>
-    inline void encode_block(T const& rs, const Src src[], size_t src_size, uint32_t temp[], Dst dst[]) {
+    inline void encode_block(T const& rs, const Src src[], size_t src_size, GFT temp[], Dst dst[]) {
         std::fill_n(&temp[0], block_len * SIMD_W, 0);
 
         auto cols = src_size / message_len;
