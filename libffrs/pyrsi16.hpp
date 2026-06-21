@@ -123,7 +123,7 @@ public:
     { }
 
     template<typename Src, typename Dst>
-    inline void encode_blocks(const Src src[], size_t full_blocks, Dst dst[]) {
+    inline void encode_blocks(const Src src[], size_t full_blocks, Dst dst[]) const {
         _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
             auto temp = new_aligned<GFT>(block_len * SIMD_W, SIMD_W * sizeof(GFT));
 
@@ -138,7 +138,7 @@ public:
     }
 
     template<typename Src, typename Dst>
-    inline void encode_interleaved_blocks(const Src src[], size_t full_blocks, Dst dst[]) {
+    inline void encode_interleaved_blocks(const Src src[], size_t full_blocks, Dst dst[]) const {
         _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
             // TODO: handle case when interleave is not a multiple of SIMD_W
             auto temp = new_aligned<GFT>(block_len * SIMD_W, SIMD_W * sizeof(GFT));
@@ -148,7 +148,7 @@ public:
     }
 
     template<typename Src, typename Dst>
-    inline void encode_interleaved(const Src src[], Dst dst[]) {
+    inline void encode_interleaved(const Src src[], Dst dst[]) const {
         _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
             auto temp = new_aligned<GFT>(block_len * SIMD_W, SIMD_W * sizeof(GFT));
             _encode_interleaved<SIMD_W>(rs, &src[0], &temp[0], &dst[0]);
@@ -156,14 +156,14 @@ public:
     }
 
     template<typename Msg, typename Ecc>
-    inline void repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count) {
+    inline void repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count) const {
         _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
             _repair_interleaved<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count);
         });
     }
 
     template<typename Msg, typename Ecc>
-    inline void repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) {
+    inline void repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) const {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)
             error_pos_rbo[i] = rs16.rbo(error_pos[i]);
@@ -181,12 +181,12 @@ public:
         rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
     }
 
-    inline void synd_block(GFT block[]) {
+    inline void synd_block(GFT block[]) const {
         rs16.pntt(&block[0]);
     }
 
     template<typename Src>
-    inline void synd_blocks(const Src msg[], const GFT ecc[], size_t count, GFT temp[], GFT synds[]) {
+    inline void synd_blocks(const Src msg[], const GFT ecc[], size_t count, GFT temp[], GFT synds[]) const {
         // len(temp) == block_len
         // len(synds) == count * ecc_len
         for (size_t i = 0; i < count; ++i) {
@@ -213,7 +213,7 @@ public:
         }
     }
 
-    inline void mix_ecc(GFT ecc[]) {
+    inline void mix_ecc(GFT ecc[]) const {
         rs16.mix_ecc(&ecc[0]);
     }
 
@@ -298,7 +298,7 @@ public:
 
 private:
     template<size_t SIMD_W, typename RS, typename Src, typename Dst>
-    inline void _encode_interleaved(RS const& rs, const Src src[], GFT temp[], Dst dst[]) {
+    inline void _encode_interleaved(RS const& rs, const Src src[], GFT temp[], Dst dst[]) const {
         // src_size = message_len * interleave
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
@@ -338,7 +338,7 @@ private:
     }
 
     template<size_t SIMD_W, typename T, typename Src, typename Dst>
-    inline void encode_block(T const& rs, const Src src[], GFT temp[], Dst dst[]) {
+    inline void encode_block(T const& rs, const Src src[], GFT temp[], Dst dst[]) const {
         vec::copy_transposed(&src[0], message_len, &temp[0], SIMD_W);
         std::fill_n(&temp[message_len * SIMD_W], ecc_len * SIMD_W, 0);
         // std::memset(&temp[message_len * SIMD_W], 0, ecc_len * SIMD_W * sizeof(GFT));
@@ -348,7 +348,7 @@ private:
     }
 
     template<size_t SIMD_W, typename T, typename Src, typename Dst>
-    inline void encode_block(T const& rs, const Src src[], size_t src_size, GFT temp[], Dst dst[]) {
+    inline void encode_block(T const& rs, const Src src[], size_t src_size, GFT temp[], Dst dst[]) const {
         std::fill_n(&temp[0], block_len * SIMD_W, 0);
 
         auto cols = src_size / message_len;
@@ -365,7 +365,7 @@ private:
     }
 
     template<size_t SIMD_W, typename Rs, typename Msg, typename Ecc>
-    inline void _repair_interleaved(Rs const& rs, Msg message[], Ecc ecc[], size_t col_start, size_t col_count) {
+    inline void _repair_interleaved(Rs const& rs, Msg message[], Ecc ecc[], size_t col_start, size_t col_count) const {
         // src_size = message_len * interleave
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
@@ -429,7 +429,7 @@ private:
     }
 
     template<size_t SIMD_W, typename Rs, typename Msg, typename Ecc>
-    inline void _repair_interleaved(Rs const& rs, Msg message[], Ecc ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos_rbo) {
+    inline void _repair_interleaved(Rs const& rs, Msg message[], Ecc ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos_rbo) const {
         // src_size = message_len * interleave
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
@@ -493,7 +493,7 @@ private:
     }
 
     template<typename F>
-    inline void _simd_dispatch(F&& f) {
+    inline void _simd_dispatch(F&& f) const {
         if (simd_x16)
             f(std::integral_constant<size_t, 16>{}, rs16x16);
         else if (simd_x8)
