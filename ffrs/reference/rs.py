@@ -11,8 +11,9 @@ def locator(GF, w, err_pos):
     # print("errors:", err_pos)
     # print("root:", w)
     poly = P(GF, [1])
-    for pos in err_pos:
-        x = GF(w**pos)
+    w = GF(w)
+    for pos in set(err_pos):
+        x = w**pos
         # print("pos", pos)
         # print("loc", poly)
         poly = poly * P(GF, [1, -x])

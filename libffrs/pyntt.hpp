@@ -45,6 +45,8 @@ inline void NTT::register_class(py::module &m) {
         .def_property_readonly("ecc_len", [](NTT& self) { return self.ecc_len; })
         .def_property_readonly("ecc_size", [](NTT& self) { return self.ecc_len * sizeof(uint16_t); })
 
+        .def("rbo", &NTT::rbo, R"(Reverse Bit Order for :math:`\log_2 \text{ntt_len}` bits)", "i"_a)
+
         .def("ntt", cast_args(&NTT::py_ntt<simd_map_t<1>>), R"(RBO input, normal order output)", "input"_a)
         .def("ntt4", cast_args(&NTT::py_ntt<simd_map_t<4>>), R"(RBO input, normal order output)", "input"_a)
         .def("ntt8", cast_args(&NTT::py_ntt<simd_map_t<8>>), R"(RBO input, normal order output)", "input"_a)

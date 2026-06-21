@@ -475,7 +475,8 @@ struct NTT {
         _reverse_ntt_vec(t, g_len);
         pd_print_vec_intt("g_rev", t, ecc_len);
 
-        auto g_inv_len = poly_inv_mod_xn_rev(t, g_len, g0, q_len, q);
+        // auto g_inv_len =
+        poly_inv_mod_xn_rev(t, g_len, g0, q_len, q);
         pd_print_vec_intt("g_rev_inv_rev", q, ecc_len);
         pd_print_vec("g_rev_inv_rev_len", &g_inv_len, 1);
 

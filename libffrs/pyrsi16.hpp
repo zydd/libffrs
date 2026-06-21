@@ -166,7 +166,7 @@ public:
     inline void repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) const {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)
-            error_pos_rbo[i] = rs16.rbo(error_pos[i]);
+            error_pos_rbo[i] = rs16.ntt.rbo(error_pos[i]);
 
         _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
             _repair_interleaved<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count, error_pos_rbo);
@@ -176,7 +176,7 @@ public:
     inline void repair_block(GFT block[], std::vector<size_t> const& error_pos, GFT temp_ntt1_ecc6[]) const {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)
-            error_pos_rbo[i] = rs16.rbo(error_pos[i]);
+            error_pos_rbo[i] = rs16.ntt.rbo(error_pos[i]);
 
         rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
     }
@@ -278,20 +278,24 @@ public:
                 R"(Systematic encode)",
                 "buffer"_a)
 
-            .def("synd", cast_args(&PyRSi16::py_synd),
-                R"(Calculate syndromes for the given message and ecc buffers)",
-                "message"_a,
-                "ecc"_a)
-
             .def("repair", cast_args(&PyRSi16::py_repair),
                 R"(Repair a block with the given error locations)",
                 "message"_a,
                 "ecc"_a,
                 "error_pos"_a = py::none())
 
-            .def("rbo", [](PyRSi16& self, uint16_t i) { return self.rs16.rbo(i); },
-                R"(Reverse Bit Order)",
-                "i"_a)
+            .def("_synd", cast_args(&PyRSi16::py_synd),
+                R"(Calculate syndromes for the given message and ecc buffers)",
+                "message"_a,
+                "ecc"_a)
+
+            .def("_sugiyama", &PyRSi16::py_sugiyama<1>,
+                R"(Compute error locator and evaluator polynomials)",
+                "synd"_a)
+
+            .def("_roots", &PyRSi16::py_roots,
+                R"(Find locator polynomial roots)",
+                "synd"_a)
 
             .doc() = R"(Reed-Solomon coding over :math:`GF(65537)`)";
     }
@@ -504,6 +508,20 @@ private:
             f(std::integral_constant<size_t, 1>{}, rs16);
     }
 
+    template<size_t W>
+    inline RSi16v<W> const& rs() const {
+        if constexpr (W == 16)
+            return rs16x16;
+        else if constexpr (W == 8)
+            return rs16x8;
+        else if constexpr (W == 4)
+            return rs16x4;
+        else if constexpr (W == 1)
+            return rs16;
+        else
+            static_assert(W == 1 || W == 4 || W == 8 || W == 16, "Unsupported SIMD width");
+    }
+
     template<typename T>
     inline void _print_table(T const& table, size_t rows, size_t cols) const {
         py::print("Table:", rows, "x", cols);
@@ -562,7 +580,7 @@ private:
 
                 auto error_pos_rbo = std::vector<size_t>(error_pos->size());
                 for (size_t i = 0; i < error_pos->size(); ++i)
-                    error_pos_rbo[i] = rs16.rbo((*error_pos)[i]);
+                    error_pos_rbo[i] = rs16.ntt.rbo((*error_pos)[i]);
 
                 rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
 
@@ -586,22 +604,53 @@ private:
         }
     }
 
-    inline py::bytearray py_synd(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc) {
+    inline std::vector<GFT> py_synd(buffer_ro<uint16_t> message, buffer_ro<uint16_t> ecc) {
         py_assert(message.size == message_len, std::to_string(message.size));
         py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
 
         auto temp = new_aligned<GFT>(block_len, sizeof(GFT));
-        auto synds = new_aligned<GFT>(ecc_len, sizeof(GFT));
 
         std::copy_n(&message[0], message_len, &temp[0]);
         std::copy_n(&ecc[0], ecc_len, &temp[message_len]);
 
         rs16.pntt(&temp[0]);
-        std::copy_n(&temp[0], ecc_len, &synds[0]);
 
-        auto output = py::bytearray(nullptr, ecc_len * sizeof(uint16_t));
-        auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
-        std::copy_n(&synds[0], ecc_len, &output_data[0]);
-        return output;
+        return std::vector(&temp[0], &temp[ecc_len]);
+    }
+
+    template<size_t W>
+    inline py::tuple py_sugiyama(std::vector<GFT> synd) {
+        auto repair_temp = new_aligned<GFT>(repair_temp_len * W, W * sizeof(GFT));
+        auto const& rs = this->rs<W>();
+
+        auto a1 = &repair_temp[0];
+        auto r1 = &repair_temp[ecc_len * W];
+        auto temp_ecc4 = &repair_temp[2 * ecc_len * W];
+
+        vec::copy_transposed(&synd[0], ecc_len, &r1[0], W);
+
+        rs.sugiyama(&a1[0], &r1[0], &temp_ecc4[0]);
+
+        return py::make_tuple(
+            std::vector(&a1[0], &a1[ecc_len]),
+            std::vector(&r1[0], &r1[ecc_len])
+        );
+    }
+
+    inline std::vector<size_t> py_roots(std::vector<GFT> poly) {
+        py_assert(poly.size() == ecc_len);
+        auto temp = new_aligned<GFT>(block_len, sizeof(GFT));
+
+        std::copy_n(&poly[0], ecc_len, &temp[0]);
+        std::fill_n(&temp[ecc_len], block_len - ecc_len, 0);
+
+        rs16.ntt.pintt_ecc(&temp[0]);
+
+        std::vector<size_t> zeros;
+        for (size_t i = 0; i < block_len; ++i) {
+            if (temp[i] == 0)
+                zeros.push_back(i);
+        }
+        return zeros;
     }
 };

@@ -120,12 +120,6 @@ void RSi16v<W>::_mix_ecc_residue(GFT *const ecc) const {
 
 
 template<size_t W>
-uint16_t RSi16v<W>::rbo(uint16_t v) const {
-    return ntt.rbo(v);
-}
-
-
-template<size_t W>
 void RSi16v<W>::_repair(GFT *const block, GFT *const temp_ntt1_ecc6) const {
     r_print("repair unknown >");
     // temp_ntt1_ecc6 = ntt_len + ecc_len * 6
@@ -739,16 +733,18 @@ py::bytearray NTT::py_poly_mul(buffer_ro<uint16_t> a, buffer_ro<uint16_t> b) con
 
 template<typename GFT>
 py::bytearray NTT::py_poly_div(buffer_ro<uint16_t> a, buffer_ro<uint16_t> b) const {
-    py_assert(a.size == ecc_len * sizeof(GFT) / sizeof(::GFT), std::to_string(a.size) + " != " + std::to_string(ecc_len * sizeof(GFT) / sizeof(::GFT)));
-    py_assert(b.size == ecc_len * sizeof(GFT) / sizeof(::GFT), std::to_string(b.size) + " != " + std::to_string(ecc_len * sizeof(GFT) / sizeof(::GFT)));
+    auto constexpr W = sizeof(GFT) / sizeof(::GFT);
+
+    py_assert(a.size == ecc_len * W, std::to_string(a.size) + " != " + std::to_string(ecc_len * W));
+    py_assert(b.size == ecc_len * W, std::to_string(b.size) + " != " + std::to_string(ecc_len * W));
 
     auto temp_a = new_aligned<GFT>(ecc_len, sizeof(GFT));
     auto temp_b = new_aligned<GFT>(ecc_len, sizeof(GFT));
     auto temp_t = new_aligned<GFT>(ecc_len, sizeof(GFT));
     auto temp_q = new_aligned<GFT>(ecc_len, sizeof(GFT));
 
-    vec::copy_transposed(&a[0], ecc_len, reinterpret_cast<::GFT *>(&temp_a[0]), sizeof(GFT) / sizeof(::GFT));
-    vec::copy_transposed(&b[0], ecc_len, reinterpret_cast<::GFT *>(&temp_b[0]), sizeof(GFT) / sizeof(::GFT));
+    vec::copy_transposed(&a[0], ecc_len, reinterpret_cast<::GFT *>(&temp_a[0]), W);
+    vec::copy_transposed(&b[0], ecc_len, reinterpret_cast<::GFT *>(&temp_b[0]), W);
 
     auto a_len = vec::poly::len(&temp_a[0], ecc_len);
     auto b_len = vec::poly::len(&temp_b[0], ecc_len);
@@ -767,15 +763,17 @@ py::bytearray NTT::py_poly_div(buffer_ro<uint16_t> a, buffer_ro<uint16_t> b) con
 
     inttr(&temp_q[0]);
 
-    auto output = py::bytearray(nullptr, ecc_len * sizeof(GFT) / sizeof(::GFT) * sizeof(uint16_t));
+    auto output = py::bytearray(nullptr, ecc_len * W * sizeof(uint16_t));
     auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
-    vec::copy_transposed(reinterpret_cast<::GFT *>(&temp_q[0]), sizeof(GFT) / sizeof(::GFT), &output_data[0], ecc_len);
+    vec::copy_transposed(reinterpret_cast<::GFT *>(&temp_q[0]), W, &output_data[0], ecc_len);
     return output;
 }
 
 template<typename GFT>
 py::bytearray NTT::py_poly_inv(buffer_ro<uint16_t> input, size_t n) const {
-    py_assert(input.size == ecc_len * sizeof(GFT) / sizeof(::GFT), std::to_string(input.size) + " != " + std::to_string(ecc_len * sizeof(GFT) / sizeof(::GFT)));
+    auto constexpr W = sizeof(GFT) / sizeof(::GFT);
+
+    py_assert(input.size == ecc_len * W, std::to_string(input.size) + " != " + std::to_string(ecc_len * W));
     return _py_ntt_io<GFT, 1>([this, n](GFT *g, GFT *res) {
         auto g0 = g[0];
         auto g_len = vec::poly::len(&g[0], ecc_len);

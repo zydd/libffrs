@@ -319,6 +319,27 @@ class BaseTestRS:
         rsi.repair(msg_buf_err, ecc_buf_err, errors.keys())
         assert msg_buf_err + ecc_buf_err == msg_buf_orig + ecc_buf_orig
 
+    def test_sugiyama_max(self, rs: ffrs.RSi16):
+        buf = bytearray(rs.message_size)
+        errors = random.sample(range(rs.message_len), rs.ecc_len // 2)
+        for e in errors:
+            buf[e * 2] = random.randrange(1, 256)
+
+        locator_ref = ref_rs.locator(ref_gf, rs.root, map(rs.ntt.rbo, errors))
+        locator_ref = list(map(int, locator_ref.x)) + [0] * (rs.ecc_len - len(locator_ref.x))
+
+        synd = rs._synd(buf, bytearray(rs.ecc_size))
+        locator, evaluator = rs._sugiyama(synd)
+        roots = rs._roots(locator)
+
+        roots_ref = rs._roots(locator_ref)
+
+        assert set(errors) == set(roots)
+        assert roots == roots_ref
+        assert locator == locator_ref
+
+    # TODO: test SIMD sugiyama
+
 
 @pytest.mark.parametrize(
     "rs",

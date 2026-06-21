@@ -111,10 +111,10 @@ class BaseTestCIRC:
         rsio_size = self._rsi_ecc_size(rs) + self._rso_ecc_size(rs)
         for i in range(rsio_size, rsio_size + rs.inner_ecc_size):
             ecc[i] ^= random.randint(0, 255)
-    
+
     def corrupt_outer_rows(self, rs, buf, ecc, n):
         for row in random.choices(range(rs.outer_block_len), k=n):
-            for interleave in [0]: # range(rs.interleave):
+            for interleave in [0]:  # range(rs.interleave):
                 if row < rs.outer_message_len:
                     for col in range(rs.inner_message_len):
                         # message
@@ -139,7 +139,6 @@ class BaseTestCIRC:
                         offset = 2 * rs.rsi_ecc_offset(interleave, row, col)
                         ecc[offset] ^= random.randint(1, 255)
                         ecc[offset + 1] ^= random.randint(1, 255)
-
 
     def test_circ_repair(self, rs: ffrs.CIRC16):
         buf = randbytes(rs.message_size)

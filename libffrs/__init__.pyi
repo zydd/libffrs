@@ -87,7 +87,7 @@ class CIRC16:
         """Cross-interleaved Reed-Solomon coder"""
 
     def _find_outer_error_locations(self: libffrs.CIRC16, message: collections.abc.Buffer, ecc: collections.abc.Buffer, interleave: typing.SupportsInt | typing.SupportsIndex) -> list[int]:
-        """Find outer codec errro locations for a given interleaved block"""
+        """Find outer codec error locations for a given interleaved block"""
 
     def encode(self: libffrs.CIRC16, buffer: collections.abc.Buffer) -> bytearray:
         """Encode data"""
@@ -345,6 +345,9 @@ class NTT:
     def poly_mul8(self: libffrs.NTT, a: collections.abc.Buffer, b: collections.abc.Buffer) -> bytearray:
         """Element wise multiplication x8"""
 
+    def rbo(self: libffrs.NTT, i: typing.SupportsInt | typing.SupportsIndex) -> int:
+        """Reverse Bit Order for :math:`\log_2 \text{ntt_len}` bits"""
+
 
 
 class RS256:
@@ -442,17 +445,20 @@ class RSi16:
     def __init__(self: libffrs.RSi16, block_len: typing.SupportsInt | typing.SupportsIndex, ecc_len: typing.SupportsInt | typing.SupportsIndex, interleave: typing.SupportsInt | typing.SupportsIndex = 1, *, primitive: typing.SupportsInt | typing.SupportsIndex = 3, simd_x4: bool | None = None, simd_x8: bool | None = None, simd_x16: bool | None = None) -> None:
         """Instantiate a Reed-Solomon encoder with the given configuration"""
 
+    def _roots(self: libffrs.RSi16, synd: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex]) -> list[int]:
+        """Find locator polynomial roots"""
+
+    def _sugiyama(self: libffrs.RSi16, synd: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex]) -> tuple:
+        """Compute error locator and evaluator polynomials"""
+
+    def _synd(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> list[int]:
+        """Calculate syndromes for the given message and ecc buffers"""
+
     def encode(self: libffrs.RSi16, buffer: collections.abc.Buffer) -> bytearray:
         """Systematic encode"""
 
-    def rbo(self: libffrs.RSi16, i: typing.SupportsInt | typing.SupportsIndex) -> int:
-        """Reverse Bit Order"""
-
     def repair(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer, error_pos: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex] | None = None) -> None:
         """Repair a block with the given error locations"""
-
-    def synd(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> bytearray:
-        """Calculate syndromes for the given message and ecc buffers"""
 
 
 
