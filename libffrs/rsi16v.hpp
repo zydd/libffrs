@@ -32,9 +32,9 @@ using GFT = uint32_t;
 template<size_t W>
 class RSi16v {
     const GFi16 &gf;
+    const NTT &ntt;
 
 public:
-    const NTT ntt;
     std::vector<::GFT> _ecc_mix;
     std::vector<::GFT> _ecc_mix_i;
 
@@ -47,7 +47,7 @@ public:
     using cGFT = const GFT *const;
     using mGFT = GFT *const;
 
-    RSi16v(GFi16 const& gf, size_t block_len, size_t ecc_len);
+    RSi16v(NTT const& ntt, size_t block_len, size_t ecc_len);
     ~RSi16v();
 
     inline void encode(::GFT block[]) const
@@ -61,9 +61,6 @@ public:
 
     inline void repair(::GFT block[], ::GFT temp_ntt1_ecc6[]) const
         { _repair(reinterpret_cast<GFT *>(block), reinterpret_cast<GFT *>(temp_ntt1_ecc6)); }
-
-    inline void pntt(::GFT block[]) const
-        { ntt.pntt(reinterpret_cast<GFT *>(block)); }
 
     inline void mix_ecc(::GFT ecc[]) const
         { _mix_ecc(reinterpret_cast<GFT *>(ecc)); }

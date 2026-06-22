@@ -47,10 +47,11 @@ private:
         bool simd_x16
     ):
         gf(primitive),
-        rs16(gf, args.block_len, args.ecc_len),
-        rs16x4(gf, args.block_len, args.ecc_len),
-        rs16x8(gf, args.block_len, args.ecc_len),
-        rs16x16(gf, args.block_len, args.ecc_len),
+        ntt(gf, args.block_len, args.ecc_len),
+        rs16(ntt, args.block_len, args.ecc_len),
+        rs16x4(ntt, args.block_len, args.ecc_len),
+        rs16x8(ntt, args.block_len, args.ecc_len),
+        rs16x16(ntt, args.block_len, args.ecc_len),
         simd_x4(simd_x4),
         simd_x8(simd_x8),
         simd_x16(simd_x16),
@@ -61,7 +62,7 @@ private:
         interleaved_block_len(block_len * interleave),
         interleaved_message_len(message_len * interleave),
         interleaved_ecc_len(ecc_len * interleave),
-        repair_temp_len(rs16.ntt_len + ecc_len * 6)
+        repair_temp_len(ntt.ntt_len + ecc_len * 6)
     {
         if (simd_x16)
             vec_align = 16 * sizeof(GFT);
@@ -85,6 +86,7 @@ private:
 
 public:
     const PyGFi16 gf;
+    const NTT ntt;
     const RSi16v<1> rs16;
     const RSi16v<4> rs16x4;
     const RSi16v<8> rs16x8;
@@ -166,7 +168,7 @@ public:
     inline void repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) const {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)
-            error_pos_rbo[i] = rs16.ntt.rbo(error_pos[i]);
+            error_pos_rbo[i] = ntt.rbo(error_pos[i]);
 
         _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
             _repair_interleaved<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count, error_pos_rbo);
@@ -176,13 +178,13 @@ public:
     inline void repair_block(GFT block[], std::vector<size_t> const& error_pos, GFT temp_ntt1_ecc6[]) const {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)
-            error_pos_rbo[i] = rs16.ntt.rbo(error_pos[i]);
+            error_pos_rbo[i] = ntt.rbo(error_pos[i]);
 
         rs16.repair(&block[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
     }
 
     inline void synd_block(GFT block[]) const {
-        rs16.pntt(&block[0]);
+        ntt.pntt(&block[0]);
     }
 
     template<typename Src>
@@ -192,7 +194,7 @@ public:
         for (size_t i = 0; i < count; ++i) {
             std::copy_n(&msg[i * message_len], message_len, &temp[0]);
             std::copy_n(&ecc[i * ecc_len], ecc_len, &temp[message_len]);
-            rs16.pntt(&temp[0]);
+            ntt.pntt(&temp[0]);
             std::copy_n(&temp[0], ecc_len, &synds[i * ecc_len]);
         }
     }
@@ -207,7 +209,7 @@ public:
             vec::copy_stride(&msg[i * SIMD_W], interleave, &temp[0], SIMD_W, SIMD_W, message_len);
             // std::copy_n(&ecc[i * ecc_len], ecc_len, &temp[message_len]);
             vec::copy_transposed(&ecc[i * ecc_len], ecc_len, &temp[message_len * SIMD_W], SIMD_W);
-            rs16.pntt(&temp[0]);
+            ntt.pntt(&temp[0]);
             // std::copy_n(&temp[0], ecc_len, &synds[i * ecc_len]);
             vec::copy_transposed(&temp[0], SIMD_W, &synds[i * ecc_len * SIMD_W], ecc_len);
         }
@@ -241,11 +243,11 @@ public:
             .def_property_readonly("rs_message_size", [](PyRSi16& self) { return self.message_len * sizeof(uint16_t); }, R"(Reed-Solomon message size in bytes)")
             .def_property_readonly("rs_ecc_len", [](PyRSi16& self) { return self.ecc_len; }, R"(Reed-Solomon error correction code length in number of elements)")
             .def_property_readonly("rs_ecc_size", [](PyRSi16& self) { return self.ecc_len * sizeof(uint16_t); }, R"(Reed-Solomon error correction code size in bytes)")
-            .def_property_readonly("ntt_len", [](PyRSi16& self) { return self.rs16.ntt_len; }, R"(Number theoretic transform length)")
-            .def_property_readonly("ntt_size", [](PyRSi16& self) { return self.rs16.ntt_len * sizeof(uint16_t); }, R"(Number theoretic transform size in bytes)")
+            .def_property_readonly("ntt_len", [](PyRSi16& self) { return self.ntt.ntt_len; }, R"(Number theoretic transform length)")
+            .def_property_readonly("ntt_size", [](PyRSi16& self) { return self.ntt.ntt_len * sizeof(uint16_t); }, R"(Number theoretic transform size in bytes)")
             .def_property_readonly("root", [](PyRSi16& self) { return self.rs16.root; }, R"(:math:`n`-th root of unity used by NTT)")
             .def_property_readonly("gf", [](PyRSi16& self) -> auto const * { return &self.gf; }, R"(:class:`GFi16` instance for :math:`GF(65537)`)")
-            .def_property_readonly("ntt", [](PyRSi16& self) -> auto const * { return &self.rs16.ntt; }, R"(:class:`NTT` instance)")
+            .def_property_readonly("ntt", [](PyRSi16& self) -> auto const * { return &self.ntt; }, R"(:class:`NTT` instance)")
             .def_property_readonly("interleave", [](PyRSi16& self) { return self.interleave; }, R"(Number of interleaved columns)")
 
             .def_property_readonly("simd_x4", [](PyRSi16& self) { return self.simd_x4; }, R"(SIMD x4 encoding enabled (SSE2))")
@@ -580,7 +582,7 @@ private:
 
                 auto error_pos_rbo = std::vector<size_t>(error_pos->size());
                 for (size_t i = 0; i < error_pos->size(); ++i)
-                    error_pos_rbo[i] = rs16.ntt.rbo((*error_pos)[i]);
+                    error_pos_rbo[i] = ntt.rbo((*error_pos)[i]);
 
                 rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
 
@@ -613,7 +615,7 @@ private:
         std::copy_n(&message[0], message_len, &temp[0]);
         std::copy_n(&ecc[0], ecc_len, &temp[message_len]);
 
-        rs16.pntt(&temp[0]);
+        ntt.pntt(&temp[0]);
 
         return std::vector(&temp[0], &temp[ecc_len]);
     }
@@ -644,7 +646,7 @@ private:
         std::copy_n(&poly[0], ecc_len, &temp[0]);
         std::fill_n(&temp[ecc_len], block_len - ecc_len, 0);
 
-        rs16.ntt.pintt_ecc(&temp[0]);
+        ntt.pintt_ecc(&temp[0]);
 
         std::vector<size_t> zeros;
         for (size_t i = 0; i < block_len; ++i) {

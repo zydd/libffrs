@@ -66,9 +66,9 @@
 
 
 template<size_t W>
-RSi16v<W>::RSi16v(GFi16 const& gf, size_t block_len, size_t ecc_len):
-    gf(gf),
-    ntt(gf, block_len, ecc_len),
+RSi16v<W>::RSi16v(NTT const& ntt, size_t block_len, size_t ecc_len):
+    gf(ntt.gf),
+    ntt(ntt),
     root(ntt.root),
     ntt_len(ntt.ntt_len),
     block_len(block_len),
