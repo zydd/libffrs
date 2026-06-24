@@ -451,11 +451,26 @@ class RSi16:
     def _sugiyama(self: libffrs.RSi16, synd: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex]) -> tuple:
         """Compute error locator and evaluator polynomials"""
 
+    def _sugiyama16(self: libffrs.RSi16, synd: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex]) -> tuple:
+        """Compute error locator and evaluator polynomials"""
+
+    def _sugiyama4(self: libffrs.RSi16, synd: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex]) -> tuple:
+        """Compute error locator and evaluator polynomials"""
+
+    def _sugiyama8(self: libffrs.RSi16, synd: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex]) -> tuple:
+        """Compute error locator and evaluator polynomials"""
+
     def _synd(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer) -> list[int]:
         """Calculate syndromes for the given message and ecc buffers"""
 
+    def ecc_offset(self: libffrs.RSi16, row: typing.SupportsInt | typing.SupportsIndex, col: typing.SupportsInt | typing.SupportsIndex) -> int:
+        """Calculate ECC offset in number of elements"""
+
     def encode(self: libffrs.RSi16, buffer: collections.abc.Buffer) -> bytearray:
         """Systematic encode"""
+
+    def message_offset(self: libffrs.RSi16, row: typing.SupportsInt | typing.SupportsIndex, col: typing.SupportsInt | typing.SupportsIndex) -> int:
+        """Calculate message offset in number of elements"""
 
     def repair(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer, error_pos: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex] | None = None) -> None:
         """Repair a block with the given error locations"""

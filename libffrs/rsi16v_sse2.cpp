@@ -43,12 +43,12 @@ GFTx4 ffrs::simd_gather_base::gather(const uint32_t vec[], GFTx4 const& i) {
 }
 
 
-// template<>
-// void vec::assign_masked<GFTx4>(GFTx4& vec, GFTx4 const& value, GFTx4 const& condition) {
-//     for (int j = 0; j < 4; j++)
-//         if (condition[j])
-//             vec[j] = value[j];
-// }
+template<>
+void vec::assign_masked<GFTx4>(GFTx4& vec, GFTx4 const& value, GFTx4 const& condition) {
+    for (int j = 0; j < 4; j++)
+        if (condition[j])
+            vec[j] = value[j];
+}
 
 
 template<>

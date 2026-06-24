@@ -31,11 +31,11 @@ simd_mask_t vec::is_zero<GFT>(GFT const& vec) {
 }
 
 
-// template<>
-// void vec::assign_masked<GFT>(GFT& vec, GFT const& value, GFT const& condition) {
-//     if (condition)
-//         vec = value;
-// }
+template<>
+void vec::assign_masked<GFT>(GFT& vec, GFT const& value, GFT const& condition) {
+    if (condition)
+        vec = value;
+}
 
 
 template<>

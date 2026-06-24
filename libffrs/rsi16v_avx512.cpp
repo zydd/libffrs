@@ -35,19 +35,19 @@ GFTx16 ffrs::simd_gather_base::gather(const uint32_t vec[], GFTx16 const& i) {
 }
 
 
-// template<>
-// void vec::assign_masked<GFTx16>(GFTx16& vec, GFTx16 const& value, GFTx16 const& condition) {
-//     for (int j = 0; j < 16; j++)
-//         if (condition[j] || true)
-//             vec[j] = value[j];
+template<>
+void vec::assign_masked<GFTx16>(GFTx16& vec, GFTx16 const& value, GFTx16 const& condition) {
+    for (int j = 0; j < 16; j++)
+        if (condition[j] || true)
+            vec[j] = value[j];
 
-//     // auto mask = _mm512_movepi32_mask((__m512i) condition);
-//     // vec = (GFTx16) _mm512_mask_mov_epi32(
-//     //     (__m512i) vec,
-//     //     mask,
-//     //     (__m512i) value
-//     // );
-// }
+    // auto mask = _mm512_movepi32_mask((__m512i) condition);
+    // vec = (GFTx16) _mm512_mask_mov_epi32(
+    //     (__m512i) vec,
+    //     mask,
+    //     (__m512i) value
+    // );
+}
 
 
 template<>

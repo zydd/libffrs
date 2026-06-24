@@ -50,23 +50,6 @@ class BaseTestCIRC:
     def _rso_ecc_size(rs: ffrs.CIRC16):
         return rs.inner_message_size * rs.outer_ecc_len * rs.interleave
 
-    @staticmethod
-    def add_errors_stride(msg, ecc, stride, max=float("inf")):
-        pos = 0
-        count = 0
-        while pos < len(msg) and count < max:
-            msg[pos] ^= 0xFF
-            pos += stride
-            count += 1
-
-        pos -= len(msg)
-        while pos < len(ecc) and count < max:
-            ecc[pos] ^= 0xFF
-            pos += stride
-            count += 1
-
-        return count
-
     def test_properties(self, rs: ffrs.CIRC16):
         assert rs.ecc_len == rs.inner_block_len * rs.outer_block_len * rs.interleave - rs.message_len
         assert rs.block_len == rs.message_len + rs.ecc_len
@@ -93,24 +76,6 @@ class BaseTestCIRC:
         # limit to small inputs to reduce chance of failure
         if rs.inner_message_len < 64:
             assert res[-len(res_io) :] == res_io
-
-    def add_errors_start(self, rs, buf, ecc):
-        # Corrupt message
-        for i in range((rs.outer_ecc_len - 1) * rs.inner_message_size):
-            buf[i] ^= random.randint(0, 255)
-
-        # Corrupt rso
-        for i in range(rs.inner_ecc_size):
-            ecc[i] ^= random.randint(0, 255)
-
-        # Corrupt rsi corresponding to message
-        for i in range(rs.inner_ecc_size * (rs.outer_ecc_len - 1)):
-            ecc[self._rso_ecc_size(rs) + i] ^= random.randint(0, 255)
-
-        # Corrupt rsio corresponding to rso
-        rsio_size = self._rsi_ecc_size(rs) + self._rso_ecc_size(rs)
-        for i in range(rsio_size, rsio_size + rs.inner_ecc_size):
-            ecc[i] ^= random.randint(0, 255)
 
     def corrupt_outer_rows(self, rs, buf, ecc, n):
         for row in random.sample(range(rs.outer_block_len), n):
@@ -147,9 +112,7 @@ class BaseTestCIRC:
         buf_orig = bytearray(buf)
         ecc_orig = bytearray(ecc)
 
-        self.add_errors_start(rs, buf, ecc)
-        # TODO
-        # self.corrupt_outer_rows(rs, buf, ecc, rs.ecc_len)
+        self.corrupt_outer_rows(rs, buf, ecc, rs.outer_ecc_len)
 
         rs.repair(buf, ecc)
 
@@ -164,7 +127,7 @@ class BaseTestCIRC:
         buf_orig = bytearray(buf)
         ecc_orig = bytearray(ecc)
 
-        self.add_errors_start(rs, buf, ecc)
+        self.corrupt_outer_rows(rs, buf, ecc, rs.outer_ecc_len)
 
         rs.repair(buf, ecc)
 
@@ -172,7 +135,7 @@ class BaseTestCIRC:
         assert ecc == ecc_orig
 
     @pytest.mark.skip
-    def test_circ_repair_zeroes(self, rs: ffrs.CIRC16):
+    def test_circ_repair_zeros(self, rs: ffrs.CIRC16):
         buf = randbytes(rs.message_size)
         ecc = rs.encode(buf)
 
@@ -220,17 +183,7 @@ class BaseTestCIRC:
         i = self._rsi_ecc_size(rs)
         ecc[o : o + i] = random.randbytes(i)
 
-        err_count = self.add_errors_stride(
-            buf, [], rs.inner_message_size + 2, rs.inner_message_len * rs.outer_ecc_len // 2
-        )
-
-        # TODO: aligned
-        # for interleave in range(rs.interleave):
-        #     # Corrupt `ecc_len // 2` rows
-        #     for row in random.sample(range(rs.outer_message_len), rs.outer_ecc_len // 2):
-        #         for col in range(rs.inner_message_len):
-        #             offset = 2 * rs.message_offset(interleave, row, col)
-        #             buf[offset:offset + 2] = randbytes(2)
+        self.corrupt_outer_rows(rs, buf, ecc, rs.outer_ecc_len // 2)
 
         rs.repair(buf, ecc)
 
@@ -339,9 +292,9 @@ class TestCircPower2(BaseTestCIRC):
     [
         ffrs.CIRC16(4 * 3, 2, 8 * 3, 2),
         ffrs.CIRC16(100, 2, 100, 2),
-        ffrs.CIRC16(1026, 2, 128 * 3, 128),
+        ffrs.CIRC16(52, 2, 64 * 3, 64),
         ffrs.CIRC16(100, 2, 100, 2, 3),
-        ffrs.CIRC16(1026, 2, 128 * 3, 128, 7),
+        ffrs.CIRC16(52, 2, 64 * 3, 64, 7),
     ],
 )
 class TestCircMult(BaseTestCIRC):

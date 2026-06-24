@@ -65,8 +65,7 @@ public:
     inline void mix_ecc(::GFT ecc[]) const
         { _mix_ecc(reinterpret_cast<GFT *>(ecc)); }
 
-    inline void sugiyama(::GFT a1[], ::GFT r1[], ::GFT temp_ecc4[]) const
-        { _sugiyama(reinterpret_cast<GFT *>(a1), reinterpret_cast<GFT *>(r1), reinterpret_cast<GFT *>(temp_ecc4)); }
+    void sugiyama(::GFT a1[], ::GFT r1[], ::GFT temp_ecc4[]) const;
 
 protected:
     void _encode(GFT block[]) const;

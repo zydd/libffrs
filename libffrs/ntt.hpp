@@ -373,20 +373,27 @@ struct NTT {
 
         size_t l = 2;
         auto a_max = vec::max(a_len);
-        while (l < a_max) {
+        GFT cond;
+        if constexpr (std::is_integral_v<GFT>) {
+            cond = -(::GFT(l) < a_len);
+        } else {
+            cond = (::GFT(l) < a_len);
+        }
+        while (vec::any(cond)) {
             pd_print("inverse modulo", l);
             pd_print_vec_intt("g", g, ecc_len);
             pd_print_vec_intt("a", a, ecc_len);
 
             // A = [a * (GF(2) - a * g) for a, g in zip(A, G)]
             py_assert(
-                vec::max(g_len) + l - 2 <= ecc_len,
-                std::to_string(vec::max(g_len)) + " + " + std::to_string(l) + " - 2 > " + std::to_string(ecc_len)
+                vec::max(g_len & cond) + l - 2 <= ecc_len,
+                std::to_string(vec::max(g_len & cond)) + " + " + std::to_string(l) + " - 2 > " + std::to_string(ecc_len)
             );
             for (size_t i = 0; i < ecc_len; ++i) {
                 GFT a_i = a[i];
                 GFT ag = gf.mul(a_i, g[i]);
-                a[i] = gf.mul(a_i, gf.sub(GFT{} + 2, ag));
+                // a[i] = gf.mul(a_i, gf.sub(GFT{} + 2, ag));
+                vec::assign_masked(a[i], gf.mul(a_i, gf.sub(GFT{} + 2, ag)), cond);
             }
 
             inttr(a);
@@ -399,10 +406,21 @@ struct NTT {
             nttr(a);
 
             l *= 2;
+            if constexpr (std::is_integral_v<GFT>) {
+                cond = -(::GFT(l) < a_len);
+            } else {
+                cond = (::GFT(l) < a_len);
+            }
         }
 
         // last iteration
         {
+            // if constexpr (std::is_integral_v<GFT>) {
+            //     cond = -(::GFT(l) <= a_len);
+            // } else {
+            //     cond = (::GFT(l) <= a_len);
+            // }
+
             pd_print("inverse modulo", l);
             pd_print_vec_intt("g", g, ecc_len);
             pd_print_vec_intt("a", a, ecc_len);
@@ -425,7 +443,12 @@ struct NTT {
 
             inttr(a);
             inttr(g);
-            std::copy_n(&g[l / 2], ecc_len - l / 2, &a[l / 2]);
+            std::copy_n(&g[0], ecc_len, &a[0]);
+            // TODO: increase aliasing endurance
+            // For this we need freeze the l value when cond becomes false
+            // Apparently this is not a problem in the sugiyama algo
+            // std::copy_n(&g[l / 2], ecc_len - l / 2, &a[l / 2]);
+            // vec::copy_n_masked(&g[l / 2], ecc_len - l / 2, &a[l / 2], cond);
 
             // A = A % x**a_len
             std::fill_n(&a[l], ::GFT(ecc_len - l), GFT{0});

@@ -35,12 +35,12 @@ GFTx8 ffrs::simd_gather_base::gather(const uint32_t vec[], GFTx8 const& i) {
 }
 
 
-// template<>
-// void vec::assign_masked<GFTx8>(GFTx8& vec, GFTx8 const& value, GFTx8 const& condition) {
-//     for (int j = 0; j < 8; j++)
-//         if (condition[j])
-//             vec[j] = value[j];
-// }
+template<>
+void vec::assign_masked<GFTx8>(GFTx8& vec, GFTx8 const& value, GFTx8 const& condition) {
+    for (int j = 0; j < 8; j++)
+        if (condition[j])
+            vec[j] = value[j];
+}
 
 
 template<>

@@ -259,6 +259,13 @@ void RSi16v<W>::_repair_ntt(GFT *const block, const size_t *const error_pos_rbo,
         ntt.intt(&block[0]);
 }
 
+
+template<size_t W>
+inline void RSi16v<W>::sugiyama(::GFT a1[], ::GFT r1[], ::GFT temp_ecc4[]) const {
+    _sugiyama(reinterpret_cast<GFT *>(a1), reinterpret_cast<GFT *>(r1), reinterpret_cast<GFT *>(temp_ecc4));
+}
+
+
 template<size_t W>
 RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const temp_ecc4) const {
     // r1 = synds
@@ -282,7 +289,7 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
     std::fill_n(&a2[0], ecc_len, GFT{} + 1);
 
     // TODO test when second-to-last synd is 0
-    auto r1_len = vec::poly::len(&r1[0], ecc_len);
+    GFT r1_len = vec::poly::len(&r1[0], ecc_len);
 
     ld_print("\n-----\nInitialize");
 
@@ -323,17 +330,25 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
         ntt.nttr(r2);
     }
 
-    GFT lanes = ~GFT{0};
-    if constexpr (!std::is_integral_v<GFT>) {
+    GFT lanes;
+    if constexpr (std::is_integral_v<GFT>)
+        lanes = -(r1_len != 0);
+    else
         lanes = (r1_len != 0);
-        a1_len &= lanes;
-        a2_len &= lanes;
-        r1_len &= lanes;
-        r2_len &= lanes;
-    }
+
+    a1_len &= lanes;
+    a2_len &= lanes;
+    r1_len &= lanes;
+    r2_len &= lanes;
 
     ld_print("------\n");
-    if (vec::max(r1_len) >= ecc_len / 2) {
+    GFT cond;
+    if constexpr (std::is_integral_v<GFT>)
+        cond = -(r1_len >= ::GFT(ecc_len / 2));
+    else
+        cond = (r1_len >= ::GFT(ecc_len / 2));
+
+    if (vec::any(cond)) {
         for (size_t i = 1; i < ecc_len / 2; ++i) {
             ld_print("------\nIteration begin");
 
@@ -349,7 +364,7 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
             ld_print_vec_intt("a1", a1, ecc_len);
 
             // q = r2 // r1
-            q_len = ntt.poly_div_ntt(r2, r2_len, r1, r1_len, r2l, r1h, t, q);
+            q_len = ntt.poly_div_ntt(r2, r2_len & cond, r1, r1_len, r2l, r1h, t, q);
 
             ld_print("------");
             ld_print_vec("q_len", &q_len, 1);
@@ -383,7 +398,12 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
             r2l = r1l;
 
             {
-                GFT cond = (r1_len >= ::GFT(ecc_len / 2));
+                if constexpr (std::is_integral_v<GFT>) {
+                    cond = -(r1_len >= ::GFT(ecc_len / 2));
+                } else {
+                    cond = (r1_len >= ::GFT(ecc_len / 2));
+                }
+
                 ld_print_vec("update cond", &cond, 1);
 
                 if (vec::is_zero(cond)) {
@@ -397,14 +417,11 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
                 vec::copy_n_masked(&q[0], ecc_len, &r1[0], cond);
                 a1_len = t_len;
                 r1_len = q_len;
-
-                if constexpr (!std::is_integral_v<GFT>)
-                    lanes &= cond;
             }
 
             ntt.inttr(r1);
 
-            r1_len = vec::poly::len(r1, vec::max(r1_len & lanes));
+            r1_len = vec::poly::len(r1, vec::max(r1_len & cond));
             ld_print_vec("r1_len", &r1_len, 1);
             ld_print("------\nIteration end");
         }
@@ -412,7 +429,7 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
 
     ntt.inttr(a1);
 
-    a1_len = vec::poly::len(a1, ecc_len);
+    a1_len = vec::poly::len(a1, vec::max(a1_len & lanes));
 
     ld_print("------\nFinal values");
     ld_print_vec("a1_len", &a1_len, 1);
@@ -434,7 +451,7 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
     ld_print_vec("locator", a1, ecc_len);
     ld_print_vec("evaluator", r1, ecc_len);
     ld_print("------\nDone\n");
-    return a1_len & lanes;
+    return a1_len;
 }
 
 

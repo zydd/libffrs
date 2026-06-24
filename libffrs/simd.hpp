@@ -55,8 +55,8 @@ simd_mask_t is_zero(GFT const& vec);
 template<typename GFT>
 void copy_n_masked(const GFT *const src, size_t n, GFT *const dst, GFT const& condition);
 
-// template<typename GFT>
-// void assign_masked(GFT& vec, GFT const& value, GFT const& condition);
+template<typename GFT>
+void assign_masked(GFT& vec, GFT const& value, GFT const& condition);
 
 
 template<typename GFT>

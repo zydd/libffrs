@@ -187,8 +187,8 @@ public:
         ntt.pntt(&block[0]);
     }
 
-    template<typename Src>
-    inline void synd_blocks(const Src msg[], const GFT ecc[], size_t count, GFT temp[], GFT synds[]) const {
+    template<typename Msg, typename Ecc>
+    inline void synd_blocks(const Msg msg[], const Ecc ecc[], size_t count, GFT temp[], GFT synds[]) const {
         // len(temp) == block_len
         // len(synds) == count * ecc_len
         for (size_t i = 0; i < count; ++i) {
@@ -219,12 +219,16 @@ public:
         rs16.mix_ecc(&ecc[0]);
     }
 
-    inline size_t message_offset(size_t interleave, size_t col) {
-        return interleave * message_len + col;
+    inline size_t message_offset(size_t row, size_t col = 0) {
+        py_assert(row < message_len);
+        py_assert(col < interleave);
+        return row * interleave + col;
     }
 
-    inline size_t ecc_offset(size_t interleave, size_t col) {
-        return interleave * ecc_len + col;
+    inline size_t ecc_offset(size_t row, size_t col = 0) {
+        py_assert(row < ecc_len);
+        py_assert(col < interleave);
+        return row * interleave + col;
     }
 
     static inline void register_class(py::module &m) {
@@ -291,9 +295,13 @@ public:
                 "message"_a,
                 "ecc"_a)
 
-            .def("_sugiyama", &PyRSi16::py_sugiyama<1>,
-                R"(Compute error locator and evaluator polynomials)",
-                "synd"_a)
+            .def("_sugiyama", &PyRSi16::py_sugiyama<1>, R"(Compute error locator and evaluator polynomials)", "synd"_a)
+            .def("_sugiyama4", &PyRSi16::py_sugiyama<4>, R"(Compute error locator and evaluator polynomials)", "synd"_a)
+            .def("_sugiyama8", &PyRSi16::py_sugiyama<8>, R"(Compute error locator and evaluator polynomials)", "synd"_a)
+            .def("_sugiyama16", &PyRSi16::py_sugiyama<16>, R"(Compute error locator and evaluator polynomials)", "synd"_a)
+
+            .def("message_offset", &PyRSi16::message_offset, R"(Calculate message offset in number of elements)", "row"_a, "col"_a)
+            .def("ecc_offset", &PyRSi16::ecc_offset, R"(Calculate ECC offset in number of elements)", "row"_a, "col"_a)
 
             .def("_roots", &PyRSi16::py_roots,
                 R"(Find locator polynomial roots)",
@@ -551,7 +559,6 @@ private:
         size_t full_blocks = buf.size / interleaved_message_len;
         size_t output_size = full_blocks * interleaved_ecc_len;
 
-
         auto output = py::bytearray(nullptr, output_size * sizeof(uint16_t));
         auto output_data = reinterpret_cast<uint16_t *>(PyByteArray_AsString(output.ptr()));
 
@@ -607,17 +614,23 @@ private:
     }
 
     inline std::vector<GFT> py_synd(buffer_ro<uint16_t> message, buffer_ro<uint16_t> ecc) {
-        py_assert(message.size == message_len, std::to_string(message.size));
-        py_assert(ecc.size == ecc_len, std::to_string(ecc.size));
+        py_assert(message.size % message_len == 0, std::to_string(message.size));
+        py_assert(ecc.size % ecc_len == 0, std::to_string(ecc.size));
+
+        size_t count = message.size / message_len;
+        py_assert(ecc.size / ecc_len == count);
 
         auto temp = new_aligned<GFT>(block_len, sizeof(GFT));
+        std::vector<GFT> synd;
+        synd.resize(count * ecc_len);
 
         std::copy_n(&message[0], message_len, &temp[0]);
         std::copy_n(&ecc[0], ecc_len, &temp[message_len]);
 
         ntt.pntt(&temp[0]);
+        synd_blocks(&message[0], &ecc[0], count, &temp[0], &synd[0]);
 
-        return std::vector(&temp[0], &temp[ecc_len]);
+        return synd;
     }
 
     template<size_t W>
@@ -626,17 +639,21 @@ private:
         auto const& rs = this->rs<W>();
 
         auto a1 = &repair_temp[0];
-        auto r1 = &repair_temp[ecc_len * W];
-        auto temp_ecc4 = &repair_temp[2 * ecc_len * W];
+        auto r1 = &repair_temp[W * ecc_len];
+        auto temp_ecc4 = &repair_temp[2 * W * ecc_len];
 
         vec::copy_transposed(&synd[0], ecc_len, &r1[0], W);
 
         rs.sugiyama(&a1[0], &r1[0], &temp_ecc4[0]);
 
-        return py::make_tuple(
-            std::vector(&a1[0], &a1[ecc_len]),
-            std::vector(&r1[0], &r1[ecc_len])
-        );
+        std::vector<GFT> locator, evaluator;
+        locator.resize(W * ecc_len);
+        evaluator.resize(W * ecc_len);
+
+        vec::copy_transposed(&a1[0], W, &locator[0], ecc_len);
+        vec::copy_transposed(&r1[0], W, &evaluator[0], ecc_len);
+
+        return py::make_tuple(locator, evaluator);
     }
 
     inline std::vector<size_t> py_roots(std::vector<GFT> poly) {

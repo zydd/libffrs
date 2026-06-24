@@ -229,7 +229,24 @@ class BaseTestRS:
         rsi.repair(msg_buf_err, ecc_buf_err)
         assert msg_buf_err + ecc_buf_err == msg_buf_orig + ecc_buf_orig
 
-    @pytest.mark.parametrize("interleave", list(range(1, 16)) + [32, 48, 50])
+    def corrupt_rows(self, rs: ffrs.RSi16, buf, ecc, n):
+        rows = list(random.sample(range(rs.rs_block_len), n))
+        for row in rows:
+            if row < rs.rs_message_len:
+                for col in range(rs.interleave):
+                    # message
+                    offset = 2 * rs.message_offset(row, col)
+                    buf[offset] ^= random.randint(1, 255)
+                    buf[offset + 1] ^= random.randint(1, 255)
+            else:
+                for col in range(rs.interleave):
+                    # rso
+                    offset = 2 * rs.ecc_offset(row - rs.rs_message_len, col)
+                    ecc[offset] ^= random.randint(1, 255)
+                    ecc[offset + 1] ^= random.randint(1, 255)
+        return rows
+
+    @pytest.mark.parametrize("interleave", list(range(1, 16)) + [32, 33, 48, 50])
     @pytest.mark.parametrize("grace", range(4))
     def test_repair_interleaved_unknown_aligned(self, rs: ffrs.RSi16, interleave, grace):
         assert rs.interleave == 1
@@ -242,36 +259,17 @@ class BaseTestRS:
             simd_x16=rs.simd_x16,
         )
 
-        msg_orig = list(range(rsi.message_len))
-        msg_buf_orig = to_bytearray(msg_orig)
+        msg_orig = randbytes(rsi.message_size)
+        ecc_orig = rsi.encode(msg_orig)
 
-        ecc_buf_orig = rsi.encode(msg_buf_orig)
-        ecc_orig = to_int_list(ecc_buf_orig)
+        msg_err = bytearray(msg_orig)
+        ecc_err = bytearray(ecc_orig)
 
-        msg_err = list(msg_orig)
-        ecc_err = list(ecc_orig)
+        self.corrupt_rows(rsi, msg_err, ecc_err, max(rsi.rs_ecc_len // 2 - grace, 1))
 
-        # Aligned errors
-        msg_err[::interleave], ecc_err[::interleave], errors = add_errors(
-            msg_err[::interleave], ecc_err[::interleave], max(rs.ecc_len // 2 - grace, 1)
-        )
-        for i in range(1, interleave):
-            for pos, _err in errors.items():
-                if pos < rs.message_len:
-                    msg_err[i + pos * interleave] ^= random.randint(1, 65536)
-                else:
-                    ecc_err[i + (pos - rs.message_len) * interleave] ^= random.randint(1, 65536)
-
-        msg_err0 = msg_err[::interleave]
-        ecc_err0 = ecc_err[::interleave]
-        rs.repair(to_bytearray(msg_err0), to_bytearray(ecc_err0))
-
-        msg_buf_err = to_bytearray(msg_err)
-        ecc_buf_err = to_bytearray(ecc_err)
-
-        assert msg_buf_err + ecc_buf_err != msg_buf_orig + ecc_buf_orig
-        rsi.repair(msg_buf_err, ecc_buf_err)
-        assert msg_buf_err + ecc_buf_err == msg_buf_orig + ecc_buf_orig
+        assert msg_err + ecc_err != msg_orig + ecc_orig
+        rsi.repair(msg_err, ecc_err)
+        assert msg_err + ecc_err == msg_orig + ecc_orig
 
     @pytest.mark.parametrize("interleave", list(range(1, 16)) + [32, 33, 48, 50])
     @pytest.mark.parametrize("grace", range(4))
@@ -286,59 +284,140 @@ class BaseTestRS:
             simd_x16=rs.simd_x16,
         )
 
-        msg_orig = list(range(rsi.message_len))
-        msg_buf_orig = to_bytearray(msg_orig)
+        msg_orig = randbytes(rsi.message_size)
+        ecc_orig = rsi.encode(msg_orig)
 
-        ecc_buf_orig = rsi.encode(msg_buf_orig)
-        ecc_orig = to_int_list(ecc_buf_orig)
+        msg_err = bytearray(msg_orig)
+        ecc_err = bytearray(ecc_orig)
 
-        msg_err = list(msg_orig)
-        ecc_err = list(ecc_orig)
+        rows = self.corrupt_rows(rsi, msg_err, ecc_err, max(rsi.rs_ecc_len - grace, 1))
 
-        # Aligned errors
-        msg_err[::interleave], ecc_err[::interleave], errors = add_errors(
-            msg_err[::interleave], ecc_err[::interleave], max(rs.ecc_len - grace, 1)
-        )
-        for i in range(1, interleave):
-            for pos, _err in errors.items():
-                if pos < rs.message_len:
-                    msg_err[i + pos * interleave] ^= random.randint(1, 65536)
-                else:
-                    ecc_err[i + (pos - rs.message_len) * interleave] ^= random.randint(1, 65536)
+        assert msg_err + ecc_err != msg_orig + ecc_orig
+        rsi.repair(msg_err, ecc_err, rows)
+        assert msg_err + ecc_err == msg_orig + ecc_orig
 
-        msg_err0 = to_bytearray(msg_err[::interleave])
-        ecc_err0 = to_bytearray(ecc_err[::interleave])
-        rs.repair(msg_err0, ecc_err0, errors.keys())
-        assert to_int_list(msg_err0) == msg_orig[::interleave]
-        assert to_int_list(ecc_err0) == ecc_orig[::interleave]
+    def test_sugiyama_no_errors(self, rs: ffrs.RSi16, subtests):
+        locator, evaluator = rs._sugiyama(bytearray(rs.ecc_size))
+        assert locator[0] == 0
 
-        msg_buf_err = to_bytearray(msg_err)
-        ecc_buf_err = to_bytearray(ecc_err)
+    @pytest.mark.parametrize("n", [4, 8, 16])
+    def test_sugiyama_no_errors_n(self, rs: ffrs.RSi16, n, subtests):
+        sugiyama = getattr(rs, f"_sugiyama{n}")
 
-        assert msg_buf_err + ecc_buf_err != msg_buf_orig + ecc_buf_orig
-        rsi.repair(msg_buf_err, ecc_buf_err, errors.keys())
-        assert msg_buf_err + ecc_buf_err == msg_buf_orig + ecc_buf_orig
+        locators, evaluators = sugiyama(bytearray(n * rs.ecc_size))
 
-    def test_sugiyama_max(self, rs: ffrs.RSi16):
-        buf = bytearray(rs.message_size)
-        errors = random.sample(range(rs.message_len), rs.ecc_len // 2)
-        for e in errors:
-            buf[e * 2] = random.randrange(1, 256)
+        for i in range(n):
+            locator = locators[i * rs.ecc_len : (i + 1) * rs.ecc_len]
+            assert locator[0] == 0
 
-        locator_ref = ref_rs.locator(ref_gf, rs.root, map(rs.ntt.rbo, errors))
-        locator_ref = list(map(int, locator_ref.x)) + [0] * (rs.ecc_len - len(locator_ref.x))
+    def test_sugiyama(self, rs: ffrs.RSi16, subtests):
+        for err_count in range(1, rs.ecc_len // 2 + 1):
+            with subtests.test(err_count=err_count):
+                buf = bytearray(rs.message_size)
+                errors = random.sample(range(rs.message_len), err_count)
+                for e in errors:
+                    buf[e * 2] = random.randrange(1, 256)
 
-        synd = rs._synd(buf, bytearray(rs.ecc_size))
-        locator, evaluator = rs._sugiyama(synd)
-        roots = rs._roots(locator)
+                locator_ref = ref_rs.locator(ref_gf, rs.root, map(rs.ntt.rbo, errors))
+                locator_ref = list(map(int, locator_ref.x)) + [0] * (rs.ecc_len - len(locator_ref.x))
 
-        roots_ref = rs._roots(locator_ref)
+                synd = rs._synd(buf, bytearray(rs.ecc_size))
+                locator, evaluator = rs._sugiyama(synd)
+                roots = rs._roots(locator)
 
-        assert set(errors) == set(roots)
-        assert roots == roots_ref
-        assert locator == locator_ref
+                roots_ref = rs._roots(locator_ref)
 
-    # TODO: test SIMD sugiyama
+                assert set(errors) == set(roots)
+                assert roots == roots_ref
+                assert locator == locator_ref
+
+    @pytest.mark.parametrize("n", [4, 8, 16])
+    def test_sugiyama_aligned_n(self, rs: ffrs.RSi16, n, subtests):
+        sugiyama = getattr(rs, f"_sugiyama{n}")
+
+        for err_count in range(1, rs.ecc_len // 2 + 1):
+            with subtests.test(err_count=err_count):
+                buf = bytearray(rs.message_size * n)
+                errors = random.sample(range(rs.message_len), err_count)
+                for i in range(n):
+                    for e in errors:
+                        buf[i * rs.message_size + e * 2] = random.randrange(1, 256)
+
+                synd = rs._synd(buf, bytearray(n * rs.ecc_size))
+                locators, evaluators = sugiyama(synd)
+
+                for i in range(n):
+                    start = i * rs.ecc_len
+                    locator_ref, evaluator_ref = rs._sugiyama(synd[start : start + rs.ecc_len])
+                    locator = locators[start : start + rs.ecc_len]
+                    evaluator = evaluators[start : start + rs.ecc_len]
+                    assert set(errors) == set(rs._roots(locator))
+                    assert locator == locator_ref
+                    assert evaluator == evaluator_ref
+
+    @pytest.mark.parametrize("n", [4, 8, 16])
+    def test_sugiyama_max_unaligned_n(self, rs: ffrs.RSi16, n, subtests):
+        sugiyama = getattr(rs, f"_sugiyama{n}")
+
+        for err_count in range(1, rs.ecc_len // 2 + 1):
+            with subtests.test(err_count=err_count):
+                buf = bytearray(rs.message_size * n)
+                errors = []
+                for i in range(n):
+                    errors.append(random.sample(range(rs.message_len), err_count))
+                    for e in errors[-1]:
+                        buf[i * rs.message_size + e * 2] = random.randrange(1, 256)
+
+                synd = rs._synd(buf, bytearray(n * rs.ecc_size))
+                locators, evaluators = sugiyama(synd)
+
+                for i in range(n):
+                    start = i * rs.ecc_len
+                    locator_ref, evaluator_ref = rs._sugiyama(synd[start : start + rs.ecc_len])
+                    locator = locators[start : start + rs.ecc_len]
+                    evaluator = evaluators[start : start + rs.ecc_len]
+                    assert locator == locator_ref
+                    assert evaluator == evaluator_ref
+                    assert set(errors[i]) == set(rs._roots(locator))
+
+    @pytest.mark.parametrize("n", [4])
+    def test_sugiyama_unaligned_random_n(self, rs: ffrs.RSi16, n, subtests):
+        sugiyama = getattr(rs, f"_sugiyama{n}")
+
+        for err_count in range(1, rs.ecc_len // 2 + 1):
+            with subtests.test(err_count=err_count):
+                buf = bytearray(rs.message_size * n)
+                errors = []
+                for i in range(n):
+                    errors.append(random.sample(range(rs.message_len), random.randrange(1, err_count + 1)))
+                    for e in errors[-1]:
+                        buf[i * rs.message_size + e * 2] = random.randrange(1, 256)
+
+                synd = rs._synd(buf, bytearray(n * rs.ecc_size))
+
+                locator_refs = []
+                evaluator_refs = []
+                for i in range(n):
+                    start = i * rs.ecc_len
+                    # capsys.readouterr()
+                    locator_ref, evaluator_ref = rs._sugiyama(synd[start : start + rs.ecc_len])
+                    # with open(f"log{i}.txt", "w") as f:
+                    #     f.write(capsys.readouterr().out)
+                    locator_refs.append(locator_ref)
+                    evaluator_refs.append(evaluator_ref)
+
+                # capsys.readouterr()
+                locators, evaluators = sugiyama(synd)
+                # with open(f"log{4}.txt", "w") as f:
+                #     f.write(capsys.readouterr().out)
+
+                for i in range(n):
+                    start = i * rs.ecc_len
+                    locator = locators[start : start + rs.ecc_len]
+                    evaluator = evaluators[start : start + rs.ecc_len]
+                    assert locator == locator_refs[i]
+                    assert evaluator == evaluator_refs[i]
+                    assert set(errors[i]) == set(rs._roots(locator))
 
 
 @pytest.mark.parametrize(
