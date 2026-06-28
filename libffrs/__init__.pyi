@@ -472,9 +472,39 @@ class RSi16:
     def message_offset(self: libffrs.RSi16, row: typing.SupportsInt | typing.SupportsIndex, col: typing.SupportsInt | typing.SupportsIndex) -> int:
         """Calculate message offset in number of elements"""
 
-    def repair(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer, error_pos: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex] | None = None) -> None:
+    def repair(self: libffrs.RSi16, message: collections.abc.Buffer, ecc: collections.abc.Buffer, error_pos: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex] | None = None) -> libffrs.RepairStatus:
         """Repair a block with the given error locations"""
 
+
+
+class RepairStatus:
+    """
+    Repair operation status
+
+    Members:
+
+      NoErrors
+
+      NoErrorsZero
+
+      RepairOk
+
+      RepairFail
+
+      ErrorLocationFail
+    """
+
+    ErrorLocationFail: libffrs.RepairStatus
+    NoErrors: libffrs.RepairStatus
+    NoErrorsZero: libffrs.RepairStatus
+    RepairFail: libffrs.RepairStatus
+    RepairOk: libffrs.RepairStatus
+    name: str
+    """name(self: object, /) -> str"""
+
+    value: int
+    def __init__(self: libffrs.RepairStatus, value: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
 
 
 def create_buffer(size: typing.SupportsInt | typing.SupportsIndex) -> memoryview:

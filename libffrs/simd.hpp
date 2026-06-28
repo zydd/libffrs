@@ -58,6 +58,14 @@ void copy_n_masked(const GFT *const src, size_t n, GFT *const dst, GFT const& co
 template<typename GFT>
 void assign_masked(GFT& vec, GFT const& value, GFT const& condition);
 
+template<typename GFT>
+inline GFT cond(GFT const& a) {
+    if constexpr (std::is_integral_v<GFT>) {
+        return -a;
+    } else {
+        return a;
+    }
+}
 
 template<typename GFT>
 inline bool any(GFT const& a) {

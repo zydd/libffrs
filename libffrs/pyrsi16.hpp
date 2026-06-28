@@ -158,20 +158,20 @@ public:
     }
 
     template<typename Msg, typename Ecc>
-    inline void repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count) const {
-        _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
-            _repair_interleaved<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count);
+    inline RepairStatus repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count) const {
+        return _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
+            return _repair_interleaved<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count);
         });
     }
 
     template<typename Msg, typename Ecc>
-    inline void repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) const {
+    inline RepairStatus repair_interleaved(Msg message[], Ecc ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos) const {
         auto error_pos_rbo = std::vector<size_t>(error_pos.size());
         for (size_t i = 0; i < error_pos.size(); ++i)
             error_pos_rbo[i] = ntt.rbo(error_pos[i]);
 
-        _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
-            _repair_interleaved<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count, error_pos_rbo);
+        return _simd_dispatch([&]<size_t SIMD_W>(std::integral_constant<size_t, SIMD_W>, auto& rs) {
+            return _repair_interleaved<SIMD_W>(rs, &message[0], &ecc[0], col_start, col_count, error_pos_rbo);
         });
     }
 
@@ -233,6 +233,14 @@ public:
 
     static inline void register_class(py::module &m) {
         using namespace pybind11::literals;
+
+        py::enum_<RepairStatus>(m, "RepairStatus", R"(Repair operation status)")
+            .value("NoErrors", RepairStatus::NoErrors)
+            .value("NoErrorsZero", RepairStatus::NoErrorsZero)
+            .value("RepairOk", RepairStatus::RepairOk)
+            .value("RepairFail", RepairStatus::RepairFail)
+            .value("ErrorLocationFail", RepairStatus::ErrorLocationFail)
+        ;
 
         py::class_<PyRSi16>(m, "RSi16")
             .def_property_readonly("block_len", [](PyRSi16& self) { return self.interleaved_block_len; }, R"(Interleaved block length in number of elements)")
@@ -307,7 +315,8 @@ public:
                 R"(Find locator polynomial roots)",
                 "synd"_a)
 
-            .doc() = R"(Reed-Solomon coding over :math:`GF(65537)`)";
+            .doc() = R"(Reed-Solomon coding over :math:`GF(65537)`)"
+        ;
     }
 
 private:
@@ -379,7 +388,7 @@ private:
     }
 
     template<size_t SIMD_W, typename Rs, typename Msg, typename Ecc>
-    inline void _repair_interleaved(Rs const& rs, Msg message[], Ecc ecc[], size_t col_start, size_t col_count) const {
+    inline RepairStatus _repair_interleaved(Rs const& rs, Msg message[], Ecc ecc[], size_t col_start, size_t col_count) const {
         // src_size = message_len * interleave
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
@@ -396,6 +405,8 @@ private:
         // Interleaved ecc
         ecc += col_start;
 
+        RepairStatus res = RepairStatus::NoErrors;
+
         size_t vec_cols = col_count / SIMD_W;
         for (size_t i = 0; i < vec_cols; ++i) {
             vec::copy_stride(&message[i * SIMD_W], interleave, &buf[0], SIMD_W, SIMD_W, message_len);
@@ -406,7 +417,7 @@ private:
             // Interleaved ecc
             vec::copy_stride(&ecc[i * SIMD_W], interleave, &buf[message_len * SIMD_W], SIMD_W, SIMD_W, ecc_len);
 
-            rs.repair(&buf[0], &temp_ntt1_ecc6[0]);
+            res = std::max(res, rs.repair(&buf[0], &temp_ntt1_ecc6[0]));
 
             vec::copy_stride(&buf[0], SIMD_W, &message[i * SIMD_W], interleave, SIMD_W, message_len);
 
@@ -430,7 +441,7 @@ private:
             // Interleaved ecc
             vec::copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * SIMD_W], SIMD_W, remaining_cols, ecc_len);
 
-            rs.repair(&buf[0], &temp_ntt1_ecc6[0]);
+            res = std::max(res, rs.repair(&buf[0], &temp_ntt1_ecc6[0]));
 
             vec::copy_stride(&buf[0], SIMD_W, &message[encoded_cols], interleave, remaining_cols, message_len);
 
@@ -440,10 +451,11 @@ private:
             // Interleaved ecc
             vec::copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[encoded_cols], interleave, remaining_cols, ecc_len);
         }
+        return res;
     }
 
     template<size_t SIMD_W, typename Rs, typename Msg, typename Ecc>
-    inline void _repair_interleaved(Rs const& rs, Msg message[], Ecc ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos_rbo) const {
+    inline RepairStatus _repair_interleaved(Rs const& rs, Msg message[], Ecc ecc[], size_t col_start, size_t col_count, std::vector<size_t> const& error_pos_rbo) const {
         // src_size = message_len * interleave
         // dst_size = ecc_len * interleave
         // block_len = message_len + ecc_len
@@ -460,6 +472,8 @@ private:
         // Interleaved ecc
         ecc += col_start;
 
+        RepairStatus res = RepairStatus::NoErrors;
+
         size_t vec_cols = col_count / SIMD_W;
         for (size_t i = 0; i < vec_cols; ++i) {
             vec::copy_stride(&message[i * SIMD_W], interleave, &buf[0], SIMD_W, SIMD_W, message_len);
@@ -470,7 +484,7 @@ private:
             // Interleaved ecc
             vec::copy_stride(&ecc[i * SIMD_W], interleave, &buf[message_len * SIMD_W], SIMD_W, SIMD_W, ecc_len);
 
-            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
+            res = std::max(res, rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]));
 
             vec::copy_stride(&buf[0], SIMD_W, &message[i * SIMD_W], interleave, SIMD_W, message_len);
 
@@ -494,7 +508,7 @@ private:
             // Interleaved ecc
             vec::copy_stride(&ecc[encoded_cols], interleave, &buf[message_len * SIMD_W], SIMD_W, remaining_cols, ecc_len);
 
-            rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
+            res = std::max(res, rs.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]));
 
             vec::copy_stride(&buf[0], SIMD_W, &message[encoded_cols], interleave, remaining_cols, message_len);
 
@@ -504,18 +518,19 @@ private:
             // Interleaved ecc
             vec::copy_stride(&buf[message_len * SIMD_W], SIMD_W, &ecc[encoded_cols], interleave, remaining_cols, ecc_len);
         }
+        return res;
     }
 
     template<typename F>
-    inline void _simd_dispatch(F&& f) const {
+    inline auto _simd_dispatch(F&& f) const {
         if (simd_x16)
-            f(std::integral_constant<size_t, 16>{}, rs16x16);
+            return f(std::integral_constant<size_t, 16>{}, rs16x16);
         else if (simd_x8)
-            f(std::integral_constant<size_t, 8>{}, rs16x8);
+            return f(std::integral_constant<size_t, 8>{}, rs16x8);
         else if (simd_x4)
-            f(std::integral_constant<size_t, 4>{}, rs16x4);
+            return f(std::integral_constant<size_t, 4>{}, rs16x4);
         else
-            f(std::integral_constant<size_t, 1>{}, rs16);
+            return f(std::integral_constant<size_t, 1>{}, rs16);
     }
 
     template<size_t W>
@@ -570,9 +585,11 @@ private:
         return output;
     }
 
-    inline void py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, std::optional<std::vector<size_t>> const& error_pos) {
+    inline RepairStatus py_repair(buffer_rw<uint16_t> message, buffer_rw<uint16_t> ecc, std::optional<std::vector<size_t>> const& error_pos) {
+        RepairStatus res = RepairStatus::NoErrors;
+
         if (error_pos && error_pos->empty())
-            return;
+            return RepairStatus::NoErrors;
 
         if (interleave == 1) {
             py_assert(message.size == message_len, std::to_string(message.size));
@@ -591,10 +608,9 @@ private:
                 for (size_t i = 0; i < error_pos->size(); ++i)
                     error_pos_rbo[i] = ntt.rbo((*error_pos)[i]);
 
-                rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
-
+                res = rs16.repair(&buf[0], &error_pos_rbo[0], error_pos_rbo.size(), &temp_ntt1_ecc6[0]);
             } else {
-                rs16.repair(&buf[0], &temp_ntt1_ecc6[0]);
+                res = rs16.repair(&buf[0], &temp_ntt1_ecc6[0]);
             }
 
             std::copy_n(&buf[0], message_len, &message[0]);
@@ -605,12 +621,13 @@ private:
 
             if (error_pos) {
                 py_assert(error_pos->size() <= ecc_len);
-                repair_interleaved(&message[0], &ecc[0], 0, interleave, *error_pos);
+                res = repair_interleaved(&message[0], &ecc[0], 0, interleave, *error_pos);
             } else {
-                repair_interleaved(&message[0], &ecc[0], 0, interleave);
+                res = repair_interleaved(&message[0], &ecc[0], 0, interleave);
             }
-
         }
+
+        return res;
     }
 
     inline std::vector<GFT> py_synd(buffer_ro<uint16_t> message, buffer_ro<uint16_t> ecc) {

@@ -76,7 +76,8 @@ class BaseTestRS:
 
         msg_err = to_bytearray(msg_err)
         ecc_err = to_bytearray(ecc_err)
-        rs.repair(msg_err, ecc_err)
+        res = rs.repair(msg_err, ecc_err)
+        assert res == ffrs.RepairStatus.RepairOk or all(s == 0 for s in rs._synd(msg_err, ecc_err))  # FIXME
         msg_err = to_int_list(msg_err)
         ecc_err = to_int_list(ecc_err)
 
@@ -95,7 +96,8 @@ class BaseTestRS:
 
         msg_err = to_bytearray(msg_err)
         ecc_err = to_bytearray(ecc_err)
-        rs.repair(msg_err, ecc_err, list(error_positions.keys()))
+        res = rs.repair(msg_err, ecc_err, list(error_positions.keys()))
+        assert res == ffrs.RepairStatus.RepairOk
         msg_err = to_int_list(msg_err)
         ecc_err = to_int_list(ecc_err)
 
@@ -108,7 +110,8 @@ class BaseTestRS:
         msg_err = bytearray(msg)
         ecc_err = bytearray(ecc)
 
-        rs.repair(msg_err, ecc_err, [])
+        res = rs.repair(msg_err, ecc_err, [])
+        assert res == ffrs.RepairStatus.NoErrors
 
         assert msg_err == msg
         assert ecc_err == ecc
@@ -120,7 +123,8 @@ class BaseTestRS:
         msg_err = bytearray(msg)
         ecc_err = bytearray(ecc)
 
-        rs.repair(msg_err, ecc_err)
+        res = rs.repair(msg_err, ecc_err)
+        assert res == ffrs.RepairStatus.RepairOk or all(s == 0 for s in rs._synd(msg_err, ecc_err))  # FIXME
 
         assert msg_err == msg
         assert ecc_err == ecc
@@ -146,22 +150,6 @@ class BaseTestRS:
         buf_enc_blk = rs.encode(buf)
 
         assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_size * count
-        assert buf_enc == buf_enc_blk
-
-    @pytest.mark.parametrize("extra", [2, 4, 6, 8, 10, 12, 14, 128, 1500])
-    @pytest.mark.skip("not supported for now")
-    def test_encode_blocks_remainder(self, rs: ffrs.RSi16, extra):
-        count = 16 + extra // rs.message_size
-        extra = (extra % rs.message_size) or 2
-        buf = randbytes(rs.message_size * count + extra)
-
-        buf_enc = [rs.encode(buf[i * rs.message_size : (i + 1) * rs.message_size]) for i in range(count)]
-
-        buf_enc += [rs.encode(buf[-extra:] + bytearray(rs.message_size - extra))]
-        buf_enc = b"".join(buf_enc)
-        buf_enc_blk = rs.encode(buf)
-
-        assert len(buf_enc) == len(buf_enc_blk) == rs.ecc_size * (count + 1)
         assert buf_enc == buf_enc_blk
 
     @pytest.mark.parametrize("interleave", list(range(2, 15)) + [32, 48, 100, 256])
@@ -219,15 +207,17 @@ class BaseTestRS:
             )
             errors.append(col_errs)
 
-        msg_err0 = msg_err[::interleave]
-        ecc_err0 = ecc_err[::interleave]
-        rs.repair(to_bytearray(msg_err0), to_bytearray(ecc_err0))
+        msg_err0 = to_bytearray(msg_err[::interleave])
+        ecc_err0 = to_bytearray(ecc_err[::interleave])
+        res = rs.repair(msg_err0, ecc_err0)
+        assert res == ffrs.RepairStatus.RepairOk or all(s == 0 for s in rs._synd(msg_err, ecc_err))  # FIXME
         msg_buf_err = to_bytearray(msg_err)
         ecc_buf_err = to_bytearray(ecc_err)
 
         assert msg_buf_err + ecc_buf_err != msg_buf_orig + ecc_buf_orig
-        rsi.repair(msg_buf_err, ecc_buf_err)
+        res = rsi.repair(msg_buf_err, ecc_buf_err)
         assert msg_buf_err + ecc_buf_err == msg_buf_orig + ecc_buf_orig
+        assert res == ffrs.RepairStatus.RepairOk
 
     def corrupt_rows(self, rs: ffrs.RSi16, buf, ecc, n):
         rows = list(random.sample(range(rs.rs_block_len), n))
@@ -484,7 +474,8 @@ class TestRSLarge:
         msg_err = bytearray(msg)
         ecc_err = bytearray(ecc)
 
-        rs.repair(msg_err, ecc_err, [])
+        res = rs.repair(msg_err, ecc_err, [])
+        assert res == ffrs.RepairStatus.NoErrors
 
         assert msg_err == msg
         assert ecc_err == ecc
@@ -495,7 +486,8 @@ class TestRSLarge:
         msg_err = bytearray(msg)
         ecc_err = bytearray(ecc)
 
-        rs.repair(msg_err, ecc_err)
+        res = rs.repair(msg_err, ecc_err)
+        assert res == ffrs.RepairStatus.RepairOk or all(s == 0 for s in rs._synd(msg_err, ecc_err))  # FIXME
 
         assert msg_err == msg
         assert ecc_err == ecc
@@ -516,7 +508,8 @@ class TestRSLarge:
 
         assert msg_err != msg_orig or ecc_err != ecc_orig
 
-        rs.repair(msg_err, ecc_err)
+        res = rs.repair(msg_err, ecc_err)
+        assert res == ffrs.RepairStatus.RepairOk
 
         assert msg_err == msg_orig
         assert ecc_err == ecc_orig
@@ -533,7 +526,8 @@ class TestRSLarge:
 
         assert msg_err != msg_orig or ecc_err != ecc_orig
 
-        rs.repair(msg_err, ecc_err, set(map(lambda x: x // 2, error_positions.keys())))
+        res = rs.repair(msg_err, ecc_err, set(map(lambda x: x // 2, error_positions.keys())))
+        assert res == ffrs.RepairStatus.RepairOk
 
         assert msg_err == msg_orig
         assert ecc_err == ecc_orig

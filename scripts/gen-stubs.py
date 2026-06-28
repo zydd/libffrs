@@ -106,6 +106,7 @@ class_stubs = {
     "GF256": libffrs.GF256(),
     "RS256": libffrs.RS256(4, 2),
     "NTT": libffrs.RSi16(4, 2).ntt,
+    "RepairStatus": libffrs.RepairStatus(0),
 }
 
 output_dir = sys.argv[1]

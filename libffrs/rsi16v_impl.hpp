@@ -120,7 +120,7 @@ void RSi16v<W>::_mix_ecc_residue(GFT *const ecc) const {
 
 
 template<size_t W>
-void RSi16v<W>::_repair(GFT *const block, GFT *const temp_ntt1_ecc6) const {
+RepairStatus RSi16v<W>::_repair(GFT *const block, GFT *const temp_ntt1_ecc6) const {
     r_print("repair unknown >");
     // temp_ntt1_ecc6 = ntt_len + ecc_len * 6
 
@@ -131,9 +131,9 @@ void RSi16v<W>::_repair(GFT *const block, GFT *const temp_ntt1_ecc6) const {
     r_print_vec("synds", synds, ecc_len);
 
     // stop if all synds are zero
-    if (std::all_of(&synds[0], &synds[ecc_len], [](const GFT& v) { return vec::max(v) == 0; })) {
+    if (std::all_of(&synds[0], &synds[ecc_len], &vec::is_zero<GFT>)) {
         r_print("no errors detected");
-        return;
+        return RepairStatus::NoErrors;
     }
 
     // init evaluator_poly with synds
@@ -156,7 +156,7 @@ void RSi16v<W>::_repair(GFT *const block, GFT *const temp_ntt1_ecc6) const {
     auto locator_poly_deriv_len = vec::poly::len(&locator_poly_deriv[0], ecc_len);
 
     auto roots = &temp_ntt1_ecc6[ecc_len * 3];
-    _find_roots_ntt(
+    auto res = _find_roots_ntt(
         &block[0],
         &locator_poly[0], locator_poly_len,
         &locator_poly_deriv[0], locator_poly_deriv_len,
@@ -164,11 +164,12 @@ void RSi16v<W>::_repair(GFT *const block, GFT *const temp_ntt1_ecc6) const {
         &roots[0]
     );
     r_print("repair <");
+    return RepairStatus(vec::max(res));
 }
 
 
 template<size_t W>
-void RSi16v<W>::_repair(GFT *const block, const size_t *const error_pos_rbo, size_t error_count, GFT *const temp_ntt1_ecc6) const {
+RepairStatus RSi16v<W>::_repair(GFT *const block, const size_t *const error_pos_rbo, size_t error_count, GFT *const temp_ntt1_ecc6) const {
     r_print("repair known >");
     // temp_ntt1_ecc6 = ntt_len + ecc_len * 6
 
@@ -179,9 +180,9 @@ void RSi16v<W>::_repair(GFT *const block, const size_t *const error_pos_rbo, siz
     r_print_vec("synds", synds, ecc_len);
 
     // stop if all synds are zero
-    if (std::all_of(&synds[0], &synds[ecc_len], [](const GFT& v) { return vec::max(v) == 0; })) {
+    if (std::all_of(&synds[0], &synds[ecc_len], &vec::is_zero<GFT>)) {
         r_print("no errors detected");
-        return;
+        return RepairStatus::NoErrors;
     }
 
     // init evaluator_poly with synds
@@ -226,6 +227,7 @@ void RSi16v<W>::_repair(GFT *const block, const size_t *const error_pos_rbo, siz
         block[pos] = gf.add(block[pos], error);
     }
     r_print("repair <");
+    return RepairStatus::RepairOk;
 }
 
 
@@ -301,6 +303,8 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
     ld_print_vec("r2_len", &r2_len, 1);
     ld_print_vec("r2/synd", r2, ecc_len);
 
+    GFT lanes = vec::cond<GFT>(r1_len != 0);
+
     {
         // Q = R2 // R1
         // A1 = A2 - Q * A1
@@ -312,14 +316,14 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
 
         a1[1] = gf.neg(gf.inv(r1h));
         a1[0] = gf.mul(r1h2, gf.mul(a1[1], a1[1]));
-        a1_len = GFT{} + 2;
+        a1_len = 2 & lanes;
 
         for (size_t i = 0; i < ecc_len; ++i)
             r1[i] = gf.mul(a1[0], r1[i]);
         for (size_t i = 1; i < ecc_len; ++i)
             r1[i] = gf.add(r1[i], gf.mul(a1[1], r2[i - 1]));
 
-        r1_len = vec::poly::len(r1, ecc_len - 1);
+        r1_len = vec::poly::len(r1, ecc_len - 1) & lanes;
         vec::fill_n(&r1[0], r1_len, ::GFT(ecc_len) - r1_len, GFT{0});
 
         ld_print_vec("r1_len", &r1_len, 1);
@@ -330,23 +334,8 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
         ntt.nttr(r2);
     }
 
-    GFT lanes;
-    if constexpr (std::is_integral_v<GFT>)
-        lanes = -(r1_len != 0);
-    else
-        lanes = (r1_len != 0);
-
-    a1_len &= lanes;
-    a2_len &= lanes;
-    r1_len &= lanes;
-    r2_len &= lanes;
-
     ld_print("------\n");
-    GFT cond;
-    if constexpr (std::is_integral_v<GFT>)
-        cond = -(r1_len >= ::GFT(ecc_len / 2));
-    else
-        cond = (r1_len >= ::GFT(ecc_len / 2));
+    GFT cond = vec::cond<GFT>(r1_len >= ::GFT(ecc_len / 2));
 
     if (vec::any(cond)) {
         for (size_t i = 1; i < ecc_len / 2; ++i) {
@@ -398,11 +387,7 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
             r2l = r1l;
 
             {
-                if constexpr (std::is_integral_v<GFT>) {
-                    cond = -(r1_len >= ::GFT(ecc_len / 2));
-                } else {
-                    cond = (r1_len >= ::GFT(ecc_len / 2));
-                }
+                cond = vec::cond<GFT>(r1_len >= ::GFT(ecc_len / 2));
 
                 ld_print_vec("update cond", &cond, 1);
 
@@ -451,12 +436,12 @@ RSi16v<W>::GFT RSi16v<W>::_sugiyama(GFT *const a1, GFT *const r1, GFT *const tem
     ld_print_vec("locator", a1, ecc_len);
     ld_print_vec("evaluator", r1, ecc_len);
     ld_print("------\nDone\n");
-    return a1_len;
+    return a1_len & lanes;
 }
 
 
 template<size_t W>
-inline void RSi16v<W>::_find_roots_ntt(
+RSi16v<W>::GFT RSi16v<W>::_find_roots_ntt(
     GFT *const block,
     const GFT *const locator_poly, GFT const& locator_poly_len,
     const GFT *const locator_poly_deriv, GFT const& locator_poly_deriv_len,
@@ -469,9 +454,7 @@ inline void RSi16v<W>::_find_roots_ntt(
     py_assert(vec::max(locator_poly_len) <= ecc_len);
     ntt.pintt_ecc(&roots[0]);
 
-    GFT lanes = ~GFT{0};
-    if constexpr (!std::is_integral_v<GFT>)
-        lanes = (locator_poly_len != 0);
+    GFT lanes = vec::cond<GFT>(locator_poly_len != 0);
 
     auto locator_poly_deriv_len_max = vec::max(locator_poly_deriv_len & lanes);
     auto evaluator_poly_len_max = vec::max(evaluator_poly_len & lanes);
@@ -479,11 +462,15 @@ inline void RSi16v<W>::_find_roots_ntt(
     r_print("locator_poly_deriv_len_max", locator_poly_deriv_len_max);
     r_print("evaluator_poly_len_max", evaluator_poly_len_max);
 
+    GFT root_count = GFT{0};
+
     for (::GFT i = 0; i < block_len; ++i) {
         auto i_rbo = ntt.rbo(i);
         // auto x = gf.pow(root, i_rbo);
         ::GFT x = ntt._roots_ntt[i_rbo];
         GFT root_locations = (roots[i] == 0) & lanes;
+
+        root_count += 1 & root_locations;
 
         if (vec::any(root_locations)) {
             GFT error = _forney(
@@ -501,6 +488,12 @@ inline void RSi16v<W>::_find_roots_ntt(
             block[i] = gf.add(block[i], error);
         }
     }
+    r_print_vec("root_count", &root_count, 1);
+
+    GFT no_root_found = vec::cond<GFT>((root_count == 0) & lanes);
+    r_print_vec("no_root_found", &no_root_found, 1);
+    GFT roots_found = vec::cond<GFT>(root_count > 0);
+    return (::GFT(RepairStatus::RepairOk) & roots_found) | (::GFT(RepairStatus::ErrorLocationFail) & no_root_found);
 }
 
 

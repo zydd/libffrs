@@ -29,6 +29,15 @@ using GFT = uint32_t;
 #include "ntt.hpp"
 
 
+enum class RepairStatus : uint32_t {
+    NoErrors,
+    NoErrorsZero,
+    RepairOk,
+    RepairFail,
+    ErrorLocationFail
+};
+
+
 template<size_t W>
 class RSi16v {
     const GFi16 &gf;
@@ -53,14 +62,14 @@ public:
     inline void encode(::GFT block[]) const
         { _encode(reinterpret_cast<GFT *>(block)); }
 
-    inline void repair(::GFT block[], const size_t error_pos_rbo[], size_t error_count, ::GFT temp_ntt1_ecc6[]) const
-        { _repair(reinterpret_cast<GFT *>(block), error_pos_rbo, error_count, reinterpret_cast<GFT *>(temp_ntt1_ecc6)); }
+    inline RepairStatus repair(::GFT block[], const size_t error_pos_rbo[], size_t error_count, ::GFT temp_ntt1_ecc6[]) const
+        { return _repair(reinterpret_cast<GFT *>(block), error_pos_rbo, error_count, reinterpret_cast<GFT *>(temp_ntt1_ecc6)); }
+
+    inline RepairStatus repair(::GFT block[], ::GFT temp_ntt1_ecc6[]) const
+        { return _repair(reinterpret_cast<GFT *>(block), reinterpret_cast<GFT *>(temp_ntt1_ecc6)); }
 
     inline void repair_ntt(::GFT block[], const size_t error_pos_rbo[], size_t error_count, ::GFT temp_ntt1_ecc6[]) const
         { _repair_ntt(reinterpret_cast<GFT *>(block), error_pos_rbo, error_count, reinterpret_cast<GFT *>(temp_ntt1_ecc6)); }
-
-    inline void repair(::GFT block[], ::GFT temp_ntt1_ecc6[]) const
-        { _repair(reinterpret_cast<GFT *>(block), reinterpret_cast<GFT *>(temp_ntt1_ecc6)); }
 
     inline void mix_ecc(::GFT ecc[]) const
         { _mix_ecc(reinterpret_cast<GFT *>(ecc)); }
@@ -69,8 +78,8 @@ public:
 
 protected:
     void _encode(GFT block[]) const;
-    void _repair(GFT block[], GFT temp_ntt1_ecc6[]) const;
-    void _repair(GFT block[], const size_t error_pos_rbo[], size_t error_count, GFT temp_ntt1_ecc6[]) const;
+    RepairStatus _repair(GFT block[], GFT temp_ntt1_ecc6[]) const;
+    RepairStatus _repair(GFT block[], const size_t error_pos_rbo[], size_t error_count, GFT temp_ntt1_ecc6[]) const;
     void _repair_ntt(GFT block[], const size_t error_pos_rbo[], size_t error_count, GFT temp_ntt1_ecc6[]) const;
     void _mix_ecc(GFT ecc[]) const;
     void _mix_ecc_residue(GFT ecc[]) const;
@@ -81,7 +90,7 @@ private:
     void _error_locator_rev(const size_t *error_pos_rbo, size_t error_count, GFT *locator_poly) const;
     void _error_locator(const size_t *error_pos_rbo, size_t error_count, GFT *locator_poly) const;
     void _error_evaluator(const GFT *locator_poly, size_t locator_poly_deg, GFT *evaluator_poly, GFT *temp) const;
-    void _find_roots_ntt(GFT *block, const GFT *locator_poly, const GFT& locator_poly_len, const GFT *locator_poly_deriv, const GFT& locator_poly_deriv_len, const GFT *evaluator_poly, const GFT& evaluator_poly_len, GFT *roots) const;
+    GFT _find_roots_ntt(GFT *block, const GFT *locator_poly, const GFT& locator_poly_len, const GFT *locator_poly_deriv, const GFT& locator_poly_deriv_len, const GFT *evaluator_poly, const GFT& evaluator_poly_len, GFT *roots) const;
     size_t _vec_shift(const GFT *a, size_t a_len, size_t shift, GFT *r) const;
     GFT _vec_sub(const GFT *a, GFT a_len, GFT *b, GFT b_len, GFT *r) const;
     size_t _norm_size_rev(GFT *r, size_t r_len) const;
