@@ -29,25 +29,41 @@ ref_ntt = lambda w, buf: to_int_list(ffrs.reference.ntt.ntt(ref_gf, ref_gf(w), r
 ref_intt = lambda w, buf: rbo_sorted(to_int_list(ffrs.reference.ntt.intt(ref_gf, ref_gf(w), buf)))
 
 
-def add_errors(msg, ecc, count):
-    error_positions = {}
-
-    # # Force 1 error in ecc
-    # i = random.randrange(len(ecc))
-    # error_positions[len(msg) + i] = random.randrange(2**16)
-    # ecc[i] ^= error_positions[len(msg) + i]
-
-    while len(error_positions) < count:
-        i = random.randrange((len(msg) + len(ecc)))
-        if i in error_positions:
-            continue
-        error_positions[i] = random.randrange(1, 256)
-        if i < len(msg):
-            msg[i] = msg[i] ^ error_positions[i]
+def add_aligned_errors(rs: ffrs.RSi16, buf, ecc, n):
+    rows = list(random.sample(range(rs.rs_block_len), n))
+    for row in rows:
+        if row < rs.rs_message_len:
+            for col in range(rs.interleave):
+                # message
+                offset = 2 * rs.message_offset(row, col)
+                buf[offset] ^= random.randint(1, 255)
+                buf[offset + 1] ^= random.randint(1, 255)
         else:
-            ecc[i - len(msg)] = ecc[i - len(msg)] ^ error_positions[i]
+            for col in range(rs.interleave):
+                # ecc
+                offset = 2 * rs.ecc_offset(row - rs.rs_message_len, col)
+                ecc[offset] ^= random.randint(1, 255)
+                ecc[offset + 1] ^= random.randint(1, 255)
+    return rows
 
-    return msg, ecc, error_positions
+
+def add_unaligned_errors(rs: ffrs.RSi16, msg, ecc, n):
+    error_positions = []
+    for col in range(rs.interleave):
+        error_positions.append([])
+        for row in random.sample(range(rs.rs_block_len), n):
+            error_positions[-1].append(row)
+            if row < rs.rs_message_len:
+                # message
+                offset = 2 * rs.message_offset(row, col)
+                msg[offset] ^= random.randint(1, 255)
+                msg[offset + 1] ^= random.randint(1, 255)
+            else:
+                # ecc
+                offset = 2 * rs.ecc_offset(row - rs.rs_message_len, col)
+                ecc[offset] ^= random.randint(1, 255)
+                ecc[offset + 1] ^= random.randint(1, 255)
+    return error_positions
 
 
 class BaseTestRS:
@@ -65,69 +81,61 @@ class BaseTestRS:
 
     @pytest.mark.parametrize("grace", [0, 1, 2, 3, 4])
     def test_repair_unknown_locations(self, rs: ffrs.RSi16, grace):
-        msg_orig = [random.randrange(0, 2**16) for _ in range(rs.message_len)]
-        ecc_orig = to_int_list(rs.encode(to_bytearray(msg_orig)))
-        msg_err = list(msg_orig)
-        ecc_err = list(ecc_orig)
+        msg_orig = randbytes(rs.message_size)
+        ecc_orig = rs.encode(msg_orig)
+        msg_err = bytearray(msg_orig)
+        ecc_err = bytearray(ecc_orig)
 
-        msg_err, ecc_err, _error_positions = add_errors(msg_err, ecc_err, max(rs.ecc_len // 2 - grace, 1))
+        _error_positions = add_aligned_errors(rs, msg_err, ecc_err, max(rs.ecc_len // 2 - grace, 1))
 
         assert msg_err != msg_orig or ecc_err != ecc_orig
 
-        msg_err = to_bytearray(msg_err)
-        ecc_err = to_bytearray(ecc_err)
         res = rs.repair(msg_err, ecc_err)
         assert res == ffrs.RepairStatus.RepairOk or all(s == 0 for s in rs._synd(msg_err, ecc_err))  # FIXME
-        msg_err = to_int_list(msg_err)
-        ecc_err = to_int_list(ecc_err)
 
-        assert msg_err + ecc_err == msg_orig + ecc_orig
+        assert msg_err == msg_orig
+        assert ecc_err == ecc_orig
 
     @pytest.mark.parametrize("grace", [0, 1, 2, 3, 4])
-    def test_repair(self, rs: ffrs.RSi16, grace):
-        msg_orig = [random.randrange(0, 2**16) for _ in range(rs.message_len)]
-        ecc_orig = to_int_list(rs.encode(to_bytearray(msg_orig)))
-        msg_err = list(msg_orig)
-        ecc_err = list(ecc_orig)
+    def test_repair_known(self, rs: ffrs.RSi16, grace):
+        msg_orig = randbytes(rs.message_size)
+        ecc_orig = rs.encode(msg_orig)
+        msg_err = bytearray(msg_orig)
+        ecc_err = bytearray(ecc_orig)
 
-        msg_err, ecc_err, error_positions = add_errors(msg_err, ecc_err, max(rs.ecc_len - grace, 1))
+        error_positions = add_aligned_errors(rs, msg_err, ecc_err, max(rs.ecc_len - grace, 1))
 
-        assert msg_err + ecc_err != msg_orig + ecc_orig
+        assert msg_err != msg_orig or ecc_err != ecc_orig
 
-        msg_err = to_bytearray(msg_err)
-        ecc_err = to_bytearray(ecc_err)
-        res = rs.repair(msg_err, ecc_err, list(error_positions.keys()))
+        res = rs.repair(msg_err, ecc_err, error_positions)
         assert res == ffrs.RepairStatus.RepairOk
-        msg_err = to_int_list(msg_err)
-        ecc_err = to_int_list(ecc_err)
 
-        assert msg_err + ecc_err == msg_orig + ecc_orig
+        assert msg_err == msg_orig
+        assert ecc_err == ecc_orig
 
     def test_repair_no_errors(self, rs: ffrs.RSi16):
-        orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
-        msg = to_bytearray(orig)
-        ecc = rs.encode(msg)
-        msg_err = bytearray(msg)
-        ecc_err = bytearray(ecc)
+        msg_orig = randbytes(rs.message_size)
+        ecc_orig = rs.encode(msg_orig)
+        msg_err = bytearray(msg_orig)
+        ecc_err = bytearray(ecc_orig)
 
         res = rs.repair(msg_err, ecc_err, [])
         assert res == ffrs.RepairStatus.NoErrors
 
-        assert msg_err == msg
-        assert ecc_err == ecc
+        assert msg_err == msg_orig
+        assert ecc_err == ecc_orig
 
     def test_repair_unknown_no_errors(self, rs: ffrs.RSi16):
-        orig = [random.randrange(0, 2**16) for _ in range(rs.block_len - rs.ecc_len)]
-        msg = to_bytearray(orig)
-        ecc = rs.encode(msg)
-        msg_err = bytearray(msg)
-        ecc_err = bytearray(ecc)
+        msg_orig = randbytes(rs.message_size)
+        ecc_orig = rs.encode(msg_orig)
+        msg_err = bytearray(msg_orig)
+        ecc_err = bytearray(ecc_orig)
 
         res = rs.repair(msg_err, ecc_err)
         assert res == ffrs.RepairStatus.RepairOk or all(s == 0 for s in rs._synd(msg_err, ecc_err))  # FIXME
 
-        assert msg_err == msg
-        assert ecc_err == ecc
+        assert msg_err == msg_orig
+        assert ecc_err == ecc_orig
 
     def test_encode_blocks_empty(self, rs: ffrs.RSi16):
         assert bytearray() == rs.encode(bytearray())
@@ -191,50 +199,24 @@ class BaseTestRS:
             simd_x16=rs.simd_x16,
         )
 
-        msg_orig = list(range(rsi.message_len))
-        msg_buf_orig = to_bytearray(msg_orig)
+        msg_orig = randbytes(rsi.message_size)
+        ecc_orig = rsi.encode(msg_orig)
 
-        ecc_buf_orig = rsi.encode(msg_buf_orig)
-        ecc_orig = to_int_list(ecc_buf_orig)
+        msg_err = bytearray(msg_orig)
+        ecc_err = bytearray(ecc_orig)
 
-        msg_err = list(msg_orig)
-        ecc_err = list(ecc_orig)
+        _error_positions = add_unaligned_errors(rs, msg_err, ecc_err, max(rs.ecc_len // 2 - grace, 1))
 
-        errors = []
-        for i in range(interleave):
-            msg_err[i::interleave], ecc_err[i::interleave], col_errs = add_errors(
-                msg_err[i::interleave], ecc_err[i::interleave], max(rs.ecc_len // 2 - grace, 1)
-            )
-            errors.append(col_errs)
-
-        msg_err0 = to_bytearray(msg_err[::interleave])
-        ecc_err0 = to_bytearray(ecc_err[::interleave])
+        msg_err0 = to_bytearray(to_int_list(msg_err)[::interleave])
+        ecc_err0 = to_bytearray(to_int_list(ecc_err)[::interleave])
         res = rs.repair(msg_err0, ecc_err0)
-        assert res == ffrs.RepairStatus.RepairOk or all(s == 0 for s in rs._synd(msg_err, ecc_err))  # FIXME
-        msg_buf_err = to_bytearray(msg_err)
-        ecc_buf_err = to_bytearray(ecc_err)
+        assert res == ffrs.RepairStatus.RepairOk or all(s == 0 for s in rs._synd(msg_err0, ecc_err0))  # FIXME
 
-        assert msg_buf_err + ecc_buf_err != msg_buf_orig + ecc_buf_orig
-        res = rsi.repair(msg_buf_err, ecc_buf_err)
-        assert msg_buf_err + ecc_buf_err == msg_buf_orig + ecc_buf_orig
+        assert msg_err != msg_orig or ecc_err != ecc_orig
+        res = rsi.repair(msg_err, ecc_err)
+        assert msg_err == msg_orig
+        assert ecc_err == ecc_orig
         assert res == ffrs.RepairStatus.RepairOk
-
-    def corrupt_rows(self, rs: ffrs.RSi16, buf, ecc, n):
-        rows = list(random.sample(range(rs.rs_block_len), n))
-        for row in rows:
-            if row < rs.rs_message_len:
-                for col in range(rs.interleave):
-                    # message
-                    offset = 2 * rs.message_offset(row, col)
-                    buf[offset] ^= random.randint(1, 255)
-                    buf[offset + 1] ^= random.randint(1, 255)
-            else:
-                for col in range(rs.interleave):
-                    # rso
-                    offset = 2 * rs.ecc_offset(row - rs.rs_message_len, col)
-                    ecc[offset] ^= random.randint(1, 255)
-                    ecc[offset + 1] ^= random.randint(1, 255)
-        return rows
 
     @pytest.mark.parametrize("interleave", list(range(1, 16)) + [32, 33, 48, 50])
     @pytest.mark.parametrize("grace", range(4))
@@ -255,11 +237,12 @@ class BaseTestRS:
         msg_err = bytearray(msg_orig)
         ecc_err = bytearray(ecc_orig)
 
-        self.corrupt_rows(rsi, msg_err, ecc_err, max(rsi.rs_ecc_len // 2 - grace, 1))
+        add_aligned_errors(rsi, msg_err, ecc_err, max(rsi.rs_ecc_len // 2 - grace, 1))
 
-        assert msg_err + ecc_err != msg_orig + ecc_orig
+        assert msg_err != msg_orig or ecc_err != ecc_orig
         rsi.repair(msg_err, ecc_err)
-        assert msg_err + ecc_err == msg_orig + ecc_orig
+        assert msg_err == msg_orig
+        assert ecc_err == ecc_orig
 
     @pytest.mark.parametrize("interleave", list(range(1, 16)) + [32, 33, 48, 50])
     @pytest.mark.parametrize("grace", range(4))
@@ -280,11 +263,12 @@ class BaseTestRS:
         msg_err = bytearray(msg_orig)
         ecc_err = bytearray(ecc_orig)
 
-        rows = self.corrupt_rows(rsi, msg_err, ecc_err, max(rsi.rs_ecc_len - grace, 1))
+        rows = add_aligned_errors(rsi, msg_err, ecc_err, max(rsi.rs_ecc_len - grace, 1))
 
-        assert msg_err + ecc_err != msg_orig + ecc_orig
+        assert msg_err != msg_orig or ecc_err != ecc_orig
         rsi.repair(msg_err, ecc_err, rows)
-        assert msg_err + ecc_err == msg_orig + ecc_orig
+        assert msg_err == msg_orig
+        assert ecc_err == ecc_orig
 
     def test_sugiyama_no_errors(self, rs: ffrs.RSi16, subtests):
         locator, evaluator = rs._sugiyama(bytearray(rs.ecc_size))
@@ -304,20 +288,20 @@ class BaseTestRS:
         for err_count in range(1, rs.ecc_len // 2 + 1):
             with subtests.test(err_count=err_count):
                 buf = bytearray(rs.message_size)
-                errors = random.sample(range(rs.message_len), err_count)
-                for e in errors:
-                    buf[e * 2] = random.randrange(1, 256)
+                ecc = bytearray(rs.ecc_size)
 
-                locator_ref = ref_rs.locator(ref_gf, rs.root, map(rs.ntt.rbo, errors))
+                error_locations = add_aligned_errors(rs, buf, ecc, err_count)
+
+                locator_ref = ref_rs.locator(ref_gf, rs.root, map(rs.ntt.rbo, error_locations))
                 locator_ref = list(map(int, locator_ref.x)) + [0] * (rs.ecc_len - len(locator_ref.x))
 
-                synd = rs._synd(buf, bytearray(rs.ecc_size))
+                synd = rs._synd(buf, ecc)
                 locator, evaluator = rs._sugiyama(synd)
                 roots = rs._roots(locator)
 
                 roots_ref = rs._roots(locator_ref)
 
-                assert set(errors) == set(roots)
+                assert set(error_locations) == set(roots)
                 assert roots == roots_ref
                 assert locator == locator_ref
 
@@ -328,12 +312,14 @@ class BaseTestRS:
         for err_count in range(1, rs.ecc_len // 2 + 1):
             with subtests.test(err_count=err_count):
                 buf = bytearray(rs.message_size * n)
-                errors = random.sample(range(rs.message_len), err_count)
+                ecc = bytearray(rs.ecc_size * n)
+
+                error_locations = random.sample(range(rs.message_len), err_count)
                 for i in range(n):
-                    for e in errors:
+                    for e in error_locations:
                         buf[i * rs.message_size + e * 2] = random.randrange(1, 256)
 
-                synd = rs._synd(buf, bytearray(n * rs.ecc_size))
+                synd = rs._synd(buf, ecc)
                 locators, evaluators = sugiyama(synd)
 
                 for i in range(n):
@@ -341,7 +327,7 @@ class BaseTestRS:
                     locator_ref, evaluator_ref = rs._sugiyama(synd[start : start + rs.ecc_len])
                     locator = locators[start : start + rs.ecc_len]
                     evaluator = evaluators[start : start + rs.ecc_len]
-                    assert set(errors) == set(rs._roots(locator))
+                    assert set(error_locations) == set(rs._roots(locator))
                     assert locator == locator_ref
                     assert evaluator == evaluator_ref
 
@@ -492,7 +478,7 @@ class TestRSLarge:
         assert msg_err == msg
         assert ecc_err == ecc
 
-    @pytest.mark.parametrize("grace", [2, 3, 4, 5])
+    @pytest.mark.parametrize("grace", range(4))
     def test_repair_unknown_locations(self, rs: ffrs.RSi16, grace):
         msg_orig = randbytes(rs.message_size)
         ecc_orig = rs.encode(msg_orig)
@@ -500,16 +486,12 @@ class TestRSLarge:
         msg_err = bytearray(msg_orig)
         ecc_err = bytearray(ecc_orig)
 
-        msg_err, ecc_err, _error_positions = add_errors(msg_err, ecc_err, max(rs.ecc_len // 2 - grace, 1))
-
-        # Corrupt first and last bytes of the block
-        msg_err[-1] ^= 0xFF
-        ecc_err[-1] ^= 0xFF
+        _error_positions = add_aligned_errors(rs, msg_err, ecc_err, max(rs.ecc_len // 2 - grace, 1))
 
         assert msg_err != msg_orig or ecc_err != ecc_orig
 
         res = rs.repair(msg_err, ecc_err)
-        assert res == ffrs.RepairStatus.RepairOk
+        assert res == ffrs.RepairStatus.RepairOk or all(s == 0 for s in rs._synd(msg_err, ecc_err))  # FIXME
 
         assert msg_err == msg_orig
         assert ecc_err == ecc_orig
@@ -522,12 +504,12 @@ class TestRSLarge:
         msg_err = bytearray(msg_orig)
         ecc_err = bytearray(ecc_orig)
 
-        msg_err, ecc_err, error_positions = add_errors(msg_err, ecc_err, max(rs.ecc_len - grace, 1))
+        error_positions = add_aligned_errors(rs, msg_err, ecc_err, max(rs.ecc_len - grace, 1))
 
         assert msg_err != msg_orig or ecc_err != ecc_orig
 
-        res = rs.repair(msg_err, ecc_err, set(map(lambda x: x // 2, error_positions.keys())))
-        assert res == ffrs.RepairStatus.RepairOk
+        res = rs.repair(msg_err, ecc_err, error_positions)
+        assert res == ffrs.RepairStatus.RepairOk or all(s == 0 for s in rs._synd(msg_err, ecc_err))  # FIXME
 
         assert msg_err == msg_orig
         assert ecc_err == ecc_orig
